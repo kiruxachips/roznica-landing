@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  roznica-landing:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roznica-landing
+    restart: unless-stopped
+    ports:
+      - "3004:3000"
+    environment:
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
