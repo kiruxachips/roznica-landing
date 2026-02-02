@@ -19,14 +19,14 @@ export function Hero() {
           <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 animate-fade-in [animation-delay:100ms]">
             Свежеобжаренный{" "}
             <span className="text-primary">кофе</span>{" "}
-            с доставкой
+            для дома с доставкой
           </h1>
 
           {/* Subheading */}
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in [animation-delay:200ms]">
-            Премиальные сорта из лучших плантаций мира.
-            Обжариваем под каждый заказ — вы получаете кофе
-            максимальной свежести и яркого вкуса.
+            Попробуйте настоящий specialty-кофе у себя дома.
+            Обжариваем под ваш заказ — вы получаете кофе
+            максимальной свежести.
           </p>
 
           {/* CTA Buttons */}
@@ -37,7 +37,7 @@ export function Hero() {
               rel="noopener noreferrer"
               className={cn(buttonVariants({ size: "xl" }), "group flex items-center gap-2")}
             >
-              Выбрать кофе
+              Попробовать кофе
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </TrackedLink>
             <a

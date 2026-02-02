@@ -1,18 +1,19 @@
 import type { Metadata } from "next"
 import Script from "next/script"
+import { CookieBanner } from "@/components/ui/cookie-banner"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Свежеобжаренный кофе с доставкой | Millor Coffee",
-  description: "Премиальный кофе свежей обжарки из лучших плантаций мира. Обжариваем под заказ, доставляем по всей России. Бесплатная доставка от 3000₽.",
-  keywords: ["кофе", "свежеобжаренный кофе", "кофе в зёрнах", "премиальный кофе", "купить кофе"],
+  title: "Купить свежеобжаренный кофе для дома с доставкой | Millor Coffee",
+  description: "Свежеобжаренный кофе в зёрнах для дома. Обжариваем под заказ, отправляем на следующий день. Бесплатная доставка по России от 3000₽. Попробуйте настоящий specialty!",
+  keywords: ["купить кофе для дома", "свежеобжаренный кофе с доставкой", "кофе в зёрнах для дома", "кофе с доставкой на дом", "попробовать кофе", "кофе в подарок"],
   icons: {
     icon: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
   openGraph: {
-    title: "Свежеобжаренный кофе с доставкой | Millor Coffee",
-    description: "Премиальный кофе свежей обжарки из лучших плантаций мира",
+    title: "Купить свежеобжаренный кофе для дома с доставкой | Millor Coffee",
+    description: "Свежеобжаренный кофе в зёрнах для дома. Обжариваем под заказ, отправляем на следующий день. Попробуйте настоящий specialty!",
     type: "website",
     locale: "ru_RU",
   },
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         {children}
+        <CookieBanner />
         {/* Yandex.Metrika counter */}
         <Script id="yandex-metrika" strategy="afterInteractive">
           {`

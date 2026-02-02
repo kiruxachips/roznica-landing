@@ -17,7 +17,7 @@ export function Products() {
             Хиты продаж
           </h2>
           <p className="text-muted-foreground text-lg">
-            Самые популярные сорта свежеобжаренного кофе
+            Самые популярные сорта для дома. Выгодная фасовка 1 кг
           </p>
         </div>
 

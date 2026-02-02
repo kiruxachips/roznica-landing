@@ -17,12 +17,12 @@ export function Contact() {
         <div className="max-w-3xl mx-auto text-center">
           {/* Heading */}
           <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
-            Попробуйте вкус настоящего specialty-кофе
+            Попробуйте specialty-кофе у себя дома
           </h2>
 
           {/* Subheading */}
           <p className="text-lg sm:text-xl text-white/80 mb-10 max-w-2xl mx-auto">
-            Закажите прямо сейчас и получите бесплатную доставку при заказе от 3000 рублей.
+            Идеальный кофе для дома — это просто. Закажите сейчас и получите бесплатную доставку от 3000₽.
             Мы обжарим кофе специально для вас!
           </p>
 

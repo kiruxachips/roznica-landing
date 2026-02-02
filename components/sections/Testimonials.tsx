@@ -12,7 +12,7 @@ export function Testimonials() {
             Отзывы наших клиентов
           </h2>
           <p className="text-muted-foreground text-lg">
-            Более 1000 клиентов уже оценили качество нашего кофе
+            Более 1000 семей по всей России начинают утро с нашего кофе
           </p>
         </div>
 

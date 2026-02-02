@@ -126,9 +126,27 @@ export default function TermsPage() {
               </section>
 
               <section className="mb-8">
-                <h2 className="text-xl font-semibold text-foreground mb-4">10. Файлы cookie и аналитика</h2>
+                <h2 className="text-xl font-semibold text-foreground mb-4">10. Файлы cookie и сервисы аналитики</h2>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  Сайт использует файлы cookie и сервисы веб-аналитики компании ООО «ЯНДЕКС» для анализа посещаемости и улучшения качества обслуживания.
+                </p>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  <strong>На сайте используются:</strong>
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground mb-4">
+                  <li><strong>Яндекс.Метрика</strong> — сервис веб-аналитики для сбора статистики посещаемости</li>
+                  <li><strong>Вебвизор</strong> — инструмент записи сессий пользователей для анализа удобства интерфейса</li>
+                  <li><strong>Карта кликов</strong> — визуализация областей с наибольшим количеством кликов</li>
+                  <li><strong>Карта скроллинга</strong> — анализ глубины просмотра страниц</li>
+                </ul>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  Продолжая использовать сайт, Пользователь даёт согласие на обработку данных указанными сервисами в соответствии с{" "}
+                  <Link href="/privacy" className="text-primary hover:underline">
+                    Политикой конфиденциальности
+                  </Link>.
+                </p>
                 <p className="text-muted-foreground leading-relaxed">
-                  Сайт использует файлы cookie и сервис Яндекс.Метрика для анализа посещаемости и улучшения качества обслуживания.
+                  Пользователь может отключить сбор данных, отклонив использование cookies при первом посещении сайта или изменив настройки браузера.
                 </p>
               </section>
 
@@ -172,7 +190,7 @@ export default function TermsPage() {
               </section>
 
               <p className="text-sm text-muted-foreground mt-8 pt-6 border-t border-border">
-                Дата последнего обновления: 26 декабря 2025 г.
+                Дата последнего обновления: 2 февраля 2026 г.
               </p>
             </div>
           </article>
