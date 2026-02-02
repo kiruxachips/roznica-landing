@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
+import { TrackedLink } from "@/components/ui/tracked-link"
 import { cn } from "@/lib/utils"
 import { CATALOG_URL, SHOP_URL } from "@/lib/constants"
 
@@ -27,7 +28,7 @@ export function Contact() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
+            <TrackedLink
               href={CATALOG_URL}
               target="_blank"
               rel="noopener noreferrer"
@@ -38,15 +39,15 @@ export function Contact() {
             >
               Перейти в каталог
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </a>
-            <a
+            </TrackedLink>
+            <TrackedLink
               href={SHOP_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center h-14 px-10 text-lg font-medium rounded-lg border-2 border-white/50 text-white bg-white/10 hover:bg-white/20 transition-all"
             >
               Главная магазина
-            </a>
+            </TrackedLink>
           </div>
 
           {/* Trust indicators */}

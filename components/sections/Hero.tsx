@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
+import { TrackedLink } from "@/components/ui/tracked-link"
 import { cn } from "@/lib/utils"
 import { CATALOG_URL } from "@/lib/constants"
 
@@ -30,7 +31,7 @@ export function Hero() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in [animation-delay:300ms]">
-            <a
+            <TrackedLink
               href={CATALOG_URL}
               target="_blank"
               rel="noopener noreferrer"
@@ -38,7 +39,7 @@ export function Hero() {
             >
               Выбрать кофе
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </a>
+            </TrackedLink>
             <a
               href="#products"
               className={cn(buttonVariants({ variant: "outline", size: "xl" }))}

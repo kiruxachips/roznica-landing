@@ -1,6 +1,7 @@
 import Image from "next/image"
 import { Star, ExternalLink, MapPin, Flame, Package } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
+import { TrackedLink } from "@/components/ui/tracked-link"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
@@ -44,14 +45,14 @@ export function Products() {
                 )}
                 {/* Quick view overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                  <a
+                  <TrackedLink
                     href={product.url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
                   >
                     Подробнее
-                  </a>
+                  </TrackedLink>
                 </div>
               </div>
 
@@ -108,7 +109,7 @@ export function Products() {
                 </div>
 
                 {/* Buy Button */}
-                <a
+                <TrackedLink
                   href={product.url}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -116,7 +117,7 @@ export function Products() {
                 >
                   Купить
                   <ExternalLink className="w-3 h-3" />
-                </a>
+                </TrackedLink>
               </CardFooter>
             </Card>
           ))}
@@ -124,7 +125,7 @@ export function Products() {
 
         {/* View All Button */}
         <div className="text-center mt-12">
-          <a
+          <TrackedLink
             href={CATALOG_URL}
             target="_blank"
             rel="noopener noreferrer"
@@ -132,7 +133,7 @@ export function Products() {
           >
             Смотреть весь каталог
             <ExternalLink className="w-4 h-4" />
-          </a>
+          </TrackedLink>
         </div>
       </div>
     </section>
