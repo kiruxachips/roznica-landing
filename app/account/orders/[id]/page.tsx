@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getOrderById } from "@/lib/dal/orders"
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge"
+import { ReorderButton } from "@/components/account/ReorderButton"
 
 export const dynamic = "force-dynamic"
 
@@ -88,6 +89,12 @@ export default async function OrderDetailPage({
             <span className="text-muted-foreground">Подытог</span>
             <span>{order.subtotal}₽</span>
           </div>
+          {order.bonusUsed > 0 && (
+            <div className="flex justify-between text-amber-600">
+              <span>Списано бонусов</span>
+              <span>-{order.bonusUsed}₽</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span className="text-muted-foreground">Доставка</span>
             <span>{order.deliveryPrice === 0 ? "Бесплатно" : `${order.deliveryPrice}₽`}</span>
@@ -96,6 +103,25 @@ export default async function OrderDetailPage({
             <span>Итого</span>
             <span className="text-primary">{order.total}₽</span>
           </div>
+          {order.bonusEarned > 0 && (
+            <p className="text-xs text-green-600 pt-1">
+              +{order.bonusEarned} бонусов начислено
+            </p>
+          )}
+        </div>
+
+        {/* Reorder */}
+        <div className="border-t border-border pt-4 mt-4">
+          <ReorderButton
+            items={order.items.map((i) => ({
+              productId: i.productId,
+              variantId: i.variantId,
+              name: i.name,
+              weight: i.weight,
+              price: i.price,
+              quantity: i.quantity,
+            }))}
+          />
         </div>
       </div>
 

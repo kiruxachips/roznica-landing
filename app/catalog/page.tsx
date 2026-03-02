@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic"
 
 import { Metadata } from "next"
 import { getProducts, getFilterOptions } from "@/lib/dal/products"
+import { getFavoriteProductIds } from "@/lib/dal/favorites"
+import { auth } from "@/lib/auth"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { CatalogHero } from "@/components/catalog/CatalogHero"
@@ -29,11 +31,18 @@ export default async function CatalogPage({
     limit: 12,
   }
 
-  const [{ products, total }, filterOptions] = await Promise.all([
+  const session = await auth()
+  const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
+
+  const [{ products, total }, filterOptions, favIds] = await Promise.all([
     getProducts(filters),
     getFilterOptions(),
+    isCustomer && session?.user?.id
+      ? getFavoriteProductIds(session.user.id)
+      : Promise.resolve([]),
   ])
 
+  const favoriteIds = isCustomer ? new Set(favIds) : undefined
   const totalPages = Math.ceil(total / 12)
 
   return (
@@ -53,7 +62,7 @@ export default async function CatalogPage({
             />
 
             {products.length > 0 ? (
-              <ProductGrid products={products} currentPage={filters.page} totalPages={totalPages} />
+              <ProductGrid products={products} currentPage={filters.page} totalPages={totalPages} favoriteIds={favoriteIds} />
             ) : (
               <EmptyState />
             )}

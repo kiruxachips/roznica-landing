@@ -7,12 +7,22 @@ import Image from "next/image"
 import Link from "next/link"
 import { useCartStore } from "@/lib/store/cart"
 import { createOrder } from "@/lib/actions/orders"
+import { BonusSelector } from "./BonusSelector"
 
 interface UserProfile {
   name: string | null
   email: string | null
   phone: string | null
   defaultAddress: string | null
+}
+
+interface SavedAddress {
+  id: string
+  title: string
+  fullAddress: string
+  recipientName: string | null
+  recipientPhone: string | null
+  isDefault: boolean
 }
 
 export function CheckoutForm() {
@@ -28,6 +38,8 @@ export function CheckoutForm() {
   const [error, setError] = useState("")
   const [agreed, setAgreed] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [bonusAmount, setBonusAmount] = useState(0)
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
@@ -41,6 +53,11 @@ export function CheckoutForm() {
       .then((r) => r.ok ? r.json() : null)
       .then((data) => data && setProfile(data))
       .catch(() => {})
+
+    fetch("/api/addresses")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => data?.addresses && setSavedAddresses(data.addresses))
+      .catch(() => {})
   }, [isCustomer, session?.user?.id])
 
   if (!mounted) return null
@@ -48,7 +65,9 @@ export function CheckoutForm() {
   const total = totalPrice()
   const afterDiscount = total - promoDiscount
   const deliveryPrice = afterDiscount >= 3000 ? 0 : 300
-  const finalTotal = afterDiscount + deliveryPrice
+  const maxBonusAmount = Math.floor(afterDiscount * 0.5)
+  const effectiveBonus = Math.min(bonusAmount, maxBonusAmount)
+  const finalTotal = afterDiscount - effectiveBonus + deliveryPrice
 
   if (items.length === 0) {
     return (
@@ -75,6 +94,7 @@ export function CheckoutForm() {
         deliveryMethod: (form.get("delivery") as string) || undefined,
         notes: (form.get("notes") as string) || undefined,
         promoCode: promoCode || undefined,
+        bonusAmount: effectiveBonus > 0 ? effectiveBonus : undefined,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -156,6 +176,47 @@ export function CheckoutForm() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Адрес доставки</label>
+            {savedAddresses.length > 0 && (
+              <select
+                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-2"
+                defaultValue=""
+                onChange={(e) => {
+                  const addr = savedAddresses.find((a) => a.id === e.target.value)
+                  if (!addr) return
+                  const textarea = e.target.parentElement?.querySelector("textarea")
+                  if (textarea) {
+                    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set
+                    nativeSet?.call(textarea, addr.fullAddress)
+                    textarea.dispatchEvent(new Event("input", { bubbles: true }))
+                  }
+                  // Auto-fill recipient name/phone if available
+                  const form = e.target.closest("form")
+                  if (form && addr.recipientName) {
+                    const nameInput = form.querySelector<HTMLInputElement>("input[name='name']")
+                    if (nameInput && !nameInput.value) {
+                      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
+                      set?.call(nameInput, addr.recipientName)
+                      nameInput.dispatchEvent(new Event("input", { bubbles: true }))
+                    }
+                  }
+                  if (form && addr.recipientPhone) {
+                    const phoneInput = form.querySelector<HTMLInputElement>("input[name='phone']")
+                    if (phoneInput && !phoneInput.value) {
+                      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
+                      set?.call(phoneInput, addr.recipientPhone)
+                      phoneInput.dispatchEvent(new Event("input", { bubbles: true }))
+                    }
+                  }
+                }}
+              >
+                <option value="">Выбрать из сохранённых...</option>
+                {savedAddresses.map((addr) => (
+                  <option key={addr.id} value={addr.id}>
+                    {addr.title}: {addr.fullAddress.slice(0, 60)}{addr.fullAddress.length > 60 ? "..." : ""}
+                  </option>
+                ))}
+              </select>
+            )}
             <textarea
               name="address"
               rows={2}
@@ -174,6 +235,13 @@ export function CheckoutForm() {
               placeholder="Пожелания к заказу"
             />
           </div>
+
+          {isCustomer && (
+            <BonusSelector
+              maxBonusAmount={maxBonusAmount}
+              onBonusChange={setBonusAmount}
+            />
+          )}
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>
@@ -235,6 +303,12 @@ export function CheckoutForm() {
               <div className="flex justify-between text-green-600">
                 <span>Скидка ({promoCode})</span>
                 <span>-{promoDiscount}₽</span>
+              </div>
+            )}
+            {effectiveBonus > 0 && (
+              <div className="flex justify-between text-amber-600">
+                <span>Бонусы</span>
+                <span>-{effectiveBonus}₽</span>
               </div>
             )}
             <div className="flex justify-between">

@@ -58,6 +58,7 @@ model Product {
   variants        ProductVariant[]
   reviews         Review[]
   orderItems      OrderItem[]
+  favorites       Favorite[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -119,11 +120,18 @@ model User {
   avatarUrl     String?
   defaultAddress String?  @db.Text
   telegramId    String?   @unique
-  accounts      Account[]
-  orders        Order[]
-  sessions      Session[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  notifyOrderStatus  Boolean   @default(true)
+  notifyPromotions   Boolean   @default(false)
+  notifyNewProducts  Boolean   @default(false)
+  bonusBalance       Int       @default(0)
+  accounts           Account[]
+  orders             Order[]
+  sessions           Session[]
+  favorites          Favorite[]
+  addresses          Address[]
+  bonusTransactions  BonusTransaction[]
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }
 
 model Account {
@@ -196,6 +204,8 @@ model Order {
   deliveryPrice  Int         @default(0)
   discount       Int         @default(0)
   total          Int
+  bonusUsed      Int         @default(0)
+  bonusEarned    Int         @default(0)
   notes          String?     @db.Text
   thankYouToken  String?     @unique
   userId         String?
@@ -250,4 +260,45 @@ model Article {
   metaDescription String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+model Address {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  fullAddress    String   @db.Text
+  recipientName  String?
+  recipientPhone String?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model BonusTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount      Int
+  type        String   // "earned" | "spent" | "admin_adjustment"
+  description String
+  orderId     String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([orderId])
 }

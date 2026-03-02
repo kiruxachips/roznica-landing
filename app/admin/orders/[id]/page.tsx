@@ -85,8 +85,14 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                 Скидка{order.promoCode ? ` (${order.promoCode.code})` : ""}: -{order.discount}₽
               </p>
             )}
+            {order.bonusUsed > 0 && (
+              <p className="text-amber-600">Списано бонусов: -{order.bonusUsed}₽</p>
+            )}
             <p>Доставка: {order.deliveryPrice === 0 ? "Бесплатно" : `${order.deliveryPrice}₽`}</p>
             <p className="text-lg font-bold">Итого: {order.total}₽</p>
+            {order.bonusEarned > 0 && (
+              <p className="text-green-600 text-xs">+{order.bonusEarned} бонусов начислено</p>
+            )}
           </div>
         </div>
 

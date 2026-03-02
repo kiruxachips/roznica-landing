@@ -6,14 +6,19 @@ interface ProductGridProps {
   products: ProductCardType[]
   currentPage: number
   totalPages: number
+  favoriteIds?: Set<string>
 }
 
-export function ProductGrid({ products, currentPage, totalPages }: ProductGridProps) {
+export function ProductGrid({ products, currentPage, totalPages, favoriteIds }: ProductGridProps) {
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
         {products.map((product) => (
-          <ProductCard key={product.id} product={product} />
+          <ProductCard
+            key={product.id}
+            product={product}
+            favorited={favoriteIds ? favoriteIds.has(product.id) : undefined}
+          />
         ))}
       </div>
 

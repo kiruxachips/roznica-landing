@@ -5,6 +5,9 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { getProductBySlug, getProductSlugs } from "@/lib/dal/products"
+import { isProductFavorited } from "@/lib/dal/favorites"
+import { auth } from "@/lib/auth"
+import { FavoriteButton } from "@/components/account/FavoriteButton"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { ProductGallery } from "@/components/product/ProductGallery"
@@ -46,6 +49,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params
   const product = await getProductBySlug(slug)
   if (!product) notFound()
+
+  const session = await auth()
+  const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
+  const favorited = isCustomer && session?.user?.id
+    ? await isProductFavorited(session.user.id, product.id)
+    : false
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -111,9 +120,18 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 )}
 
                 {/* Name */}
-                <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground">
-                  {product.name}
-                </h1>
+                <div className="flex items-start gap-3">
+                  <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground flex-1">
+                    {product.name}
+                  </h1>
+                  {isCustomer && (
+                    <FavoriteButton
+                      productId={product.id}
+                      isFavorited={favorited}
+                      className="mt-1.5 w-10 h-10"
+                    />
+                  )}
+                </div>
 
                 {/* Rating */}
                 {avgRating && (

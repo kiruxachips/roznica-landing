@@ -34,6 +34,48 @@ export async function sendVerificationCode(email: string, code: string) {
   })
 }
 
+const statusLabels: Record<string, string> = {
+  pending: "Ожидает обработки",
+  confirmed: "Подтверждён",
+  shipped: "Отправлен",
+  delivered: "Доставлен",
+  cancelled: "Отменён",
+}
+
+export async function sendOrderStatusEmail({
+  to,
+  customerName,
+  orderNumber,
+  newStatus,
+}: {
+  to: string
+  customerName: string
+  orderNumber: string
+  newStatus: string
+}) {
+  const statusText = statusLabels[newStatus] || newStatus
+
+  await transporter.sendMail({
+    from: `"Millor Coffee" <${fromEmail}>`,
+    to,
+    subject: `Заказ ${orderNumber} — ${statusText}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <h2 style="color: #7c4a1e; margin-bottom: 16px;">Статус заказа обновлён</h2>
+        <p style="color: #555; font-size: 16px; line-height: 1.5;">
+          ${customerName}, ваш заказ <strong>${orderNumber}</strong> получил новый статус:
+        </p>
+        <div style="background: #f5f0eb; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+          <span style="font-size: 20px; font-weight: bold; color: #7c4a1e;">${statusText}</span>
+        </div>
+        <p style="color: #888; font-size: 14px;">
+          Следить за заказом можно в <a href="https://millor-coffee.ru/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
+        </p>
+      </div>
+    `,
+  })
+}
+
 export async function sendPasswordResetCode(email: string, code: string) {
   await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,

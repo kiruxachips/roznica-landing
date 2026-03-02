@@ -2,6 +2,7 @@ import crypto from "crypto"
 import { prisma } from "@/lib/prisma"
 import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
+import { deductBonusesInTx } from "@/lib/dal/bonuses"
 
 function generateOrderNumber(): string {
   const date = new Date()
@@ -29,8 +30,20 @@ export async function createOrder(data: OrderData) {
   }
 
   const afterDiscount = subtotal - discount
-  const deliveryPrice = afterDiscount >= 3000 ? 0 : 300
-  const total = afterDiscount + deliveryPrice
+
+  // Bonus deduction: validate and cap at 50%
+  let bonusUsed = 0
+  if (data.bonusAmount && data.bonusAmount > 0 && data.userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { bonusBalance: true },
+    })
+    const maxBonus = Math.floor(afterDiscount * 0.5)
+    bonusUsed = Math.min(data.bonusAmount, maxBonus, user?.bonusBalance ?? 0)
+  }
+
+  const deliveryPrice = (afterDiscount - bonusUsed) >= 3000 ? 0 : (afterDiscount >= 3000 ? 0 : 300)
+  const total = afterDiscount - bonusUsed + deliveryPrice
 
   const order = await prisma.$transaction(async (tx) => {
     if (promoCodeId) {
@@ -40,7 +53,12 @@ export async function createOrder(data: OrderData) {
       })
     }
 
-    return tx.order.create({
+    // Deduct bonuses
+    if (bonusUsed > 0 && data.userId) {
+      await deductBonusesInTx(tx, data.userId, "", bonusUsed)
+    }
+
+    const created = await tx.order.create({
       data: {
         orderNumber: generateOrderNumber(),
         thankYouToken: generateToken(),
@@ -56,6 +74,7 @@ export async function createOrder(data: OrderData) {
         discount,
         deliveryPrice,
         total,
+        bonusUsed,
         promoCodeId,
         items: {
           create: data.items.map((item) => ({
@@ -70,6 +89,16 @@ export async function createOrder(data: OrderData) {
       },
       include: { items: true },
     })
+
+    // Update bonus transaction with actual orderId
+    if (bonusUsed > 0 && data.userId) {
+      await tx.bonusTransaction.updateMany({
+        where: { userId: data.userId, orderId: "", type: "spent" },
+        data: { orderId: created.id },
+      })
+    }
+
+    return created
   })
 
   return order

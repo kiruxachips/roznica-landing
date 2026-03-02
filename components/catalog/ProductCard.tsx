@@ -2,9 +2,15 @@ import Image from "next/image"
 import Link from "next/link"
 import { Star, MapPin, Flame } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { FavoriteButton } from "@/components/account/FavoriteButton"
 import type { ProductCard as ProductCardType } from "@/lib/types"
 
-export function ProductCard({ product }: { product: ProductCardType }) {
+interface ProductCardProps {
+  product: ProductCardType
+  favorited?: boolean
+}
+
+export function ProductCard({ product, favorited }: ProductCardProps) {
   return (
     <Link href={`/catalog/${product.slug}`} className="group block">
       <div className="overflow-hidden rounded-xl bg-white border border-border/50 shadow-sm hover:shadow-md transition-all duration-300">
@@ -27,6 +33,11 @@ export function ProductCard({ product }: { product: ProductCardType }) {
             <Badge className="absolute top-2.5 left-2.5 z-10 bg-white text-foreground border-0 shadow-sm text-xs font-semibold">
               {product.badge}
             </Badge>
+          )}
+          {favorited !== undefined && (
+            <div className="absolute top-2.5 right-2.5 z-10">
+              <FavoriteButton productId={product.id} isFavorited={favorited} />
+            </div>
           )}
         </div>
 

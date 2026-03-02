@@ -93,6 +93,7 @@ export interface OrderData {
   notes?: string
   userId?: string
   promoCode?: string
+  bonusAmount?: number
   items: {
     productId: string
     variantId: string
@@ -101,6 +102,22 @@ export interface OrderData {
     price: number
     quantity: number
   }[]
+}
+
+export interface FavoriteProduct {
+  id: string
+  productId: string
+  createdAt: Date
+  product: ProductCard
+}
+
+export interface BonusTransactionInfo {
+  id: string
+  amount: number
+  type: string
+  description: string
+  orderId: string | null
+  createdAt: Date
 }
 
 export interface ProductFilters {
