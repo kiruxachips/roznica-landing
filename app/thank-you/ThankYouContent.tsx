@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import Link from "next/link"
-import { CheckCircle, Package } from "lucide-react"
+import { CheckCircle, Package, XCircle } from "lucide-react"
 
 interface OrderSummary {
   orderNumber: string
@@ -22,7 +22,7 @@ interface OrderSummary {
   }[]
 }
 
-export function ThankYouContent({ order, shouldTrack }: { order: OrderSummary; shouldTrack: boolean }) {
+export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: OrderSummary; shouldTrack: boolean; paymentStatus?: string | null }) {
   const goalSent = useRef(false)
 
   useEffect(() => {
@@ -36,6 +36,43 @@ export function ThankYouContent({ order, shouldTrack }: { order: OrderSummary; s
       })
     }
   }, [shouldTrack, order.total])
+
+  if (paymentStatus === "canceled") {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <XCircle className="w-10 h-10 text-red-600" />
+          </div>
+          <h1 className="font-serif text-3xl font-bold mb-2">Оплата не прошла</h1>
+          <p className="text-muted-foreground">
+            Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> не был оплачен
+          </p>
+        </div>
+
+        <div className="bg-red-50 rounded-2xl p-6 sm:p-8 mb-8 text-center">
+          <p className="text-sm text-muted-foreground mb-1">
+            Платёж был отменён. Вы можете оформить новый заказ.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/catalog"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium text-center hover:bg-primary/90 transition-colors"
+          >
+            Перейти в каталог
+          </Link>
+          <Link
+            href="/"
+            className="px-6 py-3 border border-border rounded-xl font-medium text-center hover:bg-muted transition-colors"
+          >
+            На главную
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-2xl mx-auto">

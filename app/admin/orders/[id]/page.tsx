@@ -19,6 +19,23 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
           <OrderStatusChanger orderId={order.id} currentStatus={order.status} />
         </div>
 
+        {/* Payment info */}
+        {order.paymentId && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+            <h2 className="text-lg font-semibold mb-4">Оплата</h2>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">ID платежа:</span>
+                <p className="font-medium font-mono text-xs mt-0.5">{order.paymentId}</p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Статус платежа:</span>
+                <p className="font-medium mt-0.5">{order.paymentStatus || "—"}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Customer info */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
           <h2 className="text-lg font-semibold mb-4">Клиент</h2>

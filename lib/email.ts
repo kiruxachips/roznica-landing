@@ -36,9 +36,11 @@ export async function sendVerificationCode(email: string, code: string) {
 
 const statusLabels: Record<string, string> = {
   pending: "Ожидает обработки",
+  paid: "Оплачен",
   confirmed: "Подтверждён",
   shipped: "Отправлен",
   delivered: "Доставлен",
+  payment_failed: "Ошибка оплаты",
   cancelled: "Отменён",
 }
 

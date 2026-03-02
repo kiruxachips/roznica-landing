@@ -40,6 +40,7 @@ export function CheckoutForm() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [bonusAmount, setBonusAmount] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod")
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
@@ -92,6 +93,7 @@ export function CheckoutForm() {
         customerPhone: form.get("phone") as string,
         deliveryAddress: (form.get("address") as string) || undefined,
         deliveryMethod: (form.get("delivery") as string) || undefined,
+        paymentMethod,
         notes: (form.get("notes") as string) || undefined,
         promoCode: promoCode || undefined,
         bonusAmount: effectiveBonus > 0 ? effectiveBonus : undefined,
@@ -106,8 +108,13 @@ export function CheckoutForm() {
       })
 
       clearCart()
-      const url = `/thank-you?order=${result.orderNumber}${result.thankYouToken ? `&token=${result.thankYouToken}` : ""}`
-      router.push(url)
+
+      if (result.paymentUrl) {
+        window.location.href = result.paymentUrl
+      } else {
+        const url = `/thank-you?order=${result.orderNumber}${result.thankYouToken ? `&token=${result.thankYouToken}` : ""}`
+        router.push(url)
+      }
     } catch {
       setError("Ошибка при оформлении заказа. Попробуйте ещё раз.")
     } finally {
@@ -236,6 +243,51 @@ export function CheckoutForm() {
             />
           </div>
 
+          <h2 className="text-lg font-semibold pt-2">Оплата</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                paymentMethod === "cod"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/30"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="cod"
+                checked={paymentMethod === "cod"}
+                onChange={() => setPaymentMethod("cod")}
+                className="accent-primary"
+              />
+              <div>
+                <p className="font-medium text-sm">Оплата при получении</p>
+                <p className="text-xs text-muted-foreground">Наличными или картой курьеру</p>
+              </div>
+            </label>
+            <label
+              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
+                paymentMethod === "online"
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/30"
+              }`}
+            >
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="online"
+                checked={paymentMethod === "online"}
+                onChange={() => setPaymentMethod("online")}
+                className="accent-primary"
+              />
+              <div>
+                <p className="font-medium text-sm">Онлайн-оплата</p>
+                <p className="text-xs text-muted-foreground">Банковская карта, СБП, ЮMoney</p>
+              </div>
+            </label>
+          </div>
+
           {isCustomer && (
             <BonusSelector
               maxBonusAmount={maxBonusAmount}
@@ -271,7 +323,11 @@ export function CheckoutForm() {
             disabled={loading || !agreed}
             className="w-full h-14 bg-primary text-primary-foreground rounded-xl text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
-            {loading ? "Оформление..." : `Оформить заказ — ${finalTotal}₽`}
+            {loading
+              ? "Оформление..."
+              : paymentMethod === "online"
+                ? `Оплатить — ${finalTotal}₽`
+                : `Оформить заказ — ${finalTotal}₽`}
           </button>
         </form>
       </div>

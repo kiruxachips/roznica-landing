@@ -206,6 +206,8 @@ model Order {
   total          Int
   bonusUsed      Int         @default(0)
   bonusEarned    Int         @default(0)
+  paymentId      String?     // UUID платежа ЮKassa
+  paymentStatus  String?     // "pending" | "succeeded" | "canceled"
   notes          String?     @db.Text
   thankYouToken  String?     @unique
   userId         String?

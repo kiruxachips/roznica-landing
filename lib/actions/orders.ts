@@ -7,6 +7,8 @@ import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail } from "@/lib/email"
+import { createPayment } from "@/lib/yookassa"
+import { headers } from "next/headers"
 
 export async function createOrder(data: OrderData) {
   // Attach userId from session if logged in as customer
@@ -17,7 +19,47 @@ export async function createOrder(data: OrderData) {
 
   const order = await createOrderDAL(data)
   revalidatePath("/admin/orders")
-  return { orderNumber: order.orderNumber, id: order.id, thankYouToken: order.thankYouToken }
+
+  // Online payment via YooKassa
+  if (data.paymentMethod === "online") {
+    try {
+      const headersList = await headers()
+      const host = headersList.get("host") || "millor-coffee.ru"
+      const protocol = headersList.get("x-forwarded-proto") || "https"
+      const baseUrl = `${protocol}://${host}`
+      const returnUrl = `${baseUrl}/thank-you?order=${order.orderNumber}&token=${order.thankYouToken}`
+
+      const payment = await createPayment({
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        amount: order.total,
+        returnUrl,
+        description: `Заказ ${order.orderNumber} — Millor Coffee`,
+      })
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          paymentId: payment.id,
+          paymentStatus: "pending",
+        },
+      })
+
+      const paymentUrl = payment.confirmation?.confirmation_url
+      return {
+        orderNumber: order.orderNumber,
+        id: order.id,
+        thankYouToken: order.thankYouToken,
+        paymentUrl: paymentUrl || null,
+      }
+    } catch (e) {
+      console.error("YooKassa payment creation failed:", e)
+      // Order is created but payment failed — return without paymentUrl
+      // User can retry or pay on delivery
+    }
+  }
+
+  return { orderNumber: order.orderNumber, id: order.id, thankYouToken: order.thankYouToken, paymentUrl: null }
 }
 
 export async function updateOrderStatus(id: string, status: string) {

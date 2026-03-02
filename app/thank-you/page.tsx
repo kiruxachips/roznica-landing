@@ -50,6 +50,7 @@ export default async function ThankYouPage({
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <ThankYouContent
             shouldTrack={shouldTrack}
+            paymentStatus={order.paymentStatus}
             order={{
               orderNumber: order.orderNumber,
               customerName: order.customerName,

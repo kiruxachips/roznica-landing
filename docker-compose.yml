@@ -31,6 +31,8 @@ services:
       - YANDEX_CLIENT_SECRET=${YANDEX_CLIENT_SECRET:-}
       - VK_CLIENT_ID=${VK_CLIENT_ID:-}
       - VK_CLIENT_SECRET=${VK_CLIENT_SECRET:-}
+      - YOOKASSA_SHOP_ID=${YOOKASSA_SHOP_ID:-}
+      - YOOKASSA_SECRET_KEY=${YOOKASSA_SECRET_KEY:-}
     depends_on:
       - db
     volumes:
