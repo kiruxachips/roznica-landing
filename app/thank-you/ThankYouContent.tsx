@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import Link from "next/link"
-import { CheckCircle, Package, XCircle } from "lucide-react"
+import { CheckCircle, Clock, Package, XCircle } from "lucide-react"
 
 interface OrderSummary {
   orderNumber: string
@@ -36,6 +36,43 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       })
     }
   }, [shouldTrack, order.total])
+
+  if (paymentStatus === "pending") {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-8">
+          <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Clock className="w-10 h-10 text-amber-600" />
+          </div>
+          <h1 className="font-serif text-3xl font-bold mb-2">Оплата не завершена</h1>
+          <p className="text-muted-foreground">
+            Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> ожидает оплаты
+          </p>
+        </div>
+
+        <div className="bg-amber-50 rounded-2xl p-6 sm:p-8 mb-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Вы вернулись без завершения оплаты. Заказ сохранён — свяжитесь с нами, если хотите оплатить позже.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/catalog"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium text-center hover:bg-primary/90 transition-colors"
+          >
+            Перейти в каталог
+          </Link>
+          <Link
+            href="/"
+            className="px-6 py-3 border border-border rounded-xl font-medium text-center hover:bg-muted transition-colors"
+          >
+            На главную
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   if (paymentStatus === "canceled") {
     return (
