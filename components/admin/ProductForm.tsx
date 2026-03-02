@@ -3,12 +3,25 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createProduct, updateProduct } from "@/lib/actions/products"
+import { uploadImage } from "@/lib/actions/images"
 import { VariantManager } from "./VariantManager"
 import { ImageUploader } from "./ImageUploader"
+import { InlineVariantEditor, type LocalVariant } from "./InlineVariantEditor"
+import { InlineImagePicker } from "./InlineImagePicker"
+import {
+  isSectionVisible,
+  getSectionTitle,
+  getBrewingOptions,
+  getWeightOptions,
+  getTemplates,
+  getFieldConfig,
+  type CategoryTemplate,
+} from "@/lib/category-config"
 
 interface Category {
   id: string
   name: string
+  slug: string
 }
 
 interface Variant {
@@ -59,15 +72,6 @@ interface ProductFormProps {
   categories: Category[]
 }
 
-const BREWING_OPTIONS = [
-  { value: "espresso", label: "Эспрессо" },
-  { value: "filter", label: "Фильтр" },
-  { value: "french-press", label: "Френч-пресс" },
-  { value: "turka", label: "Турка" },
-  { value: "aeropress", label: "Аэропресс" },
-  { value: "moka", label: "Мока" },
-]
-
 export function ProductForm({ product, categories }: ProductFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -97,6 +101,35 @@ export function ProductForm({ product, categories }: ProductFormProps) {
   const [metaTitle, setMetaTitle] = useState(product?.metaTitle ?? "")
   const [metaDescription, setMetaDescription] = useState(product?.metaDescription ?? "")
 
+  // Inline create state (only for new products)
+  const [localVariants, setLocalVariants] = useState<LocalVariant[]>([])
+  const [pendingImages, setPendingImages] = useState<File[]>([])
+
+  // Derive category slug from selected categoryId
+  const categorySlug = categories.find((c) => c.id === categoryId)?.slug ?? ""
+
+  // Field visibility helpers
+  const fields = getFieldConfig(categorySlug)
+  const hasAnyAttributes = fields.length > 0
+  const showOrigin = isSectionVisible(categorySlug, "origin")
+  const showRegion = isSectionVisible(categorySlug, "region")
+  const showFarm = isSectionVisible(categorySlug, "farm")
+  const showAltitude = isSectionVisible(categorySlug, "altitude")
+  const showRoastLevel = isSectionVisible(categorySlug, "roastLevel")
+  const showProcessingMethod = isSectionVisible(categorySlug, "processingMethod")
+  const showFlavorNotes = isSectionVisible(categorySlug, "flavorNotes")
+  const showFlavorProfile = isSectionVisible(categorySlug, "flavorProfile")
+  const showBrewingMethods = isSectionVisible(categorySlug, "brewingMethods")
+
+  // Templates
+  const templates = !product ? getTemplates(categorySlug) : []
+
+  // Brewing options depend on category
+  const brewingOptions = getBrewingOptions(categorySlug)
+
+  // Weight options depend on category
+  const weightOptions = getWeightOptions(categorySlug)
+
   function generateSlug(text: string) {
     const map: Record<string, string> = {
       а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "yo", ж: "zh",
@@ -120,18 +153,75 @@ export function ProductForm({ product, categories }: ProductFormProps) {
     }
   }
 
+  function handleCategoryChange(newCategoryId: string) {
+    const newSlug = categories.find((c) => c.id === newCategoryId)?.slug ?? ""
+    const newFields = getFieldConfig(newSlug)
+
+    // Clear fields that are no longer visible
+    if (!newFields.includes("origin")) setOrigin("")
+    if (!newFields.includes("region")) setRegion("")
+    if (!newFields.includes("farm")) setFarm("")
+    if (!newFields.includes("altitude")) setAltitude("")
+    if (!newFields.includes("roastLevel")) setRoastLevel("")
+    if (!newFields.includes("processingMethod")) setProcessingMethod("")
+    if (!newFields.includes("flavorNotes")) setFlavorNotesInput("")
+    if (!newFields.includes("flavorProfile")) {
+      setAcidity(50)
+      setSweetness(50)
+      setBitterness(50)
+      setBody(50)
+    }
+    if (!newFields.includes("brewingMethods")) setBrewingMethods([])
+
+    // Reset inline variants when category changes (weight options differ)
+    if (!product) setLocalVariants([])
+
+    setCategoryId(newCategoryId)
+  }
+
+  function applyTemplate(template: CategoryTemplate) {
+    setName(template.name)
+    setSlug(generateSlug(template.name))
+    setDescription(template.description)
+
+    const attrs = template.attributes
+    if (attrs.origin) setOrigin(attrs.origin)
+    if (attrs.region) setRegion(attrs.region)
+    if (attrs.farm) setFarm(attrs.farm)
+    if (attrs.altitude) setAltitude(attrs.altitude)
+    if (attrs.roastLevel) setRoastLevel(attrs.roastLevel)
+    if (attrs.processingMethod) setProcessingMethod(attrs.processingMethod)
+    if (attrs.flavorNotes) setFlavorNotesInput(attrs.flavorNotes)
+    if (attrs.acidity !== undefined) setAcidity(attrs.acidity)
+    if (attrs.sweetness !== undefined) setSweetness(attrs.sweetness)
+    if (attrs.bitterness !== undefined) setBitterness(attrs.bitterness)
+    if (attrs.body !== undefined) setBody(attrs.body)
+    if (attrs.brewingMethods) setBrewingMethods(attrs.brewingMethods)
+
+    // Apply default variants
+    setLocalVariants(
+      template.variants.map((v, i) => ({
+        key: `template-${i}-${Date.now()}`,
+        weight: v.weight,
+        price: v.price,
+        oldPrice: v.oldPrice ?? null,
+        stock: v.stock,
+      }))
+    )
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setError("")
 
-    const flavorNotes = flavorNotesInput
-      .split(",")
-      .map((n) => n.trim())
-      .filter(Boolean)
+    const flavorNotes = showFlavorNotes
+      ? flavorNotesInput.split(",").map((n) => n.trim()).filter(Boolean)
+      : []
 
     try {
-      const data = {
+      // Build data, only including visible attribute fields
+      const data: Record<string, unknown> = {
         name,
         slug,
         description,
@@ -140,35 +230,66 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         isActive,
         isFeatured,
         badge: badge || undefined,
-        origin: origin || undefined,
-        region: region || undefined,
-        farm: farm || undefined,
-        altitude: altitude || undefined,
-        roastLevel: roastLevel || undefined,
-        processingMethod: processingMethod || undefined,
-        flavorNotes,
-        acidity,
-        sweetness,
-        bitterness,
-        body,
-        brewingMethods,
         metaTitle: metaTitle || undefined,
         metaDescription: metaDescription || undefined,
       }
 
-      if (product) {
-        await updateProduct(product.id, data)
-      } else {
-        await createProduct(data)
+      // Only include attributes that are visible for this category
+      if (showOrigin) data.origin = origin || undefined
+      if (showRegion) data.region = region || undefined
+      if (showFarm) data.farm = farm || undefined
+      if (showAltitude) data.altitude = altitude || undefined
+      if (showRoastLevel) data.roastLevel = roastLevel || undefined
+      if (showProcessingMethod) data.processingMethod = processingMethod || undefined
+      if (showFlavorNotes) data.flavorNotes = flavorNotes
+      if (showFlavorProfile) {
+        data.acidity = acidity
+        data.sweetness = sweetness
+        data.bitterness = bitterness
+        data.body = body
       }
-      router.push("/admin/products")
-      router.refresh()
+      if (showBrewingMethods) data.brewingMethods = brewingMethods
+
+      if (product) {
+        // Update existing product
+        await updateProduct(product.id, data)
+        router.push("/admin/products")
+        router.refresh()
+      } else {
+        // Create new product with variants
+        if (localVariants.length > 0) {
+          data.variants = localVariants.map((v) => ({
+            weight: v.weight,
+            price: v.price,
+            oldPrice: v.oldPrice,
+            stock: v.stock,
+          }))
+        }
+
+        const created = await createProduct(data as Parameters<typeof createProduct>[0])
+
+        // Upload pending images
+        if (pendingImages.length > 0) {
+          for (const file of pendingImages) {
+            const formData = new FormData()
+            formData.append("file", file)
+            formData.append("productId", created.id)
+            await uploadImage(formData)
+          }
+        }
+
+        router.push("/admin/products")
+        router.refresh()
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ошибка сохранения")
     } finally {
       setLoading(false)
     }
   }
+
+  const inputClass = "w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+  const selectClass = inputClass
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8 max-w-4xl">
@@ -186,7 +307,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
               value={name}
               onChange={(e) => handleNameChange(e.target.value)}
               required
-              className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className={inputClass}
             />
           </div>
           <div>
@@ -195,7 +316,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
               required
-              className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className={inputClass}
             />
           </div>
           <div className="md:col-span-2">
@@ -221,8 +342,8 @@ export function ProductForm({ product, categories }: ProductFormProps) {
             <label className="block text-sm font-medium mb-1">Категория *</label>
             <select
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className={selectClass}
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -235,7 +356,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
               value={badge}
               onChange={(e) => setBadge(e.target.value)}
               placeholder="Хит продаж, Новинка..."
-              className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className={inputClass}
             />
           </div>
           <div className="flex items-center gap-6">
@@ -251,119 +372,172 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         </div>
       </section>
 
-      {/* Coffee attributes */}
-      <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
-        <h2 className="text-lg font-semibold mb-4">Кофейные атрибуты</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Страна</label>
-            <input value={origin} onChange={(e) => setOrigin(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+      {/* Templates (only for new products when category has templates) */}
+      {templates.length > 0 && (
+        <section className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+          <h3 className="text-sm font-medium text-blue-800 mb-2">Быстрое заполнение из шаблона</h3>
+          <div className="flex flex-wrap gap-2">
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => applyTemplate(t)}
+                className="px-3 py-1.5 bg-white border border-blue-300 rounded-lg text-sm text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Регион</label>
-            <input value={region} onChange={(e) => setRegion(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+        </section>
+      )}
+
+      {/* Category-specific attributes */}
+      {hasAnyAttributes && (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">{getSectionTitle(categorySlug)}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {showOrigin && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Страна</label>
+                <input value={origin} onChange={(e) => setOrigin(e.target.value)} className={inputClass} />
+              </div>
+            )}
+            {showRegion && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Регион</label>
+                <input value={region} onChange={(e) => setRegion(e.target.value)} className={inputClass} />
+              </div>
+            )}
+            {showFarm && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Ферма</label>
+                <input value={farm} onChange={(e) => setFarm(e.target.value)} className={inputClass} />
+              </div>
+            )}
+            {showAltitude && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Высота</label>
+                <input value={altitude} onChange={(e) => setAltitude(e.target.value)} placeholder="1200-1800м" className={inputClass} />
+              </div>
+            )}
+            {showRoastLevel && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Обжарка</label>
+                <select value={roastLevel} onChange={(e) => setRoastLevel(e.target.value)} className={selectClass}>
+                  <option value="">Не указано</option>
+                  <option value="Светлая">Светлая</option>
+                  <option value="Средняя">Средняя</option>
+                  <option value="Тёмная">Тёмная</option>
+                </select>
+              </div>
+            )}
+            {showProcessingMethod && (
+              <div>
+                <label className="block text-sm font-medium mb-1">Обработка</label>
+                <select value={processingMethod} onChange={(e) => setProcessingMethod(e.target.value)} className={selectClass}>
+                  <option value="">Не указано</option>
+                  <option value="Мытая">Мытая</option>
+                  <option value="Натуральная">Натуральная</option>
+                  <option value="Хани">Хани</option>
+                </select>
+              </div>
+            )}
+            {showFlavorNotes && (
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium mb-1">Вкусовые ноты (через запятую)</label>
+                <input
+                  value={flavorNotesInput}
+                  onChange={(e) => setFlavorNotesInput(e.target.value)}
+                  placeholder="Шоколад, Карамель, Цитрус"
+                  className={inputClass}
+                />
+              </div>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Ферма</label>
-            <input value={farm} onChange={(e) => setFarm(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Высота</label>
-            <input value={altitude} onChange={(e) => setAltitude(e.target.value)} placeholder="1200-1800м" className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Обжарка</label>
-            <select value={roastLevel} onChange={(e) => setRoastLevel(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="">Не указано</option>
-              <option value="Светлая">Светлая</option>
-              <option value="Средняя">Средняя</option>
-              <option value="Тёмная">Тёмная</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Обработка</label>
-            <select value={processingMethod} onChange={(e) => setProcessingMethod(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="">Не указано</option>
-              <option value="Мытая">Мытая</option>
-              <option value="Натуральная">Натуральная</option>
-              <option value="Хани">Хани</option>
-            </select>
-          </div>
-          <div className="md:col-span-3">
-            <label className="block text-sm font-medium mb-1">Вкусовые ноты (через запятую)</label>
-            <input
-              value={flavorNotesInput}
-              onChange={(e) => setFlavorNotesInput(e.target.value)}
-              placeholder="Шоколад, Карамель, Цитрус"
-              className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Flavor profile */}
-      <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
-        <h2 className="text-lg font-semibold mb-4">Профиль вкуса</h2>
-        <div className="space-y-4">
-          {[
-            { label: "Кислотность", value: acidity, set: setAcidity },
-            { label: "Сладость", value: sweetness, set: setSweetness },
-            { label: "Горечь", value: bitterness, set: setBitterness },
-            { label: "Тело", value: body, set: setBody },
-          ].map(({ label, value, set }) => (
-            <div key={label} className="flex items-center gap-4">
-              <span className="text-sm font-medium w-28">{label}</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={value}
-                onChange={(e) => set(Number(e.target.value))}
-                className="flex-1 accent-primary"
-              />
-              <span className="text-sm text-muted-foreground w-10 text-right">{value}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {showFlavorProfile && (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">Профиль вкуса</h2>
+          <div className="space-y-4">
+            {[
+              { label: "Кислотность", value: acidity, set: setAcidity },
+              { label: "Сладость", value: sweetness, set: setSweetness },
+              { label: "Горечь", value: bitterness, set: setBitterness },
+              { label: "Тело", value: body, set: setBody },
+            ].map(({ label, value, set }) => (
+              <div key={label} className="flex items-center gap-4">
+                <span className="text-sm font-medium w-28">{label}</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={value}
+                  onChange={(e) => set(Number(e.target.value))}
+                  className="flex-1 accent-primary"
+                />
+                <span className="text-sm text-muted-foreground w-10 text-right">{value}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Brewing methods */}
-      <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
-        <h2 className="text-lg font-semibold mb-4">Способы заваривания</h2>
-        <div className="flex flex-wrap gap-3">
-          {BREWING_OPTIONS.map((method) => (
-            <label key={method.value} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={brewingMethods.includes(method.value)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setBrewingMethods([...brewingMethods, method.value])
-                  } else {
-                    setBrewingMethods(brewingMethods.filter((m) => m !== method.value))
-                  }
-                }}
-                className="rounded"
-              />
-              {method.label}
-            </label>
-          ))}
-        </div>
-      </section>
+      {showBrewingMethods && (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">Способы заваривания</h2>
+          <div className="flex flex-wrap gap-3">
+            {brewingOptions.map((method) => (
+              <label key={method.value} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={brewingMethods.includes(method.value)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setBrewingMethods([...brewingMethods, method.value])
+                    } else {
+                      setBrewingMethods(brewingMethods.filter((m) => m !== method.value))
+                    }
+                  }}
+                  className="rounded"
+                />
+                {method.label}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Images (only for existing products) */}
-      {product && (
+      {/* Images */}
+      {product ? (
         <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
           <h2 className="text-lg font-semibold mb-4">Изображения</h2>
           <ImageUploader productId={product.id} images={product.images} />
         </section>
+      ) : (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">Изображения</h2>
+          <InlineImagePicker images={pendingImages} onChange={setPendingImages} />
+        </section>
       )}
 
-      {/* Variants (only for existing products) */}
-      {product && (
+      {/* Variants */}
+      {product ? (
         <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
           <h2 className="text-lg font-semibold mb-4">Варианты (вес и цена)</h2>
           <VariantManager productId={product.id} variants={product.variants} />
+        </section>
+      ) : (
+        <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">Варианты (вес и цена)</h2>
+          <InlineVariantEditor
+            variants={localVariants}
+            onChange={setLocalVariants}
+            weightOptions={weightOptions}
+          />
         </section>
       )}
 
@@ -373,7 +547,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium mb-1">Meta Title</label>
-            <input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+            <input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} className={inputClass} />
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Meta Description</label>

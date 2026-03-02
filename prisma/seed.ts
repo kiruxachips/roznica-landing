@@ -31,6 +31,43 @@ async function main() {
     },
   })
 
+  // Create additional categories
+  await prisma.category.upsert({
+    where: { slug: "chay" },
+    update: {},
+    create: {
+      name: "Чай",
+      slug: "chay",
+      description: "Листовой чай из лучших чайных плантаций",
+      sortOrder: 2,
+      isActive: true,
+    },
+  })
+
+  await prisma.category.upsert({
+    where: { slug: "rastvorimaya-produkciya" },
+    update: {},
+    create: {
+      name: "Растворимая продукция",
+      slug: "rastvorimaya-produkciya",
+      description: "Растворимые напитки для быстрого приготовления",
+      sortOrder: 3,
+      isActive: true,
+    },
+  })
+
+  await prisma.category.upsert({
+    where: { slug: "zdorovoe-pitanie" },
+    update: {},
+    create: {
+      name: "Здоровое питание",
+      slug: "zdorovoe-pitanie",
+      description: "Суперфуды и полезные продукты для здорового образа жизни",
+      sortOrder: 4,
+      isActive: true,
+    },
+  })
+
   // Seed products
   const productsData = [
     {

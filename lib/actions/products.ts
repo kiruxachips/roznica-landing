@@ -26,31 +26,47 @@ export async function createProduct(data: {
   brewingMethods?: string[]
   metaTitle?: string
   metaDescription?: string
+  variants?: { weight: string; price: number; oldPrice?: number | null; stock: number }[]
 }) {
+  const { variants, ...productData } = data
+
   const product = await prisma.product.create({
     data: {
-      name: data.name,
-      slug: data.slug,
-      description: data.description,
-      fullDescription: data.fullDescription || null,
-      categoryId: data.categoryId,
-      isActive: data.isActive ?? true,
-      isFeatured: data.isFeatured ?? false,
-      badge: data.badge || null,
-      origin: data.origin || null,
-      region: data.region || null,
-      farm: data.farm || null,
-      altitude: data.altitude || null,
-      roastLevel: data.roastLevel || null,
-      processingMethod: data.processingMethod || null,
-      flavorNotes: data.flavorNotes ?? [],
-      acidity: data.acidity ?? null,
-      sweetness: data.sweetness ?? null,
-      bitterness: data.bitterness ?? null,
-      body: data.body ?? null,
-      brewingMethods: data.brewingMethods ?? [],
-      metaTitle: data.metaTitle || null,
-      metaDescription: data.metaDescription || null,
+      name: productData.name,
+      slug: productData.slug,
+      description: productData.description,
+      fullDescription: productData.fullDescription || null,
+      categoryId: productData.categoryId,
+      isActive: productData.isActive ?? true,
+      isFeatured: productData.isFeatured ?? false,
+      badge: productData.badge || null,
+      origin: productData.origin || null,
+      region: productData.region || null,
+      farm: productData.farm || null,
+      altitude: productData.altitude || null,
+      roastLevel: productData.roastLevel || null,
+      processingMethod: productData.processingMethod || null,
+      flavorNotes: productData.flavorNotes ?? [],
+      acidity: productData.acidity ?? null,
+      sweetness: productData.sweetness ?? null,
+      bitterness: productData.bitterness ?? null,
+      body: productData.body ?? null,
+      brewingMethods: productData.brewingMethods ?? [],
+      metaTitle: productData.metaTitle || null,
+      metaDescription: productData.metaDescription || null,
+      ...(variants && variants.length > 0 && {
+        variants: {
+          createMany: {
+            data: variants.map((v, i) => ({
+              weight: v.weight,
+              price: v.price,
+              oldPrice: v.oldPrice ?? null,
+              stock: v.stock,
+              sortOrder: i,
+            })),
+          },
+        },
+      }),
     },
   })
 
