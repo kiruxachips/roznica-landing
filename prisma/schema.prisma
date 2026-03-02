@@ -114,6 +114,7 @@ model User {
   emailVerified DateTime?
   passwordHash  String?
   name          String?
+  image         String?
   phone         String?
   avatarUrl     String?
   defaultAddress String?  @db.Text
