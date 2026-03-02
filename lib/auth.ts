@@ -114,7 +114,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       ? [Yandex({ clientId: process.env.YANDEX_CLIENT_ID!, clientSecret: process.env.YANDEX_CLIENT_SECRET! })]
       : []),
     ...(process.env.VK_CLIENT_ID
-      ? [VK({ clientId: process.env.VK_CLIENT_ID!, clientSecret: process.env.VK_CLIENT_SECRET! })]
+      ? [VK({
+          clientId: process.env.VK_CLIENT_ID!,
+          clientSecret: process.env.VK_CLIENT_SECRET!,
+          client: { token_endpoint_auth_method: "client_secret_post" },
+          checks: ["state"],
+        })]
       : []),
   ],
   callbacks: {
