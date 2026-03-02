@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail } from "@/lib/email"
 import { createPayment } from "@/lib/yookassa"
 import { headers } from "next/headers"
+import { createShipmentForOrder } from "@/lib/delivery/shipment"
 
 export async function createOrder(data: OrderData) {
   // Attach userId from session if logged in as customer
@@ -87,6 +88,15 @@ export async function updateOrderStatus(id: string, status: string) {
       // Credit bonuses on delivery
       if (status === "delivered") {
         await creditBonusesForOrder(order.userId, order.id, order.total)
+      }
+
+      // Auto-create shipment when order is confirmed (COD)
+      if (status === "confirmed" && order.paymentMethod !== "online") {
+        try {
+          await createShipmentForOrder(order.id)
+        } catch (e) {
+          console.error("Failed to create shipment for order:", order.id, e)
+        }
       }
     }
   } catch {

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx } from "@/lib/dal/bonuses"
+import { calculateDeliveryRates } from "@/lib/delivery"
 
 function generateOrderNumber(): string {
   const date = new Date()
@@ -42,7 +43,37 @@ export async function createOrder(data: OrderData) {
     bonusUsed = Math.min(data.bonusAmount, maxBonus, user?.bonusBalance ?? 0)
   }
 
-  const deliveryPrice = (afterDiscount - bonusUsed) >= 3000 ? 0 : (afterDiscount >= 3000 ? 0 : 300)
+  // Delivery price: use client-provided price with server validation
+  let deliveryPrice = 0
+  if (data.deliveryPrice !== undefined && data.tariffCode !== undefined) {
+    // Validate against server-calculated rates (±5% tolerance)
+    try {
+      const rates = await calculateDeliveryRates({
+        toCityCode: data.destinationCityCode,
+        toPostalCode: data.postalCode,
+        cartTotal: afterDiscount - bonusUsed,
+      })
+      const matchingRate = rates.find(
+        (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod
+      )
+      if (matchingRate) {
+        const tolerance = matchingRate.priceWithMarkup * 0.05
+        if (Math.abs(data.deliveryPrice - matchingRate.priceWithMarkup) <= tolerance + 1) {
+          deliveryPrice = data.deliveryPrice
+        } else {
+          deliveryPrice = matchingRate.priceWithMarkup
+        }
+      } else {
+        deliveryPrice = data.deliveryPrice
+      }
+    } catch {
+      // Fallback to client price if validation fails
+      deliveryPrice = data.deliveryPrice
+    }
+  } else {
+    // Legacy fallback for old checkout flow
+    deliveryPrice = (afterDiscount - bonusUsed) >= 3000 ? 0 : (afterDiscount >= 3000 ? 0 : 300)
+  }
   const total = afterDiscount - bonusUsed + deliveryPrice
 
   const order = await prisma.$transaction(async (tx) => {
@@ -76,6 +107,14 @@ export async function createOrder(data: OrderData) {
         total,
         bonusUsed,
         promoCodeId,
+        // Delivery module fields
+        deliveryType: data.deliveryType,
+        pickupPointCode: data.pickupPointCode,
+        pickupPointName: data.pickupPointName,
+        destinationCity: data.destinationCity,
+        destinationCityCode: data.destinationCityCode,
+        estimatedDelivery: data.estimatedDelivery,
+        tariffCode: data.tariffCode,
         items: {
           create: data.items.map((item) => ({
             productId: item.productId,

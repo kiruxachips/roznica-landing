@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation"
 import { getOrderById } from "@/lib/dal/orders"
 import { OrderStatusChanger } from "./OrderStatusChanger"
+import { OrderDeliverySection } from "./OrderDeliverySection"
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -34,6 +35,22 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
               </div>
             </div>
           </div>
+        )}
+
+        {/* Delivery info */}
+        {order.deliveryMethod && order.deliveryMethod !== "courier" && (
+          <OrderDeliverySection
+            orderId={order.id}
+            deliveryMethod={order.deliveryMethod}
+            deliveryType={order.deliveryType}
+            destinationCity={order.destinationCity}
+            estimatedDelivery={order.estimatedDelivery}
+            trackingNumber={order.trackingNumber}
+            carrierOrderId={order.carrierOrderId}
+            carrierOrderNum={order.carrierOrderNum}
+            carrierStatus={order.carrierStatus}
+            pickupPointName={order.pickupPointName}
+          />
         )}
 
         {/* Customer info */}

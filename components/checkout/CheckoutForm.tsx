@@ -6,8 +6,12 @@ import { useSession } from "next-auth/react"
 import Image from "next/image"
 import Link from "next/link"
 import { useCartStore } from "@/lib/store/cart"
+import { useDeliveryStore } from "@/lib/store/delivery"
 import { createOrder } from "@/lib/actions/orders"
 import { BonusSelector } from "./BonusSelector"
+import { CitySearch } from "./CitySearch"
+import { DeliveryOptions } from "./DeliveryOptions"
+import { PickupPointMap } from "./PickupPointMap"
 
 interface UserProfile {
   name: string | null
@@ -33,6 +37,15 @@ export function CheckoutForm() {
   const clearCart = useCartStore((s) => s.clearCart)
   const promoCode = useCartStore((s) => s.promoCode)
   const promoDiscount = useCartStore((s) => s.promoDiscount)
+  const selectedRate = useDeliveryStore((s) => s.selectedRate)
+  const selectedPickupPoint = useDeliveryStore((s) => s.selectedPickupPoint)
+  const doorAddress = useDeliveryStore((s) => s.doorAddress)
+  const setDoorAddress = useDeliveryStore((s) => s.setDoorAddress)
+  const deliveryCity = useDeliveryStore((s) => s.city)
+  const deliveryCityCode = useDeliveryStore((s) => s.cityCode)
+  const deliveryPostalCode = useDeliveryStore((s) => s.postalCode)
+  const resetDelivery = useDeliveryStore((s) => s.reset)
+
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -65,7 +78,7 @@ export function CheckoutForm() {
 
   const total = totalPrice()
   const afterDiscount = total - promoDiscount
-  const deliveryPrice = afterDiscount >= 3000 ? 0 : 300
+  const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
   const maxBonusAmount = Math.floor(afterDiscount * 0.5)
   const effectiveBonus = Math.min(bonusAmount, maxBonusAmount)
   const finalTotal = afterDiscount - effectiveBonus + deliveryPrice
@@ -87,16 +100,35 @@ export function CheckoutForm() {
     const form = new FormData(e.currentTarget)
 
     try {
+      // Build delivery address from selected option
+      const address =
+        selectedRate?.deliveryType === "pvz" && selectedPickupPoint
+          ? `ПВЗ: ${selectedPickupPoint.name}, ${selectedPickupPoint.address}`
+          : doorAddress || (form.get("address") as string) || undefined
+
       const result = await createOrder({
         customerName: form.get("name") as string,
         customerEmail: (form.get("email") as string) || undefined,
         customerPhone: form.get("phone") as string,
-        deliveryAddress: (form.get("address") as string) || undefined,
-        deliveryMethod: (form.get("delivery") as string) || undefined,
+        deliveryAddress: address,
+        deliveryMethod: selectedRate?.carrier || undefined,
         paymentMethod,
         notes: (form.get("notes") as string) || undefined,
         promoCode: promoCode || undefined,
         bonusAmount: effectiveBonus > 0 ? effectiveBonus : undefined,
+        deliveryType: selectedRate?.deliveryType,
+        deliveryPrice,
+        pickupPointCode: selectedPickupPoint?.code,
+        pickupPointName: selectedPickupPoint
+          ? `${selectedPickupPoint.name}, ${selectedPickupPoint.address}`
+          : undefined,
+        destinationCity: deliveryCity || undefined,
+        destinationCityCode: deliveryCityCode || undefined,
+        estimatedDelivery: selectedRate
+          ? `${selectedRate.minDays}-${selectedRate.maxDays} дн.`
+          : undefined,
+        tariffCode: selectedRate?.tariffCode,
+        postalCode: deliveryPostalCode || undefined,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -108,6 +140,7 @@ export function CheckoutForm() {
       })
 
       clearCart()
+      resetDelivery()
 
       if (result.paymentUrl) {
         window.location.href = result.paymentUrl
@@ -172,66 +205,41 @@ export function CheckoutForm() {
 
           <h2 className="text-lg font-semibold pt-2">Доставка</h2>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Способ доставки</label>
-            <select name="delivery" className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary">
-              <option value="cdek">СДЭК</option>
-              <option value="post">Почта России</option>
-              <option value="courier">Курьер (Калининград)</option>
-            </select>
-          </div>
+          <CitySearch />
+          <DeliveryOptions />
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Адрес доставки</label>
-            {savedAddresses.length > 0 && (
-              <select
-                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-2"
-                defaultValue=""
-                onChange={(e) => {
-                  const addr = savedAddresses.find((a) => a.id === e.target.value)
-                  if (!addr) return
-                  const textarea = e.target.parentElement?.querySelector("textarea")
-                  if (textarea) {
-                    const nativeSet = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set
-                    nativeSet?.call(textarea, addr.fullAddress)
-                    textarea.dispatchEvent(new Event("input", { bubbles: true }))
-                  }
-                  // Auto-fill recipient name/phone if available
-                  const form = e.target.closest("form")
-                  if (form && addr.recipientName) {
-                    const nameInput = form.querySelector<HTMLInputElement>("input[name='name']")
-                    if (nameInput && !nameInput.value) {
-                      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
-                      set?.call(nameInput, addr.recipientName)
-                      nameInput.dispatchEvent(new Event("input", { bubbles: true }))
-                    }
-                  }
-                  if (form && addr.recipientPhone) {
-                    const phoneInput = form.querySelector<HTMLInputElement>("input[name='phone']")
-                    if (phoneInput && !phoneInput.value) {
-                      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set
-                      set?.call(phoneInput, addr.recipientPhone)
-                      phoneInput.dispatchEvent(new Event("input", { bubbles: true }))
-                    }
-                  }
-                }}
-              >
-                <option value="">Выбрать из сохранённых...</option>
-                {savedAddresses.map((addr) => (
-                  <option key={addr.id} value={addr.id}>
-                    {addr.title}: {addr.fullAddress.slice(0, 60)}{addr.fullAddress.length > 60 ? "..." : ""}
-                  </option>
-                ))}
-              </select>
-            )}
-            <textarea
-              name="address"
-              rows={2}
-              defaultValue={profile?.defaultAddress || ""}
-              className="w-full px-4 py-3 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Город, улица, дом, квартира"
-            />
-          </div>
+          {selectedRate?.deliveryType === "pvz" && <PickupPointMap />}
+
+          {selectedRate?.deliveryType === "door" && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Адрес доставки *</label>
+              {savedAddresses.length > 0 && (
+                <select
+                  className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-2"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const addr = savedAddresses.find((a) => a.id === e.target.value)
+                    if (addr) setDoorAddress(addr.fullAddress)
+                  }}
+                >
+                  <option value="">Выбрать из сохранённых...</option>
+                  {savedAddresses.map((addr) => (
+                    <option key={addr.id} value={addr.id}>
+                      {addr.title}: {addr.fullAddress.slice(0, 60)}{addr.fullAddress.length > 60 ? "..." : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <textarea
+                name="address"
+                rows={2}
+                value={doorAddress}
+                onChange={(e) => setDoorAddress(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="Улица, дом, квартира"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Комментарий</label>

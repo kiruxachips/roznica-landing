@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail } from "@/lib/email"
+import { createShipmentForOrder } from "@/lib/delivery/shipment"
 
 // YooKassa IP ranges (validate only in production)
 const YOOKASSA_IPS = [
@@ -80,6 +81,13 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error("Failed to send payment email:", e)
       }
+    }
+
+    // Auto-create shipment with carrier
+    try {
+      await createShipmentForOrder(order.id)
+    } catch (e) {
+      console.error("Failed to create shipment for order:", order.id, e)
     }
   } else if (event === "payment.canceled") {
     await prisma.order.update({

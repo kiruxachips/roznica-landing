@@ -211,6 +211,47 @@ async function main() {
     }
   }
 
+  // Seed default delivery settings
+  const deliveryDefaults: Record<string, string> = {
+    // Sender
+    sender_city: "",
+    sender_city_code: "",
+    sender_postal_code: "",
+    // Package defaults
+    default_weight_grams: "300",
+    default_length_cm: "20",
+    default_width_cm: "15",
+    default_height_cm: "10",
+    // Free delivery threshold
+    free_delivery_threshold: "3000",
+    // CDEK
+    cdek_enabled: "false",
+    cdek_client_id: "",
+    cdek_client_secret: "",
+    cdek_test_mode: "true",
+    cdek_tariffs: JSON.stringify([136, 137]),
+    // Pochta RF
+    pochta_enabled: "false",
+    pochta_access_token: "",
+    pochta_user_auth: "",
+    pochta_object_type: "47030",
+    // Local courier
+    courier_enabled: "true",
+    courier_price: "300",
+    courier_city: "Калининград",
+    courier_free_threshold: "3000",
+    // Yandex Maps
+    yandex_maps_api_key: "",
+  }
+
+  for (const [key, value] of Object.entries(deliveryDefaults)) {
+    await prisma.deliverySetting.upsert({
+      where: { key },
+      update: {},
+      create: { key, value },
+    })
+  }
+
   console.log("Seed completed successfully!")
 }
 

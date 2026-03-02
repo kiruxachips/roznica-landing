@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Package, FolderTree, ShoppingCart, MessageSquare, LayoutDashboard, LogOut, Sparkles, Ticket, BookOpen } from "lucide-react"
+import { Package, FolderTree, ShoppingCart, MessageSquare, LayoutDashboard, LogOut, Sparkles, Ticket, BookOpen, Truck } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +11,7 @@ const navItems = [
   { name: "Товары", href: "/admin/products", icon: Package },
   { name: "Категории", href: "/admin/categories", icon: FolderTree },
   { name: "Заказы", href: "/admin/orders", icon: ShoppingCart },
+  { name: "Доставка", href: "/admin/delivery", icon: Truck },
   { name: "Отзывы", href: "/admin/reviews", icon: MessageSquare },
   { name: "Акции", href: "/admin/promotions", icon: Sparkles },
   { name: "Промокоды", href: "/admin/promo-codes", icon: Ticket },

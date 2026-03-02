@@ -215,6 +215,21 @@ model Order {
   promoCodeId    String?
   promoCode      PromoCode?  @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
   items          OrderItem[]
+
+  // Delivery module fields
+  carrierOrderId      String?   // UUID заказа у перевозчика
+  carrierOrderNum     String?   // человекочитаемый номер
+  trackingNumber      String?
+  pickupPointCode     String?   // код ПВЗ
+  pickupPointName     String?   // название (снапшот)
+  deliveryType        String?   // "door" | "pvz"
+  destinationCity     String?
+  destinationCityCode String?
+  carrierStatus       String?   // последний статус от перевозчика
+  estimatedDelivery   String?   // "3-5 дней"
+  packageWeight       Int?      // граммы
+  tariffCode          Int?      // код тарифа перевозчика
+
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 }
@@ -303,4 +318,26 @@ model BonusTransaction {
 
   @@index([userId])
   @@index([orderId])
+}
+
+model DeliverySetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model DeliveryMarkupRule {
+  id        String   @id @default(cuid())
+  name      String
+  carrier   String   // "cdek" | "pochta" | "all"
+  type      String   // "percent" | "fixed" | "replace"
+  value     Int      // 15 = +15%, 200 = +200₽
+  minWeight Int?
+  maxWeight Int?
+  minPrice  Int?     // мин. сумма корзины
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

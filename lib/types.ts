@@ -94,6 +94,16 @@ export interface OrderData {
   userId?: string
   promoCode?: string
   bonusAmount?: number
+  // Delivery module fields
+  deliveryType?: "door" | "pvz"
+  deliveryPrice?: number
+  pickupPointCode?: string
+  pickupPointName?: string
+  destinationCity?: string
+  destinationCityCode?: string
+  estimatedDelivery?: string
+  tariffCode?: number
+  postalCode?: string
   items: {
     productId: string
     variantId: string
