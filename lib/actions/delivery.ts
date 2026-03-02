@@ -3,9 +3,12 @@
 import { createShipmentForOrder, refreshTrackingForOrder } from "@/lib/delivery/shipment"
 import { revalidatePath } from "next/cache"
 
-export async function createShipmentManual(orderId: string) {
+export async function createShipmentManual(
+  orderId: string,
+  senderLocationIndex?: number
+) {
   try {
-    await createShipmentForOrder(orderId)
+    await createShipmentForOrder(orderId, senderLocationIndex)
     revalidatePath(`/admin/orders/${orderId}`)
     return { success: true }
   } catch (e) {

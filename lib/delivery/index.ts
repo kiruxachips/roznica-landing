@@ -1,5 +1,5 @@
 import type { DeliveryRate, DeliveryRateRequest } from "./types"
-import { getDeliverySettings, getMarkupRules } from "@/lib/dal/delivery-settings"
+import { getDeliverySettings, getMarkupRules, getDefaultSenderLocation } from "@/lib/dal/delivery-settings"
 import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
 import { createCourierProvider } from "./courier"
@@ -45,13 +45,14 @@ export async function calculateDeliveryRates(params: {
 }): Promise<DeliveryRate[]> {
   const settings = await getDeliverySettings()
   const rules = await getMarkupRules()
+  const sender = getDefaultSenderLocation(settings)
 
   const weight = params.cartWeight || parseInt(settings.default_weight_grams) || 300
   const cartTotal = params.cartTotal || 0
 
   const req: DeliveryRateRequest = {
-    fromCityCode: settings.sender_city_code,
-    fromPostalCode: settings.sender_postal_code,
+    fromCityCode: sender.cityCode,
+    fromPostalCode: sender.postalCode,
     toCityCode: params.toCityCode,
     toPostalCode: params.toPostalCode,
     toCity: params.toCity,
@@ -77,7 +78,7 @@ export async function calculateDeliveryRates(params: {
         clientSecret: settings.cdek_client_secret,
         testMode: settings.cdek_test_mode === "true",
         tariffs,
-        senderCityCode: settings.sender_city_code,
+        senderCityCode: sender.cityCode,
       }).calculateRates(req)
     )
   }
@@ -89,7 +90,7 @@ export async function calculateDeliveryRates(params: {
         accessToken: settings.pochta_access_token || undefined,
         userAuth: settings.pochta_user_auth || undefined,
         objectType: parseInt(settings.pochta_object_type) || 47030,
-        senderPostalCode: settings.sender_postal_code,
+        senderPostalCode: sender.postalCode,
       }).calculateRates(req)
     )
   }

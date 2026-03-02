@@ -23,6 +23,22 @@ interface Props {
   rules: DeliveryMarkupRule[]
 }
 
+interface SenderLocation {
+  name: string
+  city: string
+  cityCode: string
+  postalCode: string
+  isDefault: boolean
+}
+
+function parseSenderLocations(json: string): SenderLocation[] {
+  try {
+    const arr = JSON.parse(json)
+    if (Array.isArray(arr) && arr.length > 0) return arr
+  } catch { /* ignore */ }
+  return []
+}
+
 export function DeliverySettingsForm({ settings, rules }: Props) {
   const [activeTab, setActiveTab] = useState("general")
   const [saving, setSaving] = useState(false)
@@ -30,9 +46,57 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
   const [localSettings, setLocalSettings] = useState(settings)
   const [localRules, setLocalRules] = useState(rules)
   const [testing, setTesting] = useState(false)
+  const [senderLocations, setSenderLocations] = useState<SenderLocation[]>(() =>
+    parseSenderLocations(settings.sender_locations || "[]")
+  )
 
   function set(key: string, value: string) {
     setLocalSettings((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function updateSenderLocations(locations: SenderLocation[]) {
+    setSenderLocations(locations)
+    setLocalSettings((prev) => ({
+      ...prev,
+      sender_locations: JSON.stringify(locations),
+    }))
+  }
+
+  function addSenderLocation() {
+    const locations = [
+      ...senderLocations,
+      {
+        name: "Новый склад",
+        city: "",
+        cityCode: "",
+        postalCode: "",
+        isDefault: senderLocations.length === 0,
+      },
+    ]
+    updateSenderLocations(locations)
+  }
+
+  function removeSenderLocation(index: number) {
+    const locations = senderLocations.filter((_, i) => i !== index)
+    // Ensure at least one default
+    if (locations.length > 0 && !locations.some((l) => l.isDefault)) {
+      locations[0].isDefault = true
+    }
+    updateSenderLocations(locations)
+  }
+
+  function setSenderField(index: number, field: keyof SenderLocation, value: string | boolean) {
+    const locations = senderLocations.map((loc, i) => {
+      if (i !== index) {
+        // If setting isDefault, unset others
+        if (field === "isDefault" && value === true) {
+          return { ...loc, isDefault: false }
+        }
+        return loc
+      }
+      return { ...loc, [field]: value }
+    })
+    updateSenderLocations(locations)
   }
 
   async function handleSave() {
@@ -129,43 +193,102 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
         {activeTab === "general" && (
           <>
             <h2 className="text-lg font-semibold">Общие настройки</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Город отправки</label>
-                <input
-                  className={inputClass}
-                  value={localSettings.sender_city || ""}
-                  onChange={(e) => set("sender_city", e.target.value)}
-                  placeholder="Калининград"
-                />
+
+            {/* Sender locations */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-md font-semibold">Склады отправки</h3>
+                <button
+                  type="button"
+                  onClick={addSenderLocation}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                >
+                  Добавить склад
+                </button>
               </div>
-              <div>
-                <label className={labelClass}>Код города СДЭК</label>
-                <input
-                  className={inputClass}
-                  value={localSettings.sender_city_code || ""}
-                  onChange={(e) => set("sender_city_code", e.target.value)}
-                  placeholder="152"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Почтовый индекс отправки</label>
-                <input
-                  className={inputClass}
-                  value={localSettings.sender_postal_code || ""}
-                  onChange={(e) => set("sender_postal_code", e.target.value)}
-                  placeholder="236000"
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Порог бесплатной доставки (₽)</label>
-                <input
-                  className={inputClass}
-                  type="number"
-                  value={localSettings.free_delivery_threshold || ""}
-                  onChange={(e) => set("free_delivery_threshold", e.target.value)}
-                />
-              </div>
+
+              {senderLocations.length === 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Нет складов. Добавьте хотя бы один город отправки.
+                </p>
+              )}
+
+              {senderLocations.map((loc, i) => (
+                <div
+                  key={i}
+                  className={`border rounded-lg p-4 space-y-3 ${
+                    loc.isDefault ? "border-primary bg-primary/5" : "border-border"
+                  }`}
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className={labelClass}>Название</label>
+                      <input
+                        className={inputClass}
+                        value={loc.name}
+                        onChange={(e) => setSenderField(i, "name", e.target.value)}
+                        placeholder="СПб склад"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Город</label>
+                      <input
+                        className={inputClass}
+                        value={loc.city}
+                        onChange={(e) => setSenderField(i, "city", e.target.value)}
+                        placeholder="Санкт-Петербург"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Код СДЭК</label>
+                      <input
+                        className={inputClass}
+                        value={loc.cityCode}
+                        onChange={(e) => setSenderField(i, "cityCode", e.target.value)}
+                        placeholder="137"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelClass}>Индекс</label>
+                      <input
+                        className={inputClass}
+                        value={loc.postalCode}
+                        onChange={(e) => setSenderField(i, "postalCode", e.target.value)}
+                        placeholder="190000"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="defaultSender"
+                        checked={loc.isDefault}
+                        onChange={() => setSenderField(i, "isDefault", true)}
+                        className="accent-primary"
+                      />
+                      По умолчанию
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => removeSenderLocation(i)}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className={labelClass}>Порог бесплатной доставки (₽)</label>
+              <input
+                className={inputClass}
+                type="number"
+                value={localSettings.free_delivery_threshold || ""}
+                onChange={(e) => set("free_delivery_threshold", e.target.value)}
+              />
             </div>
 
             <h3 className="text-md font-semibold pt-2">Габариты по умолчанию</h3>

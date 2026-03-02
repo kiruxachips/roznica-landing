@@ -1,7 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createShipmentManual, refreshTracking } from "@/lib/actions/delivery"
+
+interface SenderLocation {
+  name: string
+  city: string
+  cityCode: string
+  postalCode: string
+  isDefault: boolean
+}
 
 interface Props {
   orderId: string
@@ -36,11 +44,26 @@ export function OrderDeliverySection({
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
+  const [senderLocations, setSenderLocations] = useState<SenderLocation[]>([])
+  const [selectedSender, setSelectedSender] = useState<number>(0)
+
+  // Load sender locations for shipment creation
+  useEffect(() => {
+    if (carrierOrderId) return // Already shipped, no need
+    fetch("/api/delivery/sender-locations")
+      .then((r) => r.ok ? r.json() : [])
+      .then((locations: SenderLocation[]) => {
+        setSenderLocations(locations)
+        const defaultIdx = locations.findIndex((l) => l.isDefault)
+        if (defaultIdx >= 0) setSelectedSender(defaultIdx)
+      })
+      .catch(() => {})
+  }, [carrierOrderId])
 
   async function handleCreateShipment() {
     setLoading(true)
     setMessage("")
-    const result = await createShipmentManual(orderId)
+    const result = await createShipmentManual(orderId, selectedSender)
     if (result.success) {
       setMessage("Отправка создана!")
       window.location.reload()
@@ -115,8 +138,25 @@ export function OrderDeliverySection({
         )}
       </div>
 
-      <div className="flex gap-2 mt-4">
-        {!carrierOrderId && (
+      {/* Sender location picker + Create shipment */}
+      {!carrierOrderId && (
+        <div className="mt-4 space-y-3">
+          {senderLocations.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Склад отправки</label>
+              <select
+                value={selectedSender}
+                onChange={(e) => setSelectedSender(parseInt(e.target.value))}
+                className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {senderLocations.map((loc, i) => (
+                  <option key={i} value={i}>
+                    {loc.name} — {loc.city} ({loc.postalCode}){loc.isDefault ? " (по умолчанию)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <button
             onClick={handleCreateShipment}
             disabled={loading}
@@ -124,8 +164,12 @@ export function OrderDeliverySection({
           >
             {loading ? "..." : "Создать отправку"}
           </button>
-        )}
-        {carrierOrderId && deliveryMethod === "cdek" && (
+        </div>
+      )}
+
+      {/* Refresh tracking */}
+      {carrierOrderId && deliveryMethod === "cdek" && (
+        <div className="mt-4">
           <button
             onClick={handleRefreshTracking}
             disabled={loading}
@@ -133,8 +177,8 @@ export function OrderDeliverySection({
           >
             {loading ? "..." : "Обновить статус"}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {message && (
         <p

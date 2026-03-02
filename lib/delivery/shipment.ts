@@ -1,10 +1,18 @@
 import { prisma } from "@/lib/prisma"
-import { getDeliverySettings } from "@/lib/dal/delivery-settings"
+import {
+  getDeliverySettings,
+  getDefaultSenderLocation,
+  parseSenderLocations,
+  type SenderLocation,
+} from "@/lib/dal/delivery-settings"
 import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
 import type { CreateShipmentRequest } from "./types"
 
-export async function createShipmentForOrder(orderId: string) {
+export async function createShipmentForOrder(
+  orderId: string,
+  senderLocationIndex?: number
+) {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true },
@@ -16,13 +24,22 @@ export async function createShipmentForOrder(orderId: string) {
 
   const settings = await getDeliverySettings()
 
+  // Pick sender location: explicit index or default
+  let sender: SenderLocation
+  if (senderLocationIndex !== undefined) {
+    const locations = parseSenderLocations(settings.sender_locations || "[]")
+    sender = locations[senderLocationIndex] || getDefaultSenderLocation(settings)
+  } else {
+    sender = getDefaultSenderLocation(settings)
+  }
+
   const req: CreateShipmentRequest = {
     orderId: order.id,
     carrier: order.deliveryMethod as "cdek" | "pochta",
     tariffCode: order.tariffCode || 136,
     deliveryType: (order.deliveryType as "door" | "pvz") || "pvz",
     pickupPointCode: order.pickupPointCode || undefined,
-    senderCityCode: settings.sender_city_code,
+    senderCityCode: sender.cityCode,
     recipientCityCode: order.destinationCityCode || undefined,
     recipientPostalCode: undefined,
     recipientName: order.customerName,
@@ -54,7 +71,7 @@ export async function createShipmentForOrder(orderId: string) {
       clientSecret: settings.cdek_client_secret,
       testMode: settings.cdek_test_mode === "true",
       tariffs,
-      senderCityCode: settings.sender_city_code,
+      senderCityCode: sender.cityCode,
     })
     result = await provider.createShipment(req)
   } else if (order.deliveryMethod === "pochta") {
@@ -62,7 +79,7 @@ export async function createShipmentForOrder(orderId: string) {
       accessToken: settings.pochta_access_token || undefined,
       userAuth: settings.pochta_user_auth || undefined,
       objectType: parseInt(settings.pochta_object_type) || 47030,
-      senderPostalCode: settings.sender_postal_code,
+      senderPostalCode: sender.postalCode,
     })
     result = await provider.createShipment(req)
   } else {
@@ -86,6 +103,7 @@ export async function refreshTrackingForOrder(orderId: string) {
   const settings = await getDeliverySettings()
 
   if (order.deliveryMethod === "cdek") {
+    const sender = getDefaultSenderLocation(settings)
     let tariffs: number[] = [136, 137]
     try { tariffs = JSON.parse(settings.cdek_tariffs) } catch { /* defaults */ }
 
@@ -94,7 +112,7 @@ export async function refreshTrackingForOrder(orderId: string) {
       clientSecret: settings.cdek_client_secret,
       testMode: settings.cdek_test_mode === "true",
       tariffs,
-      senderCityCode: settings.sender_city_code,
+      senderCityCode: sender.cityCode,
     })
 
     const statuses = await provider.getTrackingStatus(order.carrierOrderId)

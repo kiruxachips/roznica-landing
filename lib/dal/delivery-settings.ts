@@ -1,5 +1,38 @@
 import { prisma } from "@/lib/prisma"
 
+export interface SenderLocation {
+  name: string
+  city: string
+  cityCode: string
+  postalCode: string
+  isDefault: boolean
+}
+
+export function parseSenderLocations(json: string): SenderLocation[] {
+  try {
+    const arr = JSON.parse(json)
+    if (Array.isArray(arr) && arr.length > 0) return arr
+  } catch { /* fallback */ }
+  return []
+}
+
+export function getDefaultSenderLocation(
+  settings: Record<string, string>
+): SenderLocation {
+  const locations = parseSenderLocations(settings.sender_locations || "[]")
+  const def = locations.find((l) => l.isDefault) || locations[0]
+  if (def) return def
+
+  // Fallback to legacy single-city settings
+  return {
+    name: settings.sender_city || "Склад",
+    city: settings.sender_city || "",
+    cityCode: settings.sender_city_code || "",
+    postalCode: settings.sender_postal_code || "",
+    isDefault: true,
+  }
+}
+
 // In-memory cache with 60s TTL
 let settingsCache: Record<string, string> | null = null
 let cacheTimestamp = 0
