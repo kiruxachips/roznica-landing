@@ -118,11 +118,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       : []),
   ],
   callbacks: {
-    async signIn({ user, account }) {
-      // OAuth users are always customers
-      if (account?.type === "oauth") {
-        (user as Record<string, unknown>).userType = "customer"
-      }
+    async signIn() {
       return true
     },
     async jwt({ token, user, account }) {
