@@ -56,8 +56,7 @@ async function main() {
       images: [{ url: "/images/peru.webp", alt: "Peru GR1", isPrimary: true, sortOrder: 0 }],
       variants: [
         { weight: "250г", price: 600, oldPrice: 650, stock: 100, sortOrder: 0 },
-        { weight: "500г", price: 1100, oldPrice: 1200, stock: 100, sortOrder: 1 },
-        { weight: "1кг", price: 2000, oldPrice: 2200, stock: 100, sortOrder: 2 },
+        { weight: "1кг", price: 2000, oldPrice: 2200, stock: 100, sortOrder: 1 },
       ],
       reviews: [
         {
@@ -91,8 +90,7 @@ async function main() {
       images: [{ url: "/images/bourbon.webp", alt: "Brazil Yellow Bourbon", isPrimary: true, sortOrder: 0 }],
       variants: [
         { weight: "250г", price: 600, oldPrice: 650, stock: 100, sortOrder: 0 },
-        { weight: "500г", price: 1100, oldPrice: 1200, stock: 100, sortOrder: 1 },
-        { weight: "1кг", price: 2000, oldPrice: 2200, stock: 100, sortOrder: 2 },
+        { weight: "1кг", price: 2000, oldPrice: 2200, stock: 100, sortOrder: 1 },
       ],
       reviews: [
         {
@@ -126,8 +124,7 @@ async function main() {
       images: [{ url: "/images/santos.webp", alt: "Brazil Santos", isPrimary: true, sortOrder: 0 }],
       variants: [
         { weight: "250г", price: 550, oldPrice: 600, stock: 100, sortOrder: 0 },
-        { weight: "500г", price: 1000, oldPrice: 1100, stock: 100, sortOrder: 1 },
-        { weight: "1кг", price: 1900, oldPrice: 2000, stock: 100, sortOrder: 2 },
+        { weight: "1кг", price: 1900, oldPrice: 2000, stock: 100, sortOrder: 1 },
       ],
       reviews: [
         {

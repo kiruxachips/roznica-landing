@@ -54,7 +54,12 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {items.length === 0 ? (
-            <p className="text-center text-muted-foreground py-12">Корзина пуста</p>
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-4">Корзина пуста</p>
+              <Link href="/catalog" onClick={onClose} className="text-primary hover:underline text-sm">
+                Перейти в каталог
+              </Link>
+            </div>
           ) : (
             items.map((item) => (
               <div key={item.variantId} className="flex gap-3 bg-secondary/30 rounded-xl p-3">
