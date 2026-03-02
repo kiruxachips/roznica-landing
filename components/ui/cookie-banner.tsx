@@ -20,11 +20,13 @@ export function CookieBanner() {
 
   const handleAccept = () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, "accepted")
+    window.dispatchEvent(new Event("cookie-consent-changed"))
     setIsVisible(false)
   }
 
   const handleDecline = () => {
     localStorage.setItem(COOKIE_CONSENT_KEY, "declined")
+    window.dispatchEvent(new Event("cookie-consent-changed"))
     setIsVisible(false)
   }
 

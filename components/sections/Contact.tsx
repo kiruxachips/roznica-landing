@@ -1,8 +1,7 @@
+import Link from "next/link"
 import { ArrowRight } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
-import { TrackedLink } from "@/components/ui/tracked-link"
 import { cn } from "@/lib/utils"
-import { CATALOG_URL, SHOP_URL } from "@/lib/constants"
 
 export function Contact() {
   return (
@@ -28,10 +27,8 @@ export function Contact() {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <TrackedLink
-              href={CATALOG_URL}
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              href="/catalog"
               className={cn(
                 buttonVariants({ size: "xl" }),
                 "bg-white text-primary hover:bg-white/90 group flex items-center gap-2"
@@ -39,15 +36,7 @@ export function Contact() {
             >
               Перейти в каталог
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
-            </TrackedLink>
-            <TrackedLink
-              href={SHOP_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-14 px-10 text-lg font-medium rounded-lg border-2 border-white/50 text-white bg-white/10 hover:bg-white/20 transition-all"
-            >
-              Главная магазина
-            </TrackedLink>
+            </Link>
           </div>
 
           {/* Trust indicators */}

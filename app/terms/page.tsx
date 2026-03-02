@@ -55,7 +55,7 @@ export default function TermsPage() {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-foreground mb-4">3. Предмет Соглашения</h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Администрация предоставляет Пользователю доступ к информации о продукции, условиям поставок кофейного зерна, формам заявок и контактной информации.
+                  Администрация предоставляет Пользователю доступ к каталогу товаров, возможность оформления заказов, создания учётной записи, использования корзины и оформления доставки.
                 </p>
               </section>
 
@@ -63,8 +63,11 @@ export default function TermsPage() {
                 <h2 className="text-xl font-semibold text-foreground mb-4">4. Права и обязанности Пользователя</h2>
                 <p className="text-muted-foreground leading-relaxed mb-4"><strong>Пользователь имеет право:</strong></p>
                 <ul className="list-disc list-inside space-y-2 text-muted-foreground mb-4">
-                  <li>Просматривать информацию, размещённую на сайте</li>
-                  <li>Отправлять заявки через формы обратной связи</li>
+                  <li>Просматривать каталог товаров и информацию, размещённую на сайте</li>
+                  <li>Создавать учётную запись и управлять ею</li>
+                  <li>Добавлять товары в корзину и оформлять заказы</li>
+                  <li>Отслеживать статус своих заказов</li>
+                  <li>Использовать промокоды</li>
                   <li>Получать коммерческие предложения</li>
                   <li>Обращаться с вопросами к Администрации</li>
                 </ul>
@@ -96,9 +99,17 @@ export default function TermsPage() {
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-foreground mb-4">6. Оформление заказа</h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Заявка на сайте не является офертой и носит информационный характер. Администрация обрабатывает заявки в течение 1-3 рабочих дней. После обработки заявки менеджер свяжется с вами для уточнения деталей заказа.
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  Оформление заказа осуществляется через корзину на сайте. Пользователь добавляет товары в корзину, указывает данные для доставки и подтверждает заказ.
                 </p>
+                <ul className="list-disc list-inside space-y-2 text-muted-foreground mb-4">
+                  <li>Подтверждение заказа Пользователем является акцептом оферты Администрации</li>
+                  <li>После подтверждения заказа Пользователю присваивается номер заказа</li>
+                  <li>Оплата заказа производится при получении</li>
+                  <li>Доставка осуществляется курьерскими службами (СДЭК, Почта России) или курьером (Калининград)</li>
+                  <li>Пользователь вправе отменить заказ до момента его отправки, обратившись к Администрации</li>
+                  <li>Стоимость доставки: бесплатно при сумме заказа от 3000₽, в остальных случаях — 300₽</li>
+                </ul>
               </section>
 
               <section className="mb-8">
@@ -117,10 +128,13 @@ export default function TermsPage() {
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold text-foreground mb-4">9. Персональные данные</h2>
+                <p className="text-muted-foreground leading-relaxed mb-4">
+                  Регистрируясь на сайте и оформляя заказ, Пользователь даёт согласие на обработку персональных данных в соответствии с Федеральным законом № 152-ФЗ «О персональных данных».
+                </p>
                 <p className="text-muted-foreground leading-relaxed">
-                  Обработка персональных данных пользователей осуществляется в соответствии с{" "}
+                  Подробная информация о составе, целях и порядке обработки персональных данных изложена в{" "}
                   <Link href="/privacy" className="text-primary hover:underline">
-                    Политикой конфиденциальности
+                    Политике конфиденциальности
                   </Link>.
                 </p>
               </section>
@@ -190,7 +204,7 @@ export default function TermsPage() {
               </section>
 
               <p className="text-sm text-muted-foreground mt-8 pt-6 border-t border-border">
-                Дата последнего обновления: 2 февраля 2026 г.
+                Дата последнего обновления: 2 марта 2026 г.
               </p>
             </div>
           </article>

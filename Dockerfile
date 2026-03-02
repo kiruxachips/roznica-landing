@@ -6,7 +6,9 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+COPY prisma ./prisma/
 RUN npm ci
+RUN npx prisma generate
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -26,8 +28,14 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+
+# Create uploads directory
+RUN mkdir -p public/uploads/products public/uploads/articles && chown -R nextjs:nodejs public/uploads
 
 USER nextjs
 

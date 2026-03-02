@@ -27,9 +27,14 @@ yarn-error.log*
 .env*.local
 .env
 
+# uploads
+public/uploads/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/lib/generated/prisma

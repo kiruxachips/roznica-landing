@@ -1,7 +1,13 @@
 import Link from "next/link"
 import Image from "next/image"
 import { Send, Phone, Mail } from "lucide-react"
-import { SHOP_URL, navigation } from "@/lib/constants"
+import { SHOP_URL } from "@/lib/constants"
+
+const navigation = [
+  { name: "Каталог", href: "/catalog" },
+  { name: "О нас", href: "/#about" },
+  { name: "Отзывы", href: "/#testimonials" },
+]
 
 // VK icon component
 function VKIcon({ className }: { className?: string }) {

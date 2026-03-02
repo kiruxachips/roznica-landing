@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  slug        String     @unique
+  description String?
+  image       String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  parentId    String?
+  parent      Category?  @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryChildren")
+  products    Product[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Product {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  description     String
+  fullDescription String?          @db.Text
+  categoryId      String
+  category        Category         @relation(fields: [categoryId], references: [id])
+  isActive        Boolean          @default(true)
+  isFeatured      Boolean          @default(false)
+  badge           String?
+  sortOrder       Int              @default(0)
+
+  // Coffee attributes (nullable for non-coffee products)
+  origin          String?
+  region          String?
+  farm            String?
+  altitude        String?
+  roastLevel      String?
+  processingMethod String?
+  flavorNotes     String[]         @default([])
+  acidity         Int?             // 0-100
+  sweetness       Int?             // 0-100
+  bitterness      Int?             // 0-100
+  body            Int?             // 0-100
+  brewingMethods  String[]         @default([])
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+
+  images          ProductImage[]
+  variants        ProductVariant[]
+  reviews         Review[]
+  orderItems      OrderItem[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+}
+
+model ProductVariant {
+  id        String      @id @default(cuid())
+  productId String
+  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  weight    String      // "250г", "500г", "1кг"
+  price     Int         // price in rubles
+  oldPrice  Int?
+  sku       String?
+  stock     Int         @default(0)
+  isActive  Boolean     @default(true)
+  sortOrder Int         @default(0)
+  orderItems OrderItem[]
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  text      String   @db.Text
+  rating    Int      // 1-5
+  isVisible Boolean  @default(true)
+  date      String?  // display date like "Ноябрь 2025"
+  createdAt DateTime @default(now())
+}
+
+model AdminUser {
+  id           String @id @default(cuid())
+  email        String @unique
+  passwordHash String
+  name         String
+  role         String @default("admin") // "admin" | "superadmin"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String?
+  phone         String?
+  avatarUrl     String?
+  defaultAddress String?  @db.Text
+  telegramId    String?   @unique
+  accounts      Account[]
+  orders        Order[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+}
+
+model VerificationCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String   // "email_verify" | "password_reset"
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
+}
+
+model PromoCode {
+  id          String    @id @default(cuid())
+  name        String
+  comment     String?   @db.Text
+  code        String    @unique
+  type        String    // "percent" | "fixed"
+  value       Int       // 10 = 10% or 500 = 500₽
+  startDate   DateTime
+  endDate     DateTime
+  usageCount  Int       @default(0)
+  maxUsage    Int?
+  minOrderSum Int?
+  isActive    Boolean   @default(true)
+  orders      Order[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  status         String      @default("pending") // pending/confirmed/shipped/delivered/cancelled
+  customerName   String
+  customerEmail  String?
+  customerPhone  String
+  deliveryAddress String?    @db.Text
+  deliveryMethod  String?
+  paymentMethod   String?
+  subtotal       Int
+  deliveryPrice  Int         @default(0)
+  discount       Int         @default(0)
+  total          Int
+  notes          String?     @db.Text
+  thankYouToken  String?     @unique
+  userId         String?
+  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  promoCodeId    String?
+  promoCode      PromoCode?  @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String          @id @default(cuid())
+  orderId   String
+  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  name      String          // snapshot
+  weight    String          // snapshot
+  price     Int             // snapshot
+  quantity  Int
+}
+
+model ArticleCategory {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  sortOrder   Int       @default(0)
+  isActive    Boolean   @default(true)
+  articles    Article[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Article {
+  id              String           @id @default(cuid())
+  title           String
+  slug            String           @unique
+  excerpt         String           @db.Text
+  content         String           @db.Text
+  coverImage      String?
+  categoryId      String?
+  category        ArticleCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tags            String[]         @default([])
+  isPublished     Boolean          @default(false)
+  publishedAt     DateTime?
+  viewCount       Int              @default(0)
+  metaTitle       String?
+  metaDescription String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}

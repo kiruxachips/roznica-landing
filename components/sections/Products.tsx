@@ -1,13 +1,88 @@
 import Image from "next/image"
-import { Star, ExternalLink, MapPin, Flame, Package } from "lucide-react"
+import Link from "next/link"
+import { Star, MapPin, Flame, Package } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button"
-import { TrackedLink } from "@/components/ui/tracked-link"
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { products, CATALOG_URL } from "@/lib/constants"
+import { getFeaturedProducts } from "@/lib/dal/products"
 
-export function Products() {
+interface FeaturedProduct {
+  id: string
+  name: string
+  slug: string
+  description: string
+  origin: string | null
+  roastLevel: string | null
+  badge: string | null
+  primaryImage: string | null
+  primaryImageAlt: string | null
+  minPrice: number | null
+  minOldPrice: number | null
+  reviewCount: number
+  averageRating: number | null
+}
+
+// Static fallback data (used if DB is not available)
+const staticProducts: FeaturedProduct[] = [
+  {
+    id: "1",
+    name: "Peru GR1",
+    slug: "peru-gr1",
+    description: "Яркий вкус с нотами шоколада, карамели и лёгкой цитрусовой кислинкой",
+    origin: "Перу",
+    roastLevel: "Средняя",
+    badge: "Хит продаж",
+    primaryImage: "/images/peru.webp",
+    primaryImageAlt: "Peru GR1",
+    minPrice: 2000,
+    minOldPrice: 2200,
+    reviewCount: 24,
+    averageRating: 5,
+  },
+  {
+    id: "2",
+    name: "Brazil Yellow Bourbon",
+    slug: "brazil-yellow-bourbon",
+    description: "Сладкий вкус с нотами молочного шоколада, орехов и карамели",
+    origin: "Бразилия",
+    roastLevel: "Средняя",
+    badge: "Премиум",
+    primaryImage: "/images/bourbon.webp",
+    primaryImageAlt: "Brazil Yellow Bourbon",
+    minPrice: 2000,
+    minOldPrice: 2200,
+    reviewCount: 31,
+    averageRating: 5,
+  },
+  {
+    id: "3",
+    name: "Brazil Santos",
+    slug: "brazil-santos",
+    description: "Мягкий сбалансированный вкус с нотами какао и лёгкой ореховой сладостью",
+    origin: "Бразилия",
+    roastLevel: "Средняя",
+    badge: "Классика",
+    primaryImage: "/images/santos.webp",
+    primaryImageAlt: "Brazil Santos",
+    minPrice: 1900,
+    minOldPrice: 2000,
+    reviewCount: 18,
+    averageRating: 5,
+  },
+]
+
+async function getProducts(): Promise<FeaturedProduct[]> {
+  try {
+    return await getFeaturedProducts(3)
+  } catch {
+    return staticProducts
+  }
+}
+
+export async function Products() {
+  const products = await getProducts()
+
   return (
     <section id="products" className="py-20 sm:py-28 bg-secondary/30">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -24,116 +99,102 @@ export function Products() {
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {products.map((product) => (
-            <Card
-              key={product.id}
-              className="group overflow-hidden bg-white border-0 shadow-md hover:shadow-xl transition-all duration-300"
-            >
-              {/* Product Image */}
-              <div className="relative aspect-[2/3] bg-neutral-100 overflow-hidden rounded-t-xl">
-                <Image
-                  src={product.image}
-                  alt={product.name}
-                  fill
-                  className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-                {/* Badge */}
-                {product.badge && (
-                  <Badge className="absolute top-4 left-4 z-10 font-bold text-sm px-3 py-1 bg-white text-black border-0">
-                    {product.badge}
-                  </Badge>
-                )}
-                {/* Quick view overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center z-10">
-                  <TrackedLink
-                    href={product.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(buttonVariants({ variant: "secondary", size: "sm" }))}
-                  >
-                    Подробнее
-                  </TrackedLink>
-                </div>
-              </div>
-
-              <CardContent className="p-3">
-                {/* Rating */}
-                <div className="flex items-center gap-1 mb-1">
-                  {Array.from({ length: product.rating }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className="w-3 h-3 fill-amber-400 text-amber-400"
+            <Link key={product.id} href={`/catalog/${product.slug}`}>
+              <Card className="group overflow-hidden bg-white border-0 shadow-md hover:shadow-xl transition-all duration-300">
+                {/* Product Image */}
+                <div className="relative aspect-[2/3] bg-neutral-100 overflow-hidden rounded-t-xl">
+                  {product.primaryImage && (
+                    <Image
+                      src={product.primaryImage}
+                      alt={product.primaryImageAlt ?? product.name}
+                      fill
+                      className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     />
-                  ))}
-                  <span className="text-xs text-muted-foreground ml-1">
-                    ({product.reviews})
-                  </span>
+                  )}
+                  {product.badge && (
+                    <Badge className="absolute top-4 left-4 z-10 font-bold text-sm px-3 py-1 bg-white text-black border-0">
+                      {product.badge}
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Title */}
-                <h3 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
-                  {product.name}
-                </h3>
+                <CardContent className="p-3">
+                  {/* Rating */}
+                  {product.averageRating && (
+                    <div className="flex items-center gap-1 mb-1">
+                      {Array.from({ length: Math.round(product.averageRating) }).map((_, i) => (
+                        <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      ))}
+                      <span className="text-xs text-muted-foreground ml-1">
+                        ({product.reviewCount})
+                      </span>
+                    </div>
+                  )}
 
-                {/* Description */}
-                <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                  {product.description}
-                </p>
+                  {/* Title */}
+                  <h3 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
+                    {product.name}
+                  </h3>
 
-                {/* Meta */}
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {product.origin}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Flame className="w-3 h-3" />
-                    {product.roast}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Package className="w-3 h-3" />
-                    {product.weight}
-                  </span>
-                </div>
-              </CardContent>
+                  {/* Description */}
+                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                    {product.description}
+                  </p>
 
-              <CardFooter className="p-3 pt-0 flex items-center justify-between">
-                {/* Price */}
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xl font-bold text-primary">
-                    {product.price}₽
-                  </span>
-                  <span className="text-sm text-muted-foreground line-through">
-                    {product.oldPrice}₽
-                  </span>
-                </div>
+                  {/* Meta */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {product.origin && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        {product.origin}
+                      </span>
+                    )}
+                    {product.roastLevel && (
+                      <span className="flex items-center gap-1">
+                        <Flame className="w-3 h-3" />
+                        {product.roastLevel}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1">
+                      <Package className="w-3 h-3" />
+                      1 кг
+                    </span>
+                  </div>
+                </CardContent>
 
-                {/* Buy Button */}
-                <TrackedLink
-                  href={product.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(buttonVariants({ size: "sm" }), "flex items-center gap-1")}
-                >
-                  Купить
-                  <ExternalLink className="w-3 h-3" />
-                </TrackedLink>
-              </CardFooter>
-            </Card>
+                <CardFooter className="p-3 pt-0 flex items-center justify-between">
+                  {/* Price */}
+                  <div className="flex items-baseline gap-2">
+                    {product.minPrice && (
+                      <span className="text-xl font-bold text-primary">
+                        {product.minPrice}₽
+                      </span>
+                    )}
+                    {product.minOldPrice && product.minOldPrice > (product.minPrice ?? 0) && (
+                      <span className="text-sm text-muted-foreground line-through">
+                        {product.minOldPrice}₽
+                      </span>
+                    )}
+                  </div>
+
+                  <span className={cn(buttonVariants({ size: "sm" }), "pointer-events-none")}>
+                    Подробнее
+                  </span>
+                </CardFooter>
+              </Card>
+            </Link>
           ))}
         </div>
 
         {/* View All Button */}
         <div className="text-center mt-12">
-          <TrackedLink
-            href={CATALOG_URL}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href="/catalog"
             className={cn(buttonVariants({ variant: "outline", size: "lg" }), "inline-flex items-center gap-2")}
           >
             Смотреть весь каталог
-            <ExternalLink className="w-4 h-4" />
-          </TrackedLink>
+          </Link>
         </div>
       </div>
     </section>
