@@ -57,12 +57,7 @@ export async function createOrder(data: OrderData) {
         (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod
       )
       if (matchingRate) {
-        const tolerance = matchingRate.priceWithMarkup * 0.05
-        if (Math.abs(data.deliveryPrice - matchingRate.priceWithMarkup) <= tolerance + 1) {
-          deliveryPrice = data.deliveryPrice
-        } else {
-          deliveryPrice = matchingRate.priceWithMarkup
-        }
+        deliveryPrice = matchingRate.priceWithMarkup
       } else {
         deliveryPrice = data.deliveryPrice
       }
@@ -115,6 +110,7 @@ export async function createOrder(data: OrderData) {
         destinationCityCode: data.destinationCityCode,
         estimatedDelivery: data.estimatedDelivery,
         tariffCode: data.tariffCode,
+        postalCode: data.postalCode,
         items: {
           create: data.items.map((item) => ({
             productId: item.productId,

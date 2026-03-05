@@ -9,6 +9,16 @@ import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
 import type { CreateShipmentRequest } from "./types"
 
+function parseWeightGrams(str: string): number {
+  const lower = str.toLowerCase().trim()
+  const match = lower.match(/^([\d.,]+)\s*(кг|г|kg|g)?$/)
+  if (!match) return 0
+  const num = parseFloat(match[1].replace(",", "."))
+  if (isNaN(num)) return 0
+  const unit = match[2] || "г"
+  return unit === "кг" || unit === "kg" ? Math.round(num * 1000) : Math.round(num)
+}
+
 export async function createShipmentForOrder(
   orderId: string,
   senderLocationIndex?: number
@@ -41,17 +51,20 @@ export async function createShipmentForOrder(
     pickupPointCode: order.pickupPointCode || undefined,
     senderCityCode: sender.cityCode,
     recipientCityCode: order.destinationCityCode || undefined,
-    recipientPostalCode: undefined,
+    recipientPostalCode: order.postalCode || undefined,
     recipientName: order.customerName,
     recipientPhone: order.customerPhone,
     recipientAddress: order.deliveryAddress || undefined,
     items: order.items.map((item) => ({
       name: item.name,
-      weight: parseInt(settings.default_weight_grams) || 300,
+      weight: parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300,
       price: item.price,
       quantity: item.quantity,
     })),
-    weight: order.packageWeight || parseInt(settings.default_weight_grams) || 300,
+    weight: order.packageWeight || order.items.reduce(
+      (sum, item) => sum + (parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300) * item.quantity,
+      0
+    ),
     length: parseInt(settings.default_length_cm) || 20,
     width: parseInt(settings.default_width_cm) || 15,
     height: parseInt(settings.default_height_cm) || 10,

@@ -229,6 +229,7 @@ model Order {
   estimatedDelivery   String?   // "3-5 дней"
   packageWeight       Int?      // граммы
   tariffCode          Int?      // код тарифа перевозчика
+  postalCode          String?   // почтовый индекс получателя
 
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt

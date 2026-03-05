@@ -17,6 +17,7 @@ export function CitySearch() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null)
+  const abortRef = useRef<AbortController>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const city = useDeliveryStore((s) => s.city)
@@ -70,22 +71,31 @@ export function CitySearch() {
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(async () => {
+      if (abortRef.current) abortRef.current.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
       setLoading(true)
       try {
-        const res = await fetch(`/api/delivery/cities?q=${encodeURIComponent(query)}`)
+        const res = await fetch(`/api/delivery/cities?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        })
         if (res.ok) {
           const data = await res.json()
           setResults(data)
           setOpen(true)
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }, 300)
 
-    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) }
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (abortRef.current) abortRef.current.abort()
+    }
   }, [query])
 
   // Close dropdown on outside click

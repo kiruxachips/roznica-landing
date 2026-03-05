@@ -100,6 +100,17 @@ export function CheckoutForm() {
     const form = new FormData(e.currentTarget)
 
     try {
+      if (selectedRate?.deliveryType === "door" && !doorAddress?.trim()) {
+        setError("Укажите адрес доставки")
+        setLoading(false)
+        return
+      }
+      if (selectedRate?.deliveryType === "pvz" && !selectedPickupPoint) {
+        setError("Выберите пункт выдачи")
+        setLoading(false)
+        return
+      }
+
       // Build delivery address from selected option
       const address =
         selectedRate?.deliveryType === "pvz" && selectedPickupPoint
@@ -303,6 +314,12 @@ export function CheckoutForm() {
             />
           )}
 
+          {deliveryCity && !selectedRate && (
+            <p className="text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
+              Выберите способ доставки, чтобы продолжить оформление
+            </p>
+          )}
+
           {error && (
             <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>
           )}
@@ -328,7 +345,7 @@ export function CheckoutForm() {
 
           <button
             type="submit"
-            disabled={loading || !agreed}
+            disabled={loading || !agreed || !selectedRate}
             className="w-full h-14 bg-primary text-primary-foreground rounded-xl text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {loading
