@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { persist } from "zustand/middleware"
 
 interface DeliveryRate {
   carrier: string
@@ -59,7 +60,7 @@ interface DeliveryState {
   reset: () => void
 }
 
-export const useDeliveryStore = create<DeliveryState>()((set) => ({
+export const useDeliveryStore = create<DeliveryState>()(persist((set) => ({
   city: "",
   cityCode: "",
   postalCode: "",
@@ -100,4 +101,4 @@ export const useDeliveryStore = create<DeliveryState>()((set) => ({
       selectedPickupPoint: null,
       doorAddress: "",
     }),
-}))
+}), { name: "millor-delivery" }))

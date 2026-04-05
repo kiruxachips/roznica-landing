@@ -49,11 +49,12 @@ export function CheckoutForm() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [agreed, setAgreed] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
   const [bonusAmount, setBonusAmount] = useState(0)
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "online">("cod")
+  const paymentMethod = "online" as const
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
@@ -98,6 +99,27 @@ export function CheckoutForm() {
     setError("")
 
     const form = new FormData(e.currentTarget)
+    const name = (form.get("name") as string)?.trim()
+    const phone = (form.get("phone") as string)?.trim()
+
+    const errors: Record<string, string> = {}
+    if (!name) errors.name = "Укажите имя"
+    if (!phone) {
+      errors.phone = "Укажите телефон"
+    } else {
+      // Accept Russian phone: +7/8 followed by 10 digits
+      const digits = phone.replace(/\D/g, "")
+      if (!/^[78]\d{10}$/.test(digits)) {
+        errors.phone = "Введите корректный номер, например +7 (999) 123-45-67"
+      }
+    }
+    if (!selectedRate) errors.delivery = "Выберите способ доставки"
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setLoading(false)
+      return
+    }
+    setFieldErrors({})
 
     try {
       if (selectedRate?.deliveryType === "door" && !doorAddress?.trim()) {
@@ -186,9 +208,11 @@ export function CheckoutForm() {
                 name="name"
                 required
                 defaultValue={profile?.name || ""}
-                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={() => setFieldErrors((e) => ({ ...e, name: "" }))}
+                className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.name ? "border-red-400" : "border-input"}`}
                 placeholder="Иван Иванов"
               />
+              {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Телефон *</label>
@@ -197,9 +221,11 @@ export function CheckoutForm() {
                 type="tel"
                 required
                 defaultValue={profile?.phone || ""}
-                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                onChange={() => setFieldErrors((e) => ({ ...e, phone: "" }))}
+                className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.phone ? "border-red-400" : "border-input"}`}
                 placeholder="+7 (999) 123-45-67"
               />
+              {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
             </div>
           </div>
 
@@ -264,47 +290,11 @@ export function CheckoutForm() {
 
           <h2 className="text-lg font-semibold pt-2">Оплата</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label
-              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                paymentMethod === "cod"
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/30"
-              }`}
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="cod"
-                checked={paymentMethod === "cod"}
-                onChange={() => setPaymentMethod("cod")}
-                className="accent-primary"
-              />
-              <div>
-                <p className="font-medium text-sm">Оплата при получении</p>
-                <p className="text-xs text-muted-foreground">Наличными или картой курьеру</p>
-              </div>
-            </label>
-            <label
-              className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-colors ${
-                paymentMethod === "online"
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-primary/30"
-              }`}
-            >
-              <input
-                type="radio"
-                name="paymentMethod"
-                value="online"
-                checked={paymentMethod === "online"}
-                onChange={() => setPaymentMethod("online")}
-                className="accent-primary"
-              />
-              <div>
-                <p className="font-medium text-sm">Онлайн-оплата</p>
-                <p className="text-xs text-muted-foreground">Банковская карта, СБП, ЮMoney</p>
-              </div>
-            </label>
+          <div className="flex items-center gap-3 p-4 rounded-xl border-2 border-primary bg-primary/5">
+            <div>
+              <p className="font-medium text-sm">Онлайн-оплата</p>
+              <p className="text-xs text-muted-foreground">Банковская карта, СБП, ЮMoney</p>
+            </div>
           </div>
 
           {isCustomer && (

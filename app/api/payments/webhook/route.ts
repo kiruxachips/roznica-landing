@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail } from "@/lib/email"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
+import { getPayment } from "@/lib/yookassa"
 
-// YooKassa IP ranges (validate only in production)
+// YooKassa IP ranges (first line of defense)
 const YOOKASSA_IPS = [
   "185.71.76.",
   "185.71.77.",
@@ -17,7 +18,7 @@ function isYookassaIp(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  // IP validation in production
+  // IP validation in production (first line of defense)
   if (process.env.NODE_ENV === "production") {
     const forwarded = request.headers.get("x-forwarded-for")
     const ip = forwarded?.split(",")[0]?.trim() || ""
@@ -33,7 +34,6 @@ export async function POST(request: NextRequest) {
     object: {
       id: string
       status: string
-      metadata?: { orderId?: string; orderNumber?: string }
     }
   }
 
@@ -43,16 +43,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const { event, object } = body
-  const paymentId = object?.id
+  const paymentId = body.object?.id
 
   if (!paymentId) {
     return NextResponse.json({}, { status: 200 })
   }
 
+  // Second line of defense: verify payment via direct API call.
+  // We never trust webhook body data — always fetch the real status from YooKassa.
+  let verifiedPayment
+  try {
+    verifiedPayment = await getPayment(paymentId)
+  } catch (e) {
+    console.error(`Webhook: failed to verify payment ${paymentId}:`, e)
+    // Return 500 so YooKassa retries the webhook later
+    return NextResponse.json({ error: "Payment verification failed" }, { status: 500 })
+  }
+
   const order = await prisma.order.findFirst({
     where: { paymentId },
-    include: { user: { select: { email: true, name: true, notifyOrderStatus: true } } },
+    include: {
+      user: { select: { email: true, name: true, notifyOrderStatus: true } },
+      items: { select: { variantId: true, quantity: true } },
+    },
   })
 
   if (!order) {
@@ -60,14 +73,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({}, { status: 200 })
   }
 
-  if (event === "payment.succeeded") {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: "paid",
-        paymentStatus: "succeeded",
-      },
-    })
+  // Use verified status from API, not from webhook body
+  const verifiedStatus = verifiedPayment.status
+
+  if (verifiedStatus === "succeeded") {
+    // Idempotency: skip if already processed
+    if (order.paymentStatus === "succeeded") {
+      return NextResponse.json({}, { status: 200 })
+    }
+
+    // Validate payment amount from verified API response
+    const paidAmount = parseFloat(verifiedPayment.amount.value)
+    if (Math.abs(paidAmount - order.total) > 1) {
+      console.error("Payment amount mismatch", {
+        paymentId,
+        paidAmount,
+        orderTotal: order.total,
+        orderId: order.id,
+      })
+      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 })
+    }
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: { status: "paid", paymentStatus: "succeeded" },
+      }),
+      prisma.orderStatusLog.create({
+        data: { orderId: order.id, fromStatus: order.status, toStatus: "paid", changedBy: "system" },
+      }),
+    ])
 
     // Send email notification
     if (order.user?.email && order.user.notifyOrderStatus) {
@@ -89,14 +124,31 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       console.error("Failed to create shipment for order:", order.id, e)
     }
-  } else if (event === "payment.canceled") {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status: "cancelled",
-        paymentStatus: "canceled",
-      },
-    })
+  } else if (verifiedStatus === "canceled") {
+    // Idempotency: skip if already cancelled
+    if (order.paymentStatus === "canceled" || order.status === "cancelled") {
+      return NextResponse.json({}, { status: 200 })
+    }
+
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: { status: "cancelled", paymentStatus: "canceled" },
+      }),
+      prisma.orderStatusLog.create({
+        data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
+      }),
+    ])
+
+    // Return stock for cancelled payment
+    for (const item of order.items) {
+      if (item.variantId) {
+        await prisma.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        })
+      }
+    }
 
     // Refund bonuses if used
     if (order.bonusUsed > 0 && order.userId) {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -59,14 +59,25 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
     router.push(`/catalog?${params.toString()}`)
   }, [router, activeSort])
 
+  const [filtersOpen, setFiltersOpen] = useState(!!hasActiveFilters)
+
   return (
-    <div className="mb-8 rounded-xl border border-border/60 bg-white p-4 sm:p-5 shadow-sm">
+    <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-border -mx-4 px-4 sm:-mx-6 sm:px-6 mb-6 pb-3 pt-3">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setFiltersOpen(!filtersOpen)}
+          className={cn(
+            "flex items-center gap-1.5 p-2 rounded-lg transition-colors",
+            filtersOpen ? "text-primary" : "text-muted-foreground hover:text-foreground"
+          )}
+          title="Фильтры"
+        >
           <SlidersHorizontal className="w-4 h-4" />
-          Фильтры
-        </div>
+          {hasActiveFilters && (
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+          )}
+        </button>
         <div className="flex items-center gap-3">
           {hasActiveFilters && (
             <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-primary transition-colors">
@@ -85,8 +96,8 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
         </div>
       </div>
 
-      {/* Filter rows */}
-      <div className="space-y-3">
+      {/* Filter rows — collapsible */}
+      {filtersOpen && <div className="space-y-3 mt-3">
         {/* Roast levels */}
         <FilterRow label="Обжарка">
           <FilterPill active={!activeRoast} onClick={() => updateParams("roast", undefined)}>
@@ -126,7 +137,7 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
             ))}
           </FilterRow>
         )}
-      </div>
+      </div>}
     </div>
   )
 }

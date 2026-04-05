@@ -9,6 +9,7 @@ import { CartButton } from "@/components/cart/CartButton"
 import { CartDrawer } from "@/components/cart/CartDrawer"
 import { UserMenu } from "@/components/layout/UserMenu"
 import { cn } from "@/lib/utils"
+import { useCartUIStore } from "@/lib/store/cart-ui"
 
 const navigation = [
   { name: "Каталог", href: "/catalog" },
@@ -19,7 +20,9 @@ const navigation = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [cartOpen, setCartOpen] = useState(false)
+  const cartOpen = useCartUIStore((s) => s.drawerOpen)
+  const openCart = useCartUIStore((s) => s.openDrawer)
+  const closeCart = useCartUIStore((s) => s.closeDrawer)
 
   return (
     <>
@@ -53,7 +56,7 @@ export function Header() {
             {/* CTA + Cart + User */}
             <div className="hidden md:flex md:items-center gap-3">
               <UserMenu />
-              <CartButton onClick={() => setCartOpen(true)} />
+              <CartButton onClick={openCart} />
               <Link
                 href="/catalog"
                 className={cn(buttonVariants({ size: "lg" }))}
@@ -65,7 +68,7 @@ export function Header() {
             {/* Mobile: user + cart + menu */}
             <div className="md:hidden flex items-center gap-2">
               <UserMenu />
-              <CartButton onClick={() => setCartOpen(true)} />
+              <CartButton onClick={openCart} />
               <button
                 type="button"
                 className="inline-flex items-center justify-center rounded-md p-2 text-foreground hover:bg-muted transition-colors"
@@ -107,7 +110,7 @@ export function Header() {
         </nav>
       </header>
 
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer isOpen={cartOpen} onClose={closeCart} />
     </>
   )
 }

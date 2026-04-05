@@ -5,7 +5,8 @@ export async function GET() {
   try {
     const settings = await getDeliverySettings()
 
-    // Only expose public-safe settings
+    // Public-safe settings only. Yandex Maps key is intentionally public
+    // (required by JS SDK in browser) — restrict it by HTTP Referer in Yandex console.
     return NextResponse.json({
       freeDeliveryThreshold: parseInt(settings.free_delivery_threshold) || 0,
       yandexMapsApiKey: settings.yandex_maps_api_key || "",

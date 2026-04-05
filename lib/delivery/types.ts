@@ -81,7 +81,8 @@ export interface CitySearchResult {
 export interface DeliveryProvider {
   carrier: "cdek" | "pochta" | "courier"
   calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]>
-  getPickupPoints(cityCode: string): Promise<PickupPoint[]>
+  /** CDEK: pass city code. Pochta: pass city name. Route handler picks the right value. */
+  getPickupPoints(cityOrCode: string): Promise<PickupPoint[]>
   createShipment(req: CreateShipmentRequest): Promise<CreateShipmentResult>
   getTrackingStatus(carrierOrderId: string): Promise<TrackingStatus[]>
 }

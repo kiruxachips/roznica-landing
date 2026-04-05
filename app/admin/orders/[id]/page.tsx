@@ -1,13 +1,20 @@
 import { notFound } from "next/navigation"
 import { getOrderById } from "@/lib/dal/orders"
+import { prisma } from "@/lib/prisma"
 import { OrderStatusChanger } from "./OrderStatusChanger"
 import { OrderDeliverySection } from "./OrderDeliverySection"
+import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const order = await getOrderById(id)
 
   if (!order) notFound()
+
+  const statusLogs = await prisma.orderStatusLog.findMany({
+    where: { orderId: order.id },
+    orderBy: { createdAt: "desc" },
+  })
 
   return (
     <div className="max-w-3xl">
@@ -129,6 +136,31 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             )}
           </div>
         </div>
+
+        {/* Admin notes */}
+        <OrderNotesEditor orderId={order.id} initialNotes={order.adminNotes} />
+
+        {/* Status history */}
+        {statusLogs.length > 0 && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+            <h2 className="text-lg font-semibold mb-3">История статусов</h2>
+            <div className="space-y-2">
+              {statusLogs.map((log) => (
+                <div key={log.id} className="flex items-center gap-3 text-sm">
+                  <span className="text-muted-foreground text-xs whitespace-nowrap">
+                    {new Date(log.createdAt).toLocaleString("ru-RU", {
+                      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                    })}
+                  </span>
+                  <span>{log.fromStatus} → {log.toStatus}</span>
+                  {log.changedBy && (
+                    <span className="text-xs text-muted-foreground">({log.changedBy})</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <p className="text-sm text-muted-foreground">
           Создан: {new Date(order.createdAt).toLocaleString("ru-RU")}

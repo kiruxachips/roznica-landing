@@ -12,11 +12,9 @@ import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { ProductGallery } from "@/components/product/ProductGallery"
 import { FlavorProfileBars } from "@/components/product/FlavorProfileBars"
-import { BrewingMethods } from "@/components/product/BrewingMethods"
 import { FlavorNotes } from "@/components/product/FlavorNotes"
-import { WeightSelector } from "@/components/product/WeightSelector"
-import { ProductMeta } from "@/components/product/ProductMeta"
-import { ReviewsList } from "@/components/product/ReviewsList"
+import { ProductClientSection } from "@/components/product/ProductClientSection"
+import { ProductTabs } from "@/components/product/ProductTabs"
 import { Star } from "lucide-react"
 
 export async function generateStaticParams() {
@@ -24,7 +22,6 @@ export async function generateStaticParams() {
     const slugs = await getProductSlugs()
     return slugs.map((slug) => ({ slug }))
   } catch {
-    // DB not available during build, return empty for on-demand generation
     return []
   }
 }
@@ -102,11 +99,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         </div>
 
         {/* Product section */}
-        <section className="py-12 sm:py-16 lg:py-24">
+        <section className="py-8 sm:py-10">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
-              {/* Gallery */}
-              <div className="lg:col-span-5">
+              {/* Gallery — sticky on desktop */}
+              <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
                 <ProductGallery images={product.images} productName={product.name} />
               </div>
 
@@ -148,19 +145,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 )}
 
                 {/* Short description */}
-                <p className="text-lg text-muted-foreground leading-relaxed">
+                <p className="text-muted-foreground leading-relaxed">
                   {product.description}
                 </p>
-
-                {/* Meta info */}
-                <ProductMeta
-                  origin={product.origin}
-                  region={product.region}
-                  altitude={product.altitude}
-                  roastLevel={product.roastLevel}
-                  processingMethod={product.processingMethod}
-                  farm={product.farm}
-                />
 
                 {/* Flavor notes */}
                 {product.flavorNotes.length > 0 && <FlavorNotes notes={product.flavorNotes} />}
@@ -175,12 +162,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   />
                 )}
 
-                {/* Brewing methods */}
-                {product.brewingMethods.length > 0 && <BrewingMethods methods={product.brewingMethods} />}
-
-                {/* Weight selector + price + add to cart */}
+                {/* Weight selector + trust signals + sticky CTA */}
                 {product.variants.length > 0 && (
-                  <WeightSelector
+                  <ProductClientSection
                     variants={product.variants}
                     productId={product.id}
                     productName={product.name}
@@ -191,22 +175,18 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               </div>
             </div>
 
-            {/* Full description */}
-            {product.fullDescription && (
-              <div className="mt-16 sm:mt-24 max-w-3xl">
-                <h2 className="font-serif text-2xl font-bold mb-6">О кофе</h2>
-                <div className="text-muted-foreground leading-relaxed whitespace-pre-line">
-                  {product.fullDescription}
-                </div>
-              </div>
-            )}
-
-            {/* Reviews */}
-            {product.reviews.length > 0 && (
-              <div className="mt-16 sm:mt-24">
-                <ReviewsList reviews={product.reviews} />
-              </div>
-            )}
+            {/* Tabs: Description / Meta / Reviews */}
+            <ProductTabs
+              fullDescription={product.fullDescription}
+              origin={product.origin}
+              region={product.region}
+              altitude={product.altitude}
+              roastLevel={product.roastLevel}
+              processingMethod={product.processingMethod}
+              farm={product.farm}
+              brewingMethods={product.brewingMethods}
+              reviews={product.reviews}
+            />
           </div>
         </section>
       </main>

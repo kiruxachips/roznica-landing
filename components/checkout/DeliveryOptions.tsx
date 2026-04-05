@@ -21,8 +21,11 @@ export function DeliveryOptions() {
   }
 
   if (ratesError) {
+    const friendlyError = ratesError.toLowerCase().includes("fetch") || ratesError.toLowerCase().includes("network")
+      ? "Не удалось связаться со службой доставки. Попробуйте позже"
+      : ratesError
     return (
-      <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{ratesError}</p>
+      <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{friendlyError}</p>
     )
   }
 

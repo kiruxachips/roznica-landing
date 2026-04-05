@@ -1,3 +1,5 @@
+import { XMLParser } from "fast-xml-parser"
+import { fetchWithTimeout } from "./utils"
 import type {
   DeliveryProvider,
   DeliveryRateRequest,
@@ -12,10 +14,14 @@ import type {
 const TARIFF_API = "https://tariff.pochta.ru/tariff/v1/calculate"
 const DELIVERY_API = "https://delivery.pochta.ru/delivery/v1/calculate"
 const OTPRAVKA_API = "https://otpravka-api.pochta.ru"
+const TRACKING_API = "https://tracking.pochta.ru/rtm34"
+const POCHTA_PVZ_TARIFF_OFFSET = 100000
 
 export function createPochtaProvider(config: {
   accessToken?: string
   userAuth?: string
+  trackingLogin?: string
+  trackingPassword?: string
   objectType: number // 47030 = посылка нестандартная
   senderPostalCode: string
 }): DeliveryProvider {
@@ -23,12 +29,33 @@ export function createPochtaProvider(config: {
     carrier: "pochta",
 
     async calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]> {
-      if (!req.toPostalCode) return []
+      let postalCode = req.toPostalCode
+
+      // If no postal code provided, try to look up from city name
+      if (!postalCode && req.toCity) {
+        try {
+          const lookupRes = await fetchWithTimeout(
+            `https://api.pochta.ru/postoffice/1.0/by-address?${new URLSearchParams({ address: req.toCity })}`,
+            {},
+            5000
+          )
+          if (lookupRes.ok) {
+            const offices = await lookupRes.json()
+            if (Array.isArray(offices) && offices.length > 0) {
+              postalCode = String(offices[0]?.["postal-code"] || offices[0]?.postalCode || "")
+            }
+          }
+        } catch {
+          // Lookup failed — can't calculate without postal code
+        }
+      }
+
+      if (!postalCode) return []
 
       const params = new URLSearchParams({
         "object": config.objectType.toString(),
         "from": config.senderPostalCode,
-        "to": req.toPostalCode,
+        "to": postalCode,
         "weight": req.weight.toString(),
         "group": "0",
         "closed": "1",
@@ -43,11 +70,11 @@ export function createPochtaProvider(config: {
 
       try {
         const [tariffRes, deliveryRes] = await Promise.allSettled([
-          fetch(`${TARIFF_API}?${params}`),
-          fetch(`${DELIVERY_API}?${new URLSearchParams({
+          fetchWithTimeout(`${TARIFF_API}?${params}`),
+          fetchWithTimeout(`${DELIVERY_API}?${new URLSearchParams({
             "object": config.objectType.toString(),
             "from": config.senderPostalCode,
-            "to": req.toPostalCode,
+            "to": postalCode,
           })}`),
         ])
 
@@ -57,6 +84,8 @@ export function createPochtaProvider(config: {
           // Pochta returns price in kopecks
           price = Math.ceil((data.ground?.val || data.paynds || 0) / 100)
         } else {
+          const reason = tariffRes.status === "rejected" ? tariffRes.reason : `HTTP ${tariffRes.value.status}`
+          console.error("Pochta tariff API failed:", reason)
           return []
         }
 
@@ -73,22 +102,67 @@ export function createPochtaProvider(config: {
             carrier: "pochta",
             carrierName: "Почта России",
             tariffCode: config.objectType,
-            tariffName: "Почта России — Посылка",
+            tariffName: "Почта России — До двери",
             deliveryType: "door",
             price,
             priceWithMarkup: price,
             minDays,
             maxDays,
           },
+          {
+            carrier: "pochta",
+            carrierName: "Почта России",
+            tariffCode: config.objectType + POCHTA_PVZ_TARIFF_OFFSET,
+            tariffName: "Почта России — До отделения",
+            deliveryType: "pvz",
+            price,
+            priceWithMarkup: price,
+            minDays: Math.max(minDays - 1, 1),
+            maxDays: Math.max(maxDays - 1, minDays),
+          },
         ]
-      } catch {
+      } catch (e) {
+        console.error("Pochta calculateRates error:", e)
         return []
       }
     },
 
-    async getPickupPoints(): Promise<PickupPoint[]> {
-      // Pochta delivers to address/postal index, no PVZ selection
-      return []
+    async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
+      if (!config.accessToken || !config.userAuth || !cityName) return []
+
+      try {
+        const res = await fetchWithTimeout(
+          `${OTPRAVKA_API}/1.0/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
+          {
+            headers: {
+              Authorization: `AccessToken ${config.accessToken}`,
+              "X-User-Authorization": `Basic ${config.userAuth}`,
+              Accept: "application/json;charset=UTF-8",
+            },
+          }
+        )
+
+        if (!res.ok) return []
+
+        const data = await res.json()
+        const offices: unknown[] = Array.isArray(data) ? data : []
+
+        return offices
+          .filter((o: any) => o.latitude && o.longitude)
+          .map((o: any) => ({
+            code: String(o["postal-code"] || o.postalCode || ""),
+            name: `Почтовое отделение ${o["postal-code"] || o.postalCode || ""}`,
+            address: o["address-source"] || o.addressSource || "",
+            lat: o.latitude,
+            lng: o.longitude,
+            workTime: o["work-time"] || o.workTime || undefined,
+            phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
+            carrier: "pochta" as const,
+          }))
+      } catch (e) {
+        console.error("Pochta getPickupPoints error:", e)
+        return []
+      }
     },
 
     async createShipment(req: CreateShipmentRequest): Promise<CreateShipmentResult> {
@@ -101,7 +175,9 @@ export function createPochtaProvider(config: {
           "address-type-to": "DEFAULT",
           "given-name": req.recipientName.split(" ")[0] || req.recipientName,
           "house-to": "",
-          "index-to": parseInt(req.recipientPostalCode || "0"),
+          "index-to": req.deliveryType === "pvz" && req.pickupPointCode
+            ? parseInt(req.pickupPointCode)
+            : parseInt(req.recipientPostalCode || "0"),
           "mail-category": "ORDINARY",
           "mail-direct": 643,
           "mail-type": "POSTAL_PARCEL",
@@ -120,7 +196,7 @@ export function createPochtaProvider(config: {
         },
       ]
 
-      const res = await fetch(`${OTPRAVKA_API}/1.0/user/backlog`, {
+      const res = await fetchWithTimeout(`${OTPRAVKA_API}/1.0/user/backlog`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json;charset=UTF-8",
@@ -144,9 +220,80 @@ export function createPochtaProvider(config: {
       }
     },
 
-    async getTrackingStatus(): Promise<TrackingStatus[]> {
-      // MVP: manual tracking in admin
-      return []
+    async getTrackingStatus(barcode: string): Promise<TrackingStatus[]> {
+      if (!config.trackingLogin || !config.trackingPassword || !barcode) return []
+
+      const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
+  xmlns:oper="http://russianpost.org/operationhistory"
+  xmlns:data="http://russianpost.org/operationhistory/data"
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <oper:getOperationHistory>
+      <data:OperationHistoryRequest>
+        <data:Barcode>${barcode}</data:Barcode>
+        <data:MessageType>0</data:MessageType>
+        <data:Language>RUS</data:Language>
+      </data:OperationHistoryRequest>
+      <data:AuthorizationHeader soapenv:mustUnderstand="1">
+        <data:login>${config.trackingLogin}</data:login>
+        <data:password>${config.trackingPassword}</data:password>
+      </data:AuthorizationHeader>
+    </oper:getOperationHistory>
+  </soap:Body>
+</soap:Envelope>`
+
+      try {
+        const res = await fetchWithTimeout(TRACKING_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/soap+xml;charset=UTF-8",
+          },
+          body: soapBody,
+        })
+
+        if (!res.ok) return []
+
+        const xml = await res.text()
+        const parser = new XMLParser({
+          ignoreAttributes: false,
+          removeNSPrefix: true,
+        })
+        const parsed = parser.parse(xml)
+
+        const historyRecords =
+          parsed?.Envelope?.Body?.getOperationHistoryResponse
+            ?.OperationHistoryData?.historyRecord
+
+        if (!historyRecords) return []
+
+        const records = Array.isArray(historyRecords)
+          ? historyRecords
+          : [historyRecords]
+
+        return records
+          .map((r: any) => {
+            const operType = r?.OperationParameters?.OperType
+            const operAttr = r?.OperationParameters?.OperAttr
+            const dateStr = r?.OperationParameters?.DateOper
+            const address = r?.AddressParameters?.OperationAddress
+
+            const typeName = operType?.Name || ""
+            const attrName = operAttr?.Name || ""
+            const name = attrName ? `${typeName}: ${attrName}` : typeName
+
+            return {
+              code: `${operType?.Id || 0}.${operAttr?.Id || 0}`,
+              name,
+              date: dateStr || "",
+              cityName: address?.Description || address?.Index || "",
+            }
+          })
+          .reverse()
+      } catch (e) {
+        console.error("Pochta getTrackingStatus error:", e)
+        return []
+      }
     },
   }
 }

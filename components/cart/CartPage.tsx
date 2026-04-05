@@ -114,8 +114,9 @@ export function CartPage() {
                   </button>
                   <span className="w-9 text-center text-sm font-medium">{item.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm"
+                    onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
+                    disabled={item.quantity >= 99}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm disabled:opacity-30"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -195,7 +196,7 @@ export function CartPage() {
             </div>
             {deliveryPrice > 0 && (
               <p className="text-xs text-muted-foreground">
-                Бесплатная доставка от 3000₽ (ещё {3000 - (subtotal - promoDiscount)}₽)
+                Бесплатная доставка от 3000₽ (ещё {Math.max(0, 3000 - (subtotal - promoDiscount))}₽)
               </p>
             )}
             <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">

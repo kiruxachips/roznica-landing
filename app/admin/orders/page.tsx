@@ -22,26 +22,47 @@ const statusStyles: Record<string, string> = {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string }>
+  searchParams: Promise<{ status?: string; page?: string; search?: string }>
 }) {
   const params = await searchParams
   const status = params.status
+  const search = params.search
   const page = Number(params.page) || 1
 
-  const { orders, total } = await getOrders({ status, page })
+  const { orders, total } = await getOrders({ status, search, page })
   const totalPages = Math.ceil(total / 20)
 
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Заказы</h1>
 
-      {/* Filter */}
-      <div className="flex gap-2 mb-4">
-        <Link href="/admin/orders" className={`px-3 py-1.5 rounded-lg text-sm ${!status ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+      {/* Search + Filter */}
+      <form action="/admin/orders" method="get" className="mb-4">
+        <div className="flex gap-3 items-center">
+          <input
+            name="search"
+            type="text"
+            defaultValue={search || ""}
+            placeholder="Поиск по номеру, имени, телефону, email..."
+            className="flex-1 h-10 px-4 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          {status && <input type="hidden" name="status" value={status} />}
+          <button type="submit" className="h-10 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
+            Найти
+          </button>
+          {search && (
+            <Link href={`/admin/orders${status ? `?status=${status}` : ""}`} className="text-sm text-muted-foreground hover:text-foreground">
+              Сбросить
+            </Link>
+          )}
+        </div>
+      </form>
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <Link href={`/admin/orders${search ? `?search=${search}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm ${!status ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
           Все
         </Link>
         {Object.entries(statusLabels).map(([key, label]) => (
-          <Link key={key} href={`/admin/orders?status=${key}`} className={`px-3 py-1.5 rounded-lg text-sm ${status === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          <Link key={key} href={`/admin/orders?status=${key}${search ? `&search=${search}` : ""}`} className={`px-3 py-1.5 rounded-lg text-sm ${status === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
             {label}
           </Link>
         ))}
@@ -96,7 +117,7 @@ export default async function AdminOrdersPage({
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <Link
               key={p}
-              href={`/admin/orders?${status ? `status=${status}&` : ""}page=${p}`}
+              href={`/admin/orders?${status ? `status=${status}&` : ""}${search ? `search=${search}&` : ""}page=${p}`}
               className={`w-8 h-8 flex items-center justify-center rounded-lg text-sm ${p === page ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/80"}`}
             >
               {p}

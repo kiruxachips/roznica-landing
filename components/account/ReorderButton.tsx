@@ -44,8 +44,13 @@ export function ReorderButton({ items }: Props) {
       const data = await res.json()
 
       let added = 0
+      let adjusted = false
       for (const av of data.available) {
         const original = items.find((i) => i.variantId === av.variantId)
+        const wantedQty = original?.quantity ?? 1
+        const qty = Math.min(wantedQty, av.stock ?? wantedQty)
+        if (qty <= 0) continue
+        if (qty < wantedQty) adjusted = true
         addItem({
           productId: av.productId,
           variantId: av.variantId,
@@ -53,7 +58,7 @@ export function ReorderButton({ items }: Props) {
           weight: av.weight,
           price: av.price,
           image: av.image,
-          quantity: original?.quantity ?? 1,
+          quantity: qty,
           slug: av.slug,
         })
         added++
@@ -63,6 +68,8 @@ export function ReorderButton({ items }: Props) {
         setMessage(`Добавлено ${added} из ${items.length} товаров. Некоторые недоступны.`)
       } else if (data.unavailable.length > 0 && added === 0) {
         setMessage("Все товары из заказа недоступны")
+      } else if (adjusted) {
+        setMessage("Товары добавлены, количество скорректировано по наличию")
       } else {
         setMessage("Товары добавлены в корзину!")
       }

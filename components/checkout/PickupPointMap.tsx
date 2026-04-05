@@ -30,6 +30,7 @@ interface YMapMarker {
 }
 
 export function PickupPointMap() {
+  const city = useDeliveryStore((s) => s.city)
   const cityCode = useDeliveryStore((s) => s.cityCode)
   const selectedRate = useDeliveryStore((s) => s.selectedRate)
   const pickupPoints = useDeliveryStore((s) => s.pickupPoints)
@@ -58,7 +59,12 @@ export function PickupPointMap() {
     if (!cityCode || selectedRate?.deliveryType !== "pvz") return
 
     setPickupPointsLoading(true)
-    fetch(`/api/delivery/pickup-points?city_code=${cityCode}&carrier=${selectedRate.carrier}`)
+    const params = new URLSearchParams({
+      city_code: cityCode,
+      carrier: selectedRate.carrier,
+      ...(city ? { city } : {}),
+    })
+    fetch(`/api/delivery/pickup-points?${params}`)
       .then((r) => r.ok ? r.json() : [])
       .then((points) => {
         setPickupPoints(points)

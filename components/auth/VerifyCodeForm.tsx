@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { signIn } from "next-auth/react"
 import { verifyEmailCode, resendVerificationCode } from "@/lib/actions/auth"
 
 export function VerifyCodeForm() {
@@ -73,21 +72,7 @@ export function VerifyCodeForm() {
       return
     }
 
-    // Auto-login after verification
-    const signInResult = await signIn("customer-credentials", {
-      email,
-      // We need to get the password from somewhere...
-      // Since we just verified, redirect to login
-      redirect: false,
-    })
-
-    if (signInResult?.ok) {
-      router.push("/account")
-      router.refresh()
-    } else {
-      // Redirect to login with success message
-      router.push("/auth/login?verified=1")
-    }
+    router.push("/auth/login?verified=1")
   }
 
   async function handleResend() {

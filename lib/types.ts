@@ -13,6 +13,8 @@ export interface ProductCard {
   minOldPrice: number | null
   reviewCount: number
   averageRating: number | null
+  firstVariant: { id: string; weight: string; price: number; stock: number } | null
+  variants?: { id: string; weight: string; price: number; stock: number }[]
 }
 
 export interface ProductDetail {
@@ -132,6 +134,7 @@ export interface BonusTransactionInfo {
 
 export interface ProductFilters {
   categorySlug?: string
+  collectionSlug?: string
   roastLevel?: string
   origin?: string
   brewingMethod?: string

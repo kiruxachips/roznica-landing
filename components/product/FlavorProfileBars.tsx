@@ -41,10 +41,10 @@ export function FlavorProfileBars({ acidity, sweetness, bitterness, body }: Flav
 
   return (
     <div ref={ref}>
-      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
         Профиль вкуса
       </h3>
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         {barItems.map(({ key, label }) => {
           const value = values[key]
           if (value === null) return null

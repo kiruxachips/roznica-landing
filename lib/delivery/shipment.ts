@@ -32,6 +32,11 @@ export async function createShipmentForOrder(
   if (order.carrierOrderId) return // Already created
   if (!order.deliveryMethod || order.deliveryMethod === "courier") return
 
+  // Validate pvz orders have pickup point code
+  if (order.deliveryType === "pvz" && order.deliveryMethod === "pochta" && !order.pickupPointCode) {
+    throw new Error("Не указан код почтового отделения для доставки до отделения")
+  }
+
   const settings = await getDeliverySettings()
 
   // Pick sender location: explicit index or default
@@ -134,6 +139,41 @@ export async function refreshTrackingForOrder(orderId: string) {
       await prisma.order.update({
         where: { id: orderId },
         data: { carrierStatus: latest.name },
+      })
+    }
+    return statuses
+  }
+
+  if (order.deliveryMethod === "pochta") {
+    if (!order.trackingNumber) return null
+
+    const provider = createPochtaProvider({
+      accessToken: settings.pochta_access_token || undefined,
+      userAuth: settings.pochta_user_auth || undefined,
+      trackingLogin: settings.pochta_tracking_login || undefined,
+      trackingPassword: settings.pochta_tracking_password || undefined,
+      objectType: parseInt(settings.pochta_object_type) || 47030,
+      senderPostalCode: getDefaultSenderLocation(settings).postalCode,
+    })
+
+    const statuses = await provider.getTrackingStatus(order.trackingNumber)
+    if (statuses.length > 0) {
+      const latest = statuses[0]
+      const updateData: { carrierStatus: string; status?: string } = {
+        carrierStatus: latest.name,
+      }
+
+      // Map Pochta operation types to order status
+      const operTypeId = parseInt(latest.code.split(".")[0])
+      if (operTypeId === 2 && order.status !== "delivered") {
+        updateData.status = "delivered"
+      } else if (operTypeId === 1 && ["paid", "confirmed"].includes(order.status)) {
+        updateData.status = "shipped"
+      }
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: updateData,
       })
     }
     return statuses

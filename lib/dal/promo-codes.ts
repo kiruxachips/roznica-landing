@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 
-export async function validatePromoCode(code: string, subtotal: number) {
+export async function validatePromoCode(code: string, subtotal: number, userId?: string) {
   const promo = await prisma.promoCode.findUnique({
     where: { code: code.toUpperCase() },
   })
@@ -23,6 +23,15 @@ export async function validatePromoCode(code: string, subtotal: number) {
 
   if (promo.maxUsage !== null && promo.usageCount >= promo.maxUsage) {
     return { valid: false, error: "Промокод исчерпан" }
+  }
+
+  if (promo.maxPerCustomer !== null && userId) {
+    const customerUsage = await prisma.order.count({
+      where: { promoCodeId: promo.id, userId, status: { not: "cancelled" } },
+    })
+    if (customerUsage >= promo.maxPerCustomer) {
+      return { valid: false, error: "Вы уже использовали этот промокод максимальное количество раз" }
+    }
   }
 
   if (promo.minOrderSum !== null && subtotal < promo.minOrderSum) {

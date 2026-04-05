@@ -6,7 +6,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   products: ProductCard[]
   total: number
 }> {
-  const { categorySlug, roastLevel, origin, brewingMethod, search, sort, page = 1, limit = 12 } = filters
+  const { categorySlug, collectionSlug, roastLevel, origin, brewingMethod, search, sort, page = 1, limit = 12 } = filters
 
   const where: Prisma.ProductWhereInput = {
     isActive: true,
@@ -14,6 +14,9 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
 
   if (categorySlug) {
     where.category = { slug: categorySlug }
+  }
+  if (collectionSlug) {
+    where.collections = { some: { collection: { slug: collectionSlug } } }
   }
   if (roastLevel) {
     where.roastLevel = roastLevel
@@ -32,24 +35,77 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     ]
   }
 
+  const isPriceSort = sort === "price-asc" || sort === "price-desc"
+
   let orderBy: Prisma.ProductOrderByWithRelationInput = { sortOrder: "asc" }
   if (sort === "newest") orderBy = { createdAt: "desc" }
   if (sort === "popular") orderBy = { sortOrder: "asc" }
 
-  const [items, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy,
-      skip: (page - 1) * limit,
-      take: limit,
+  let items
+  let total: number
+
+  if (isPriceSort) {
+    // Price lives on ProductVariant, so we can't use Prisma ORDER BY directly.
+    // Step 1: Get all matching product IDs with their min variant price (lightweight query).
+    const [allWithPrice, count] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        select: {
+          id: true,
+          variants: {
+            where: { isActive: true },
+            select: { price: true },
+            orderBy: { price: "asc" },
+            take: 1,
+          },
+        },
+      }),
+      prisma.product.count({ where }),
+    ])
+    total = count
+
+    // Step 2: Sort all by min price and paginate.
+    allWithPrice.sort((a, b) => {
+      const aPrice = a.variants[0]?.price ?? Infinity
+      const bPrice = b.variants[0]?.price ?? Infinity
+      return sort === "price-asc" ? aPrice - bPrice : bPrice - aPrice
+    })
+    const pageIds = allWithPrice
+      .slice((page - 1) * limit, page * limit)
+      .map((p) => p.id)
+
+    // Step 3: Fetch full data for the current page only.
+    const fullItems = await prisma.product.findMany({
+      where: { id: { in: pageIds } },
       include: {
         images: { where: { isPrimary: true }, take: 1 },
-        variants: { where: { isActive: true }, orderBy: { price: "asc" }, take: 1 },
+        variants: { where: { isActive: true }, orderBy: { price: "asc" } },
         reviews: { where: { isVisible: true }, select: { rating: true } },
       },
-    }),
-    prisma.product.count({ where }),
-  ])
+    })
+
+    // Preserve sort order (Prisma IN doesn't guarantee order).
+    const idOrder = new Map(pageIds.map((id, i) => [id, i]))
+    fullItems.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0))
+    items = fullItems
+  } else {
+    const [fetched, count] = await Promise.all([
+      prisma.product.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          images: { where: { isPrimary: true }, take: 1 },
+          variants: { where: { isActive: true }, orderBy: { price: "asc" } },
+          reviews: { where: { isVisible: true }, select: { rating: true } },
+        },
+      }),
+      prisma.product.count({ where }),
+    ])
+    items = fetched
+    total = count
+  }
 
   let products: ProductCard[] = items.map((p) => ({
     id: p.id,
@@ -64,6 +120,8 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     primaryImageAlt: p.images[0]?.alt ?? null,
     minPrice: p.variants[0]?.price ?? null,
     minOldPrice: p.variants[0]?.oldPrice ?? null,
+    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, stock: p.variants[0].stock } : null,
+    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, stock: v.stock })),
     reviewCount: p.reviews.length,
     averageRating:
       p.reviews.length > 0
@@ -71,18 +129,11 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
         : null,
   }))
 
-  // Sort by price after fetching (since price is on variant)
-  if (sort === "price-asc") {
-    products = products.sort((a, b) => (a.minPrice ?? 0) - (b.minPrice ?? 0))
-  } else if (sort === "price-desc") {
-    products = products.sort((a, b) => (b.minPrice ?? 0) - (a.minPrice ?? 0))
-  }
-
   return { products, total }
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-  const product = await prisma.product.findUnique({
+  const product = await prisma.product.findFirst({
     where: { slug, isActive: true },
     include: {
       category: { select: { name: true, slug: true } },
@@ -171,6 +222,7 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
       primaryImageAlt: p.images[0]?.alt ?? null,
       minPrice: displayVariant?.price ?? null,
       minOldPrice: displayVariant?.oldPrice ?? null,
+      firstVariant: displayVariant ? { id: displayVariant.id, weight: displayVariant.weight, price: displayVariant.price, stock: displayVariant.stock } : null,
       reviewCount: p.reviews.length,
       averageRating:
         p.reviews.length > 0

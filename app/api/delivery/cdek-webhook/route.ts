@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prisma"
 
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.CDEK_WEBHOOK_SECRET
-  if (webhookSecret) {
-    const url = new URL(request.url)
-    const secret = url.searchParams.get("secret")
-    if (secret !== webhookSecret) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
+  if (!webhookSecret) {
+    console.error("CDEK_WEBHOOK_SECRET not configured — rejecting all webhooks")
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 503 })
+  }
+  const url = new URL(request.url)
+  const secret = url.searchParams.get("secret")
+  if (secret !== webhookSecret) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   let body: {
@@ -51,9 +53,17 @@ export async function POST(request: NextRequest) {
   const statusCode = body.attributes?.status_code
   const cdekNumber = body.attributes?.cdek_number
 
+  // Only process known CDEK status codes
+  const KNOWN_STATUSES = [
+    "CREATED", "RECEIVED_AT_SHIPMENT_WAREHOUSE", "READY_FOR_SHIPMENT_IN_TRANSIT_CITY",
+    "ACCEPTED", "IN_TRANSIT", "ARRIVED_AT_RECIPIENT_CITY",
+    "ACCEPTED_AT_PICK_UP_POINT", "TAKEN_BY_COURIER", "DELIVERED",
+    "NOT_DELIVERED", "RETURNED", "SEIZED",
+  ]
+
   const updateData: Record<string, unknown> = {}
 
-  if (statusCode) {
+  if (statusCode && KNOWN_STATUSES.includes(statusCode)) {
     updateData.carrierStatus = statusCode
   }
 
@@ -66,7 +76,6 @@ export async function POST(request: NextRequest) {
   if (statusCode === "DELIVERED") {
     updateData.status = "delivered"
   } else if (statusCode === "ACCEPTED" || statusCode === "CREATED") {
-    // Order accepted by CDEK
     if (order.status === "paid" || order.status === "confirmed") {
       updateData.status = "shipped"
     }
@@ -77,6 +86,18 @@ export async function POST(request: NextRequest) {
       where: { id: order.id },
       data: updateData,
     })
+
+    // Log status change for audit trail
+    if (updateData.status && updateData.status !== order.status) {
+      await prisma.orderStatusLog.create({
+        data: {
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: updateData.status as string,
+          changedBy: "cdek-webhook",
+        },
+      })
+    }
   }
 
   return NextResponse.json({}, { status: 200 })

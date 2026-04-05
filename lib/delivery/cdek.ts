@@ -7,12 +7,13 @@ import type {
   CreateShipmentResult,
   TrackingStatus,
 } from "./types"
+import { fetchWithTimeout } from "./utils"
 
 const PROD_API = "https://api.cdek.ru"
 const TEST_API = "https://api.edu.cdek.ru"
 
-// Token cache
-let tokenCache: { token: string; expiresAt: number } | null = null
+// Token cache keyed by credentials, so changing creds in admin invalidates it
+let tokenCache: { key: string; token: string; expiresAt: number } | null = null
 
 function getApiUrl(testMode: boolean) {
   return testMode ? TEST_API : PROD_API
@@ -24,7 +25,8 @@ async function getAccessToken(
   testMode: boolean
 ): Promise<string> {
   const now = Date.now()
-  if (tokenCache && now < tokenCache.expiresAt - 60_000) {
+  const cacheKey = `${clientId}:${testMode}`
+  if (tokenCache && tokenCache.key === cacheKey && now < tokenCache.expiresAt - 60_000) {
     return tokenCache.token
   }
 
@@ -35,7 +37,7 @@ async function getAccessToken(
     client_secret: clientSecret,
   })
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
@@ -48,6 +50,7 @@ async function getAccessToken(
 
   const data = await res.json()
   tokenCache = {
+    key: cacheKey,
     token: data.access_token,
     expiresAt: now + data.expires_in * 1000,
   }
@@ -67,7 +70,7 @@ async function cdekFetch(
   const token = await getAccessToken(options.clientId, options.clientSecret, options.testMode)
   const apiUrl = getApiUrl(options.testMode)
 
-  const res = await fetch(`${apiUrl}${path}`, {
+  const res = await fetchWithTimeout(`${apiUrl}${path}`, {
     method: options.method || "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -83,6 +86,9 @@ async function cdekFetch(
 
   return res.json()
 }
+
+/** Shared CDEK fetch with auth + timeout. Exported for city-search. */
+export { cdekFetch, getApiUrl }
 
 export function createCdekProvider(config: {
   clientId: string
@@ -125,29 +131,37 @@ export function createCdekProvider(config: {
 
       if (!data.tariff_codes) return []
 
-      const tariffNames: Record<number, { name: string; type: "pvz" | "door" }> = {
-        136: { name: "СДЭК Посылка (склад-склад)", type: "pvz" },
-        137: { name: "СДЭК Посылка (склад-дверь)", type: "door" },
-        233: { name: "СДЭК Эконом (склад-склад)", type: "pvz" },
-        234: { name: "СДЭК Эконом (склад-дверь)", type: "door" },
-        138: { name: "СДЭК Посылка (дверь-склад)", type: "pvz" },
-        139: { name: "СДЭК Посылка (дверь-дверь)", type: "door" },
+      // delivery_mode from CDEK API: 1=door-door, 2=door-pvz, 3=pvz-door, 4=pvz-pvz
+      // We care about the destination part: modes 1,3 → door, modes 2,4 → pvz
+      function deliveryTypeFromMode(mode?: number): "pvz" | "door" {
+        if (mode === 1 || mode === 3) return "door"
+        return "pvz" // modes 2, 4, or unknown default to pvz
+      }
+
+      // Human-readable names for well-known tariffs
+      const tariffNames: Record<number, string> = {
+        136: "СДЭК Посылка (склад-склад)",
+        137: "СДЭК Посылка (склад-дверь)",
+        138: "СДЭК Посылка (дверь-склад)",
+        139: "СДЭК Посылка (дверь-дверь)",
+        233: "СДЭК Эконом (склад-склад)",
+        234: "СДЭК Эконом (склад-дверь)",
+        291: "СДЭК E-com Standard (склад-склад)",
+        293: "СДЭК E-com Standard (склад-дверь)",
+        294: "СДЭК E-com Standard (дверь-склад)",
+        295: "СДЭК E-com Standard (дверь-дверь)",
       }
 
       return data.tariff_codes
         .filter((t: { tariff_code: number }) => config.tariffs.includes(t.tariff_code))
-        .map((t: { tariff_code: number; delivery_sum: number; period_min: number; period_max: number }) => {
-          const info = tariffNames[t.tariff_code] || {
-            name: `СДЭК Тариф ${t.tariff_code}`,
-            type: t.tariff_code % 2 === 0 ? "door" : "pvz",
-          }
+        .map((t: { tariff_code: number; tariff_name?: string; delivery_mode: number; delivery_sum: number; period_min: number; period_max: number }) => {
           const price = Math.ceil(t.delivery_sum)
           return {
             carrier: "cdek" as const,
             carrierName: "СДЭК",
             tariffCode: t.tariff_code,
-            tariffName: info.name,
-            deliveryType: info.type,
+            tariffName: tariffNames[t.tariff_code] || t.tariff_name || `СДЭК Тариф ${t.tariff_code}`,
+            deliveryType: deliveryTypeFromMode(t.delivery_mode),
             price,
             priceWithMarkup: price,
             minDays: t.period_min,
@@ -254,8 +268,10 @@ export async function testCdekConnection(
   testMode: boolean
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Clear cached token to test fresh
-    tokenCache = null
+    // Clear cached token for these credentials to test fresh
+    if (tokenCache?.key === `${clientId}:${testMode}`) {
+      tokenCache = null
+    }
     await getAccessToken(clientId, clientSecret, testMode)
     return { success: true }
   } catch (e) {

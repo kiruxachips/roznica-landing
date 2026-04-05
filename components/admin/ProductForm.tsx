@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createProduct, updateProduct } from "@/lib/actions/products"
+import { syncProductCollections } from "@/lib/actions/collections"
 import { uploadImage } from "@/lib/actions/images"
 import { VariantManager } from "./VariantManager"
 import { ImageUploader } from "./ImageUploader"
@@ -41,7 +42,15 @@ interface ProductImage {
   isPrimary: boolean
 }
 
+interface CollectionOption {
+  id: string
+  name: string
+  emoji: string | null
+}
+
 interface ProductFormProps {
+  collections?: CollectionOption[]
+  productCollectionIds?: string[]
   product?: {
     id: string
     name: string
@@ -72,7 +81,7 @@ interface ProductFormProps {
   categories: Category[]
 }
 
-export function ProductForm({ product, categories }: ProductFormProps) {
+export function ProductForm({ product, categories, collections = [], productCollectionIds = [] }: ProductFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -85,6 +94,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? categories[0]?.id ?? "")
   const [isActive, setIsActive] = useState(product?.isActive ?? true)
   const [isFeatured, setIsFeatured] = useState(product?.isFeatured ?? false)
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(productCollectionIds)
   const [badge, setBadge] = useState(product?.badge ?? "")
   const [origin, setOrigin] = useState(product?.origin ?? "")
   const [region, setRegion] = useState(product?.region ?? "")
@@ -253,6 +263,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
       if (product) {
         // Update existing product
         await updateProduct(product.id, data)
+        await syncProductCollections(product.id, selectedCollectionIds)
         router.push("/admin/products")
         router.refresh()
       } else {
@@ -267,6 +278,7 @@ export function ProductForm({ product, categories }: ProductFormProps) {
         }
 
         const created = await createProduct(data as Parameters<typeof createProduct>[0])
+        await syncProductCollections(created.id, selectedCollectionIds)
 
         // Upload pending images
         if (pendingImages.length > 0) {
@@ -370,6 +382,32 @@ export function ProductForm({ product, categories }: ProductFormProps) {
             </label>
           </div>
         </div>
+
+        {/* Collections */}
+        {collections.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium mb-2">Подборки</label>
+            <div className="flex flex-wrap gap-2">
+              {collections.map((c) => (
+                <label key={c.id} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={selectedCollectionIds.includes(c.id)}
+                    onChange={(e) => {
+                      setSelectedCollectionIds(
+                        e.target.checked
+                          ? [...selectedCollectionIds, c.id]
+                          : selectedCollectionIds.filter((id) => id !== c.id)
+                      )
+                    }}
+                    className="rounded"
+                  />
+                  {c.emoji && `${c.emoji} `}{c.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Templates (only for new products when category has templates) */}

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getDeliverySettings } from "./delivery-settings"
 
 export async function getBonusBalance(userId: string) {
   const user = await prisma.user.findUnique({
@@ -25,14 +26,18 @@ export async function getBonusTransactions(
   return { transactions, total }
 }
 
-const BONUS_RATE = 0.05 // 5%
+async function getBonusRate(): Promise<number> {
+  const settings = await getDeliverySettings()
+  return parseFloat(settings.bonus_rate || "5") / 100
+}
 
 export async function creditBonusesForOrder(
   userId: string,
   orderId: string,
   orderTotal: number
 ) {
-  const earned = Math.floor(orderTotal * BONUS_RATE)
+  const rate = await getBonusRate()
+  const earned = Math.floor(orderTotal * rate)
   if (earned <= 0) return
 
   await prisma.$transaction([
@@ -66,10 +71,16 @@ export async function deductBonusesInTx(
 ) {
   if (amount <= 0) return
 
-  await tx.user.update({
-    where: { id: userId },
-    data: { bonusBalance: { decrement: amount } },
-  })
+  // Atomic deduction — prevents negative balance from concurrent orders
+  const affected = await tx.$executeRaw`
+    UPDATE "User"
+    SET "bonusBalance" = "bonusBalance" - ${amount}
+    WHERE id = ${userId} AND "bonusBalance" >= ${amount}
+  `
+  if (affected === 0) {
+    throw new Error("Недостаточно бонусов. Обновите страницу")
+  }
+
   await tx.bonusTransaction.create({
     data: {
       userId,

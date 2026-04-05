@@ -43,6 +43,7 @@ export function CitySearch() {
       body: JSON.stringify({
         cityCode: cityCode || undefined,
         postalCode: postalCode || undefined,
+        city: city || undefined,
         cartTotal,
       }),
     })
@@ -59,6 +60,8 @@ export function CitySearch() {
         setRatesError("Не удалось рассчитать стоимость доставки")
         setRatesLoading(false)
       })
+    // city is intentionally excluded — cityCode is the unique identifier;
+    // city name is sent in the body but shouldn't trigger re-fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityCode, postalCode, cartTotal])
 

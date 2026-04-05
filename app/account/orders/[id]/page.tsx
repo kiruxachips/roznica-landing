@@ -2,11 +2,14 @@ import { Metadata } from "next"
 import Link from "next/link"
 import Image from "next/image"
 import { redirect, notFound } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, ExternalLink } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getOrderById } from "@/lib/dal/orders"
 import { OrderStatusBadge } from "@/components/account/OrderStatusBadge"
 import { ReorderButton } from "@/components/account/ReorderButton"
+import { CancelOrderButton } from "@/components/account/CancelOrderButton"
+import { RefreshTrackingButton } from "@/components/account/RefreshTrackingButton"
+import { RetryPaymentButton } from "@/components/account/RetryPaymentButton"
 
 export const dynamic = "force-dynamic"
 
@@ -110,8 +113,11 @@ export default async function OrderDetailPage({
           )}
         </div>
 
-        {/* Reorder */}
-        <div className="border-t border-border pt-4 mt-4">
+        {/* Payment retry + Reorder + Cancel */}
+        <div className="border-t border-border pt-4 mt-4 flex items-center gap-3 flex-wrap">
+          {order.paymentMethod === "online" && order.status === "pending" && order.paymentStatus !== "succeeded" && (
+            <RetryPaymentButton orderId={order.id} />
+          )}
           <ReorderButton
             items={order.items.map((i) => ({
               productId: i.productId,
@@ -122,6 +128,9 @@ export default async function OrderDetailPage({
               quantity: i.quantity,
             }))}
           />
+          {["pending", "paid", "confirmed"].includes(order.status) && !order.carrierOrderId && (
+            <CancelOrderButton orderId={order.id} />
+          )}
         </div>
       </div>
 
@@ -146,8 +155,40 @@ export default async function OrderDetailPage({
           {order.deliveryMethod && (
             <div className="flex justify-between">
               <span className="text-muted-foreground">Способ доставки</span>
-              <span>{order.deliveryMethod === "cdek" ? "СДЭК" : order.deliveryMethod === "post" ? "Почта России" : order.deliveryMethod === "courier" ? "Курьер" : order.deliveryMethod}</span>
+              <span>{order.deliveryMethod === "cdek" ? "СДЭК" : order.deliveryMethod === "pochta" ? "Почта России" : order.deliveryMethod === "courier" ? "Курьер" : order.deliveryMethod}</span>
             </div>
+          )}
+          {order.trackingNumber && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Трек-номер</span>
+              <span className="font-mono text-sm">{order.trackingNumber}</span>
+            </div>
+          )}
+          {order.carrierStatus && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Статус доставки</span>
+              <div className="flex items-center gap-2">
+                <span>{order.carrierStatus}</span>
+                {order.trackingNumber && ["cdek", "pochta"].includes(order.deliveryMethod || "") && (
+                  <RefreshTrackingButton orderId={order.id} />
+                )}
+              </div>
+            </div>
+          )}
+          {order.trackingNumber && (order.deliveryMethod === "pochta" || order.deliveryMethod === "cdek") && (
+            <a
+              href={
+                order.deliveryMethod === "pochta"
+                  ? `https://www.pochta.ru/tracking#${order.trackingNumber}`
+                  : `https://www.cdek.ru/ru/tracking?order_id=${order.trackingNumber}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition-colors"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Отследить посылку
+            </a>
           )}
           {order.deliveryAddress && (
             <div className="flex justify-between">

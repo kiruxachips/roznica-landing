@@ -4,11 +4,12 @@ import { calculateDeliveryRates } from "@/lib/delivery"
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { cityCode, postalCode, weight, cartTotal } = body
+    const { cityCode, postalCode, city, weight, cartTotal } = body
 
     const rates = await calculateDeliveryRates({
       toCityCode: cityCode,
       toPostalCode: postalCode,
+      toCity: city,
       cartWeight: weight,
       cartTotal,
     })

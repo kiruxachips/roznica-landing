@@ -1,11 +1,12 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProductForm } from "@/components/admin/ProductForm"
+import { getAllCollections, getCollectionIdsForProduct } from "@/lib/dal/collections"
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const [product, categories] = await Promise.all([
+  const [product, categories, allCollections, productCollectionIds] = await Promise.all([
     prisma.product.findUnique({
       where: { id },
       include: {
@@ -18,14 +19,18 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, slug: true },
     }),
+    getAllCollections(),
+    getCollectionIdsForProduct(id),
   ])
 
   if (!product) notFound()
 
+  const collections = allCollections.map((c) => ({ id: c.id, name: c.name, emoji: c.emoji }))
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Редактирование: {product.name}</h1>
-      <ProductForm product={product} categories={categories} />
+      <ProductForm product={product} categories={categories} collections={collections} productCollectionIds={productCollectionIds} />
     </div>
   )
 }

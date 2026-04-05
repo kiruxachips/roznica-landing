@@ -11,6 +11,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/account"
+  const verified = searchParams.get("verified")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -40,6 +41,12 @@ export function LoginForm() {
   return (
     <div className="bg-white rounded-2xl shadow-sm p-8">
       <h1 className="text-2xl font-serif font-bold text-center mb-6">Вход</h1>
+
+      {verified === "1" && (
+        <p className="text-sm text-green-700 bg-green-50 rounded-xl px-4 py-3 mb-4 text-center">
+          Email подтверждён! Войдите в аккаунт.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

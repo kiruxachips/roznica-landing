@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { getFeaturedProducts } from "@/lib/dal/products"
+import { FeaturedBuyButton } from "./FeaturedBuyButton"
 
 interface FeaturedProduct {
   id: string
@@ -21,6 +22,7 @@ interface FeaturedProduct {
   minOldPrice: number | null
   reviewCount: number
   averageRating: number | null
+  firstVariant: { id: string; weight: string; price: number; stock: number } | null
 }
 
 // Static fallback data (used if DB is not available)
@@ -39,6 +41,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2200,
     reviewCount: 24,
     averageRating: 5,
+    firstVariant: null,
   },
   {
     id: "2",
@@ -54,6 +57,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2200,
     reviewCount: 31,
     averageRating: 5,
+    firstVariant: null,
   },
   {
     id: "3",
@@ -69,6 +73,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2000,
     reviewCount: 18,
     averageRating: 5,
+    firstVariant: null,
   },
 ]
 
@@ -99,91 +104,108 @@ export async function Products() {
         {/* Products Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {products.map((product) => (
-            <Link key={product.id} href={`/catalog/${product.slug}`}>
-              <Card className="group overflow-hidden bg-white border-0 shadow-md hover:shadow-xl transition-all duration-300">
-                {/* Product Image */}
-                <div className="relative aspect-[2/3] bg-neutral-100 overflow-hidden rounded-t-xl">
-                  {product.primaryImage && (
-                    <Image
-                      src={product.primaryImage}
-                      alt={product.primaryImageAlt ?? product.name}
-                      fill
-                      className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                    />
-                  )}
-                  {product.badge && (
-                    <Badge className="absolute top-4 left-4 z-10 font-bold text-sm px-3 py-1 bg-white text-black border-0">
-                      {product.badge}
-                    </Badge>
-                  )}
-                </div>
+            <div key={product.id}>
+              <Link href={`/catalog/${product.slug}`}>
+                <Card className="group overflow-hidden bg-white border-0 shadow-md hover:shadow-xl transition-all duration-300">
+                  {/* Product Image */}
+                  <div className="relative aspect-[2/3] bg-neutral-100 overflow-hidden rounded-t-xl">
+                    {product.primaryImage && (
+                      <Image
+                        src={product.primaryImage}
+                        alt={product.primaryImageAlt ?? product.name}
+                        fill
+                        className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      />
+                    )}
+                    {product.badge && (
+                      <Badge className="absolute top-4 left-4 z-10 font-bold text-sm px-3 py-1 bg-white text-black border-0">
+                        {product.badge}
+                      </Badge>
+                    )}
+                  </div>
 
-                <CardContent className="p-3">
-                  {/* Rating */}
-                  {product.averageRating && (
-                    <div className="flex items-center gap-1 mb-1">
-                      {Array.from({ length: Math.round(product.averageRating) }).map((_, i) => (
-                        <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      ))}
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({product.reviewCount})
-                      </span>
+                  <CardContent className="p-3">
+                    {/* Rating */}
+                    {product.averageRating && (
+                      <div className="flex items-center gap-1 mb-1">
+                        {Array.from({ length: Math.round(product.averageRating) }).map((_, i) => (
+                          <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        ))}
+                        <span className="text-xs text-muted-foreground ml-1">
+                          ({product.reviewCount})
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Title */}
+                    <h3 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
+                      {product.name}
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
+                      {product.description}
+                    </p>
+
+                    {/* Meta */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {product.origin && (
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {product.origin}
+                        </span>
+                      )}
+                      {product.roastLevel && (
+                        <span className="flex items-center gap-1">
+                          <Flame className="w-3 h-3" />
+                          {product.roastLevel}
+                        </span>
+                      )}
+                      {product.firstVariant && (
+                        <span className="flex items-center gap-1">
+                          <Package className="w-3 h-3" />
+                          {product.firstVariant.weight}
+                        </span>
+                      )}
                     </div>
-                  )}
+                  </CardContent>
 
-                  {/* Title */}
-                  <h3 className="font-semibold text-base text-foreground mb-1 group-hover:text-primary transition-colors">
-                    {product.name}
-                  </h3>
+                  <CardFooter className="p-3 pt-0 flex items-center justify-between">
+                    {/* Price */}
+                    <div className="flex items-baseline gap-2">
+                      {product.minPrice && (
+                        <span className="text-xl font-bold text-primary">
+                          {product.minPrice}₽
+                        </span>
+                      )}
+                      {product.minOldPrice && product.minOldPrice > (product.minPrice ?? 0) && (
+                        <span className="text-sm text-muted-foreground line-through">
+                          {product.minOldPrice}₽
+                        </span>
+                      )}
+                    </div>
 
-                  {/* Description */}
-                  <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                    {product.description}
-                  </p>
-
-                  {/* Meta */}
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {product.origin && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {product.origin}
+                    {product.firstVariant ? (
+                      <FeaturedBuyButton
+                        productId={product.id}
+                        variantId={product.firstVariant.id}
+                        name={product.name}
+                        weight={product.firstVariant.weight}
+                        price={product.firstVariant.price}
+                        image={product.primaryImage}
+                        slug={product.slug}
+                        stock={product.firstVariant.stock}
+                      />
+                    ) : (
+                      <span className={cn(buttonVariants({ size: "sm" }), "pointer-events-none")}>
+                        Купить
                       </span>
                     )}
-                    {product.roastLevel && (
-                      <span className="flex items-center gap-1">
-                        <Flame className="w-3 h-3" />
-                        {product.roastLevel}
-                      </span>
-                    )}
-                    <span className="flex items-center gap-1">
-                      <Package className="w-3 h-3" />
-                      1 кг
-                    </span>
-                  </div>
-                </CardContent>
-
-                <CardFooter className="p-3 pt-0 flex items-center justify-between">
-                  {/* Price */}
-                  <div className="flex items-baseline gap-2">
-                    {product.minPrice && (
-                      <span className="text-xl font-bold text-primary">
-                        {product.minPrice}₽
-                      </span>
-                    )}
-                    {product.minOldPrice && product.minOldPrice > (product.minPrice ?? 0) && (
-                      <span className="text-sm text-muted-foreground line-through">
-                        {product.minOldPrice}₽
-                      </span>
-                    )}
-                  </div>
-
-                  <span className={cn(buttonVariants({ size: "sm" }), "pointer-events-none")}>
-                    Подробнее
-                  </span>
-                </CardFooter>
-              </Card>
-            </Link>
+                  </CardFooter>
+                </Card>
+              </Link>
+            </div>
           ))}
         </div>
 

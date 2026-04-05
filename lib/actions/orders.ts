@@ -1,15 +1,45 @@
 "use server"
 
-import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById } from "@/lib/dal/orders"
+import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 import type { OrderData } from "@/lib/types"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail } from "@/lib/email"
-import { createPayment } from "@/lib/yookassa"
+import { sendOrderStatusEmail, sendOrderConfirmationEmail } from "@/lib/email"
+import { createPayment, createRefund } from "@/lib/yookassa"
 import { headers } from "next/headers"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
+
+async function rollbackOrder(
+  orderId: string,
+  items: { variantId: string; quantity: number }[],
+  bonusUsed: number,
+  userId: string | null | undefined
+) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: "cancelled" },
+      })
+      for (const item of items) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        })
+      }
+      if (bonusUsed > 0 && userId) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { bonusBalance: { increment: bonusUsed } },
+        })
+      }
+    })
+  } catch (rollbackErr) {
+    console.error("Critical: failed to rollback order", orderId, rollbackErr)
+  }
+}
 
 export async function createOrder(data: OrderData) {
   // Attach userId from session if logged in as customer
@@ -18,45 +48,75 @@ export async function createOrder(data: OrderData) {
     data.userId = session.user.id
   }
 
+  // Server-side phone validation
+  const phoneDigits = data.customerPhone.replace(/\D/g, "")
+  if (!/^[78]\d{10}$/.test(phoneDigits)) {
+    throw new Error("Некорректный номер телефона")
+  }
+
   const order = await createOrderDAL(data)
   revalidatePath("/admin/orders")
 
+  // Send order confirmation email
+  if (data.customerEmail) {
+    try {
+      const itemsSummary = data.items.map((i) => `${i.name} (${i.weight}) x${i.quantity}`).join(", ")
+      await sendOrderConfirmationEmail({
+        to: data.customerEmail,
+        customerName: data.customerName,
+        orderNumber: order.orderNumber,
+        total: order.total,
+        itemsSummary,
+      })
+    } catch (e) {
+      console.error("Failed to send order confirmation email:", e)
+    }
+  }
+
   // Online payment via YooKassa
   if (data.paymentMethod === "online") {
-    try {
-      const headersList = await headers()
-      const host = headersList.get("host") || "millor-coffee.ru"
-      const protocol = headersList.get("x-forwarded-proto") || "https"
-      const baseUrl = `${protocol}://${host}`
-      const returnUrl = `${baseUrl}/thank-you?order=${order.orderNumber}&token=${order.thankYouToken}`
+    const headersList = await headers()
+    const host = headersList.get("host") || "millor-coffee.ru"
+    const protocol = headersList.get("x-forwarded-proto") || "https"
+    const baseUrl = `${protocol}://${host}`
+    const returnUrl = `${baseUrl}/thank-you?order=${order.orderNumber}&token=${order.thankYouToken}`
 
-      const payment = await createPayment({
+    let payment
+    try {
+      payment = await createPayment({
         orderId: order.id,
         orderNumber: order.orderNumber,
         amount: order.total,
         returnUrl,
         description: `Заказ ${order.orderNumber} — Millor Coffee`,
       })
-
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          paymentId: payment.id,
-          paymentStatus: "pending",
-        },
-      })
-
-      const paymentUrl = payment.confirmation?.confirmation_url
-      return {
-        orderNumber: order.orderNumber,
-        id: order.id,
-        thankYouToken: order.thankYouToken,
-        paymentUrl: paymentUrl || null,
-      }
     } catch (e) {
       console.error("YooKassa payment creation failed:", e)
-      // Order is created but payment failed — return without paymentUrl
-      // User can retry or pay on delivery
+      // Rollback: cancel order, restore stock and bonuses
+      await rollbackOrder(order.id, data.items, order.bonusUsed, order.userId)
+      throw new Error("Ошибка при создании платежа. Попробуйте ещё раз")
+    }
+
+    await prisma.order.update({
+      where: { id: order.id },
+      data: {
+        paymentId: payment.id,
+        paymentStatus: "pending",
+      },
+    })
+
+    const paymentUrl = payment.confirmation?.confirmation_url
+    if (!paymentUrl) {
+      // YooKassa returned success but no redirect URL — rollback
+      await rollbackOrder(order.id, data.items, order.bonusUsed, order.userId)
+      throw new Error("Платёжная система не вернула ссылку на оплату. Попробуйте ещё раз")
+    }
+
+    return {
+      orderNumber: order.orderNumber,
+      id: order.id,
+      thankYouToken: order.thankYouToken,
+      paymentUrl,
     }
   }
 
@@ -75,8 +135,9 @@ export async function updateOrderStatus(id: string, status: string) {
         select: { email: true, name: true, notifyOrderStatus: true },
       })
 
-      // Send email if user opted in
-      if (user?.email && user.notifyOrderStatus) {
+      // Send email only for customer-visible statuses
+      const customerVisibleStatuses = ["paid", "confirmed", "shipped", "delivered", "cancelled"]
+      if (user?.email && user.notifyOrderStatus && customerVisibleStatuses.includes(status)) {
         await sendOrderStatusEmail({
           to: user.email,
           customerName: user.name || "Клиент",
@@ -106,4 +167,136 @@ export async function updateOrderStatus(id: string, status: string) {
   revalidatePath("/admin/orders")
   revalidatePath(`/admin/orders/${id}`)
   revalidatePath("/account/orders")
+}
+
+export async function updateOrderNotes(orderId: string, adminNotes: string) {
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { adminNotes },
+  })
+  revalidatePath(`/admin/orders/${orderId}`)
+}
+
+const CANCELLABLE_STATUSES = ["pending", "paid", "confirmed"]
+
+export async function cancelOrder(orderId: string) {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("Не авторизован")
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { items: { select: { variantId: true, quantity: true } } },
+  })
+
+  if (!order) throw new Error("Заказ не найден")
+  if (order.userId !== session.user.id) throw new Error("Нет доступа")
+  if (!CANCELLABLE_STATUSES.includes(order.status)) {
+    throw new Error("Заказ в этом статусе нельзя отменить")
+  }
+  if (order.carrierOrderId) {
+    throw new Error("Заказ уже передан в службу доставки")
+  }
+
+  // Refund via YooKassa if the order was paid online
+  if (order.paymentId && order.paymentStatus === "succeeded") {
+    try {
+      await createRefund(order.paymentId, order.total, order.id)
+    } catch (e) {
+      console.error("YooKassa refund failed for order:", order.orderNumber, e)
+      throw new Error("Не удалось выполнить возврат средств. Свяжитесь с поддержкой")
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Update order status
+    await tx.order.update({
+      where: { id: orderId },
+      data: { status: "cancelled", paymentStatus: order.paymentStatus === "succeeded" ? "refunded" : order.paymentStatus },
+    })
+
+    await tx.orderStatusLog.create({
+      data: {
+        orderId: order.id,
+        fromStatus: order.status,
+        toStatus: "cancelled",
+        changedBy: "customer",
+      },
+    })
+
+    // Return stock
+    for (const item of order.items) {
+      if (item.variantId) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        })
+      }
+    }
+
+    // Refund bonuses
+    if (order.bonusUsed > 0 && order.userId) {
+      await tx.user.update({
+        where: { id: order.userId },
+        data: { bonusBalance: { increment: order.bonusUsed } },
+      })
+      await tx.bonusTransaction.create({
+        data: {
+          userId: order.userId,
+          amount: order.bonusUsed,
+          type: "admin_adjustment",
+          description: `Возврат бонусов — отмена заказа ${order.orderNumber}`,
+          orderId: order.id,
+        },
+      })
+    }
+  })
+
+  revalidatePath("/account/orders")
+  revalidatePath(`/account/orders/${orderId}`)
+  revalidatePath("/admin/orders")
+}
+
+export async function retryPayment(orderId: string): Promise<string> {
+  const session = await auth()
+  if (!session?.user?.id) throw new Error("Не авторизован")
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+  })
+
+  if (!order) throw new Error("Заказ не найден")
+  if (order.userId !== session.user.id) throw new Error("Нет доступа")
+  if (order.paymentMethod !== "online") throw new Error("Заказ не предполагает онлайн-оплату")
+  if (order.paymentStatus === "succeeded") throw new Error("Заказ уже оплачен")
+  if (order.status === "cancelled") throw new Error("Заказ отменён")
+
+  const headersList = await headers()
+  const host = headersList.get("host") || "millor-coffee.ru"
+  const protocol = headersList.get("x-forwarded-proto") || "https"
+  const baseUrl = `${protocol}://${host}`
+  const returnUrl = `${baseUrl}/thank-you?order=${order.orderNumber}${order.thankYouToken ? `&token=${order.thankYouToken}` : ""}`
+
+  // Use unique idempotence key per retry attempt (orderId + timestamp prefix)
+  // so that YooKassa creates a new payment after a previous one expired/canceled
+  const retryKey = `${order.id}-retry-${Date.now()}`
+  const payment = await createPayment({
+    orderId: retryKey,
+    orderNumber: order.orderNumber,
+    amount: order.total,
+    returnUrl,
+    description: `Заказ ${order.orderNumber} — Millor Coffee`,
+  })
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: {
+      paymentId: payment.id,
+      paymentStatus: "pending",
+    },
+  })
+
+  const paymentUrl = payment.confirmation?.confirmation_url
+  if (!paymentUrl) throw new Error("Платёжная система не вернула ссылку на оплату")
+
+  return paymentUrl
 }

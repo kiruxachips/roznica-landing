@@ -1,3 +1,4 @@
+import "@/lib/env" // Validate critical env vars on startup
 import type { Metadata } from "next"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"

@@ -1,7 +1,7 @@
 export function FlavorNotes({ notes }: { notes: string[] }) {
   return (
     <div>
-      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">
         Вкусовые ноты
       </h3>
       <div className="flex flex-wrap gap-2">

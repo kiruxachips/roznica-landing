@@ -59,6 +59,7 @@ model Product {
   reviews         Review[]
   orderItems      OrderItem[]
   favorites       Favorite[]
+  collections     ProductCollectionItem[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 }
@@ -181,9 +182,10 @@ model PromoCode {
   value       Int       // 10 = 10% or 500 = 500₽
   startDate   DateTime
   endDate     DateTime
-  usageCount  Int       @default(0)
-  maxUsage    Int?
-  minOrderSum Int?
+  usageCount     Int       @default(0)
+  maxUsage       Int?
+  maxPerCustomer Int?
+  minOrderSum    Int?
   isActive    Boolean   @default(true)
   orders      Order[]
   createdAt   DateTime  @default(now())
@@ -230,9 +232,28 @@ model Order {
   packageWeight       Int?      // граммы
   tariffCode          Int?      // код тарифа перевозчика
   postalCode          String?   // почтовый индекс получателя
+  adminNotes          String?   @db.Text
 
+  statusLogs     OrderStatusLog[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
+
+  @@index([paymentId])
+  @@index([status])
+  @@index([deliveryMethod, status])
+  @@index([userId])
+}
+
+model OrderStatusLog {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  fromStatus String
+  toStatus   String
+  changedBy  String?
+  createdAt  DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderItem {
@@ -319,6 +340,32 @@ model BonusTransaction {
 
   @@index([userId])
   @@index([orderId])
+}
+
+model ProductCollection {
+  id          String                  @id @default(cuid())
+  name        String
+  slug        String                  @unique
+  description String?
+  emoji       String?
+  sortOrder   Int                     @default(0)
+  isActive    Boolean                 @default(true)
+  products    ProductCollectionItem[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+model ProductCollectionItem {
+  id           String            @id @default(cuid())
+  collectionId String
+  collection   ProductCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder    Int               @default(0)
+
+  @@unique([collectionId, productId])
+  @@index([collectionId])
+  @@index([productId])
 }
 
 model DeliverySetting {

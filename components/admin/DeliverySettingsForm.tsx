@@ -282,6 +282,22 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
             </div>
 
             <div>
+              <label className={labelClass}>Процент бонусов (%)</label>
+              <input
+                className={inputClass}
+                type="number"
+                min="0"
+                max="100"
+                step="0.5"
+                value={localSettings.bonus_rate || "5"}
+                onChange={(e) => set("bonus_rate", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Процент от суммы заказа, начисляемый как бонусы при доставке
+              </p>
+            </div>
+
+            <div>
               <label className={labelClass}>Порог бесплатной доставки (₽)</label>
               <input
                 className={inputClass}
@@ -475,6 +491,35 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
             </div>
             <p className="text-xs text-muted-foreground">
               Расчёт стоимости работает без токенов. Токены нужны только для автоматического создания отправок.
+            </p>
+
+            <h3 className="text-md font-semibold pt-4">Трекинг</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>Логин tracking.pochta.ru</label>
+                <input
+                  className={inputClass}
+                  value={localSettings.pochta_tracking_login || ""}
+                  onChange={(e) => set("pochta_tracking_login", e.target.value)}
+                  placeholder="Логин"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Пароль tracking.pochta.ru</label>
+                <input
+                  className={inputClass}
+                  type="password"
+                  value={localSettings.pochta_tracking_password || ""}
+                  onChange={(e) => set("pochta_tracking_password", e.target.value)}
+                  placeholder="Пароль"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Для отслеживания отправлений. Получите учётные данные на{" "}
+              <a href="https://tracking.pochta.ru" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                tracking.pochta.ru
+              </a>
             </p>
           </>
         )}

@@ -14,34 +14,62 @@ const statuses = [
   { value: "cancelled", label: "Отменён", color: "bg-red-50 text-red-700 border-red-200" },
 ]
 
+const allowedTransitions: Record<string, string[]> = {
+  pending: ["paid", "confirmed", "cancelled"],
+  paid: ["confirmed", "cancelled"],
+  confirmed: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: [],
+  payment_failed: ["pending", "cancelled"],
+  cancelled: [],
+}
+
 export function OrderStatusChanger({ orderId, currentStatus }: { orderId: string; currentStatus: string }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  const allowed = allowedTransitions[currentStatus] || []
 
   async function handleChange(status: string) {
     setSaving(true)
+    setError("")
     try {
       await updateOrderStatus(orderId, status)
       router.refresh()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка смены статуса")
     } finally {
       setSaving(false)
     }
   }
 
+  const currentStatusInfo = statuses.find((s) => s.value === currentStatus)
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {statuses.map((s) => (
-        <button
-          key={s.value}
-          onClick={() => handleChange(s.value)}
-          disabled={saving || s.value === currentStatus}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-70 ${
-            s.value === currentStatus ? `${s.color} ring-2 ring-offset-1 ring-current` : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
-          }`}
-        >
-          {s.label}
-        </button>
-      ))}
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
+        {currentStatusInfo && (
+          <span
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border ring-2 ring-offset-1 ring-current ${currentStatusInfo.color}`}
+          >
+            {currentStatusInfo.label}
+          </span>
+        )}
+        {statuses
+          .filter((s) => allowed.includes(s.value))
+          .map((s) => (
+            <button
+              key={s.value}
+              onClick={() => handleChange(s.value)}
+              disabled={saving}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium border bg-muted text-muted-foreground border-border hover:bg-muted/80 transition-colors disabled:opacity-70"
+            >
+              {saving ? "..." : `→ ${s.label}`}
+            </button>
+          ))}
+      </div>
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }

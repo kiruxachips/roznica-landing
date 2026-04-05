@@ -17,13 +17,34 @@ function generateToken(): string {
 }
 
 export async function createOrder(data: OrderData) {
+  // Validate prices and stock availability before proceeding
+  for (const item of data.items) {
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: item.variantId },
+      select: { price: true, stock: true, isActive: true, product: { select: { name: true } } },
+    })
+    if (!variant || !variant.isActive) {
+      throw new Error(`Товар "${item.name}" недоступен`)
+    }
+    if (variant.price !== item.price) {
+      throw new Error(`Цена на "${item.name}" изменилась. Обновите корзину`)
+    }
+    if (variant.stock < item.quantity) {
+      throw new Error(
+        variant.stock === 0
+          ? `"${item.name}" нет в наличии`
+          : `"${item.name}" — доступно только ${variant.stock} шт.`
+      )
+    }
+  }
+
   const subtotal = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
   let discount = 0
   let promoCodeId: string | null = null
 
   if (data.promoCode) {
-    const result = await validatePromoCode(data.promoCode, subtotal)
+    const result = await validatePromoCode(data.promoCode, subtotal, data.userId)
     if (result.valid && result.promo && result.discount) {
       discount = result.discount
       promoCodeId = result.promo.id
@@ -43,31 +64,21 @@ export async function createOrder(data: OrderData) {
     bonusUsed = Math.min(data.bonusAmount, maxBonus, user?.bonusBalance ?? 0)
   }
 
-  // Delivery price: use client-provided price with server validation
+  // Delivery price: always calculate server-side, never trust client price
   let deliveryPrice = 0
-  if (data.deliveryPrice !== undefined && data.tariffCode !== undefined) {
-    // Validate against server-calculated rates (±5% tolerance)
-    try {
-      const rates = await calculateDeliveryRates({
-        toCityCode: data.destinationCityCode,
-        toPostalCode: data.postalCode,
-        cartTotal: afterDiscount - bonusUsed,
-      })
-      const matchingRate = rates.find(
-        (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod
-      )
-      if (matchingRate) {
-        deliveryPrice = matchingRate.priceWithMarkup
-      } else {
-        deliveryPrice = data.deliveryPrice
-      }
-    } catch {
-      // Fallback to client price if validation fails
-      deliveryPrice = data.deliveryPrice
+  if (data.tariffCode !== undefined && data.deliveryMethod) {
+    const rates = await calculateDeliveryRates({
+      toCityCode: data.destinationCityCode,
+      toPostalCode: data.postalCode,
+      cartTotal: afterDiscount - bonusUsed,
+    })
+    const matchingRate = rates.find(
+      (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod
+    )
+    if (!matchingRate) {
+      throw new Error("Выбранный тариф доставки недоступен. Обновите страницу и выберите доставку заново")
     }
-  } else {
-    // Legacy fallback for old checkout flow
-    deliveryPrice = (afterDiscount - bonusUsed) >= 3000 ? 0 : (afterDiscount >= 3000 ? 0 : 300)
+    deliveryPrice = matchingRate.priceWithMarkup
   }
   const total = afterDiscount - bonusUsed + deliveryPrice
 
@@ -77,11 +88,6 @@ export async function createOrder(data: OrderData) {
         where: { id: promoCodeId },
         data: { usageCount: { increment: 1 } },
       })
-    }
-
-    // Deduct bonuses
-    if (bonusUsed > 0 && data.userId) {
-      await deductBonusesInTx(tx, data.userId, "", bonusUsed)
     }
 
     const created = await tx.order.create({
@@ -125,12 +131,22 @@ export async function createOrder(data: OrderData) {
       include: { items: true },
     })
 
-    // Update bonus transaction with actual orderId
+    // Atomically decrement stock — rejects if insufficient.
+    // This is the real safety check (pre-validation above is advisory for UX).
+    for (const item of data.items) {
+      const affected = await tx.$executeRaw`
+        UPDATE "ProductVariant"
+        SET stock = stock - ${item.quantity}
+        WHERE id = ${item.variantId} AND stock >= ${item.quantity}
+      `
+      if (affected === 0) {
+        throw new Error(`"${item.name}" — недостаточно на складе. Обновите корзину`)
+      }
+    }
+
+    // Deduct bonuses with real orderId (after order is created)
     if (bonusUsed > 0 && data.userId) {
-      await tx.bonusTransaction.updateMany({
-        where: { userId: data.userId, orderId: "", type: "spent" },
-        data: { orderId: created.id },
-      })
+      await deductBonusesInTx(tx, data.userId, created.id, bonusUsed)
     }
 
     return created
@@ -139,9 +155,22 @@ export async function createOrder(data: OrderData) {
   return order
 }
 
-export async function getOrders(filters: { status?: string; page?: number; limit?: number } = {}) {
-  const { status, page = 1, limit = 20 } = filters
-  const where = status ? { status } : {}
+export async function getOrders(filters: { status?: string; search?: string; page?: number; limit?: number } = {}) {
+  const { status, search, page = 1, limit = 20 } = filters
+
+  const conditions: Record<string, unknown>[] = []
+  if (status) conditions.push({ status })
+  if (search) {
+    conditions.push({
+      OR: [
+        { orderNumber: { contains: search, mode: "insensitive" as const } },
+        { customerPhone: { contains: search } },
+        { customerEmail: { contains: search, mode: "insensitive" as const } },
+        { customerName: { contains: search, mode: "insensitive" as const } },
+      ],
+    })
+  }
+  const where = conditions.length > 0 ? { AND: conditions } : {}
 
   const [orders, total] = await Promise.all([
     prisma.order.findMany({
@@ -194,9 +223,43 @@ export async function getOrdersByUserId(userId: string, { page = 1, limit = 10 }
   return { orders, total }
 }
 
-export async function updateOrderStatus(id: string, status: string) {
-  return prisma.order.update({
-    where: { id },
-    data: { status },
-  })
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  pending: ["paid", "confirmed", "cancelled"],
+  paid: ["confirmed", "cancelled"],
+  confirmed: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: [],
+  payment_failed: ["pending", "cancelled"],
+  cancelled: [],
 }
+
+export async function updateOrderStatus(id: string, status: string, changedBy?: string) {
+  const order = await prisma.order.findUnique({
+    where: { id },
+    select: { status: true },
+  })
+  if (!order) throw new Error("Заказ не найден")
+
+  const allowed = ALLOWED_TRANSITIONS[order.status] || []
+  if (!allowed.includes(status)) {
+    throw new Error(`Нельзя перевести заказ из "${order.status}" в "${status}"`)
+  }
+
+  const [updated] = await prisma.$transaction([
+    prisma.order.update({
+      where: { id },
+      data: { status },
+    }),
+    prisma.orderStatusLog.create({
+      data: {
+        orderId: id,
+        fromStatus: order.status,
+        toStatus: status,
+        changedBy: changedBy || null,
+      },
+    }),
+  ])
+  return updated
+}
+
+export { ALLOWED_TRANSITIONS }

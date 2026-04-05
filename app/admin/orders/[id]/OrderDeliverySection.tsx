@@ -1,7 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { ExternalLink } from "lucide-react"
 import { createShipmentManual, refreshTracking } from "@/lib/actions/delivery"
+
+interface TrackingEvent {
+  code: string
+  name: string
+  date: string
+  cityName?: string
+}
 
 interface SenderLocation {
   name: string
@@ -46,6 +54,7 @@ export function OrderDeliverySection({
   const [message, setMessage] = useState("")
   const [senderLocations, setSenderLocations] = useState<SenderLocation[]>([])
   const [selectedSender, setSelectedSender] = useState<number>(0)
+  const [trackingHistory, setTrackingHistory] = useState<TrackingEvent[]>([])
 
   // Load sender locations for shipment creation
   useEffect(() => {
@@ -79,11 +88,22 @@ export function OrderDeliverySection({
     const result = await refreshTracking(orderId)
     if (result.success) {
       setMessage("Статус обновлён")
-      window.location.reload()
+      if (result.statuses && result.statuses.length > 0) {
+        setTrackingHistory(result.statuses as TrackingEvent[])
+      } else {
+        window.location.reload()
+      }
     } else {
       setMessage(`Ошибка: ${result.error}`)
     }
     setLoading(false)
+  }
+
+  function getTrackingUrl(): string | null {
+    if (!trackingNumber) return null
+    if (deliveryMethod === "pochta") return `https://www.pochta.ru/tracking#${trackingNumber}`
+    if (deliveryMethod === "cdek") return `https://www.cdek.ru/ru/tracking?order_id=${trackingNumber}`
+    return null
   }
 
   return (
@@ -121,7 +141,19 @@ export function OrderDeliverySection({
         {trackingNumber && (
           <div>
             <span className="text-muted-foreground">Трек-номер:</span>
-            <p className="font-medium font-mono">{trackingNumber}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium font-mono">{trackingNumber}</p>
+              {getTrackingUrl() && (
+                <a
+                  href={getTrackingUrl()!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary/80"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
+            </div>
           </div>
         )}
         {carrierOrderNum && (
@@ -168,8 +200,8 @@ export function OrderDeliverySection({
       )}
 
       {/* Refresh tracking */}
-      {carrierOrderId && deliveryMethod === "cdek" && (
-        <div className="mt-4">
+      {carrierOrderId && ["cdek", "pochta"].includes(deliveryMethod || "") && (
+        <div className="mt-4 space-y-3">
           <button
             onClick={handleRefreshTracking}
             disabled={loading}
@@ -177,6 +209,27 @@ export function OrderDeliverySection({
           >
             {loading ? "..." : "Обновить статус"}
           </button>
+
+          {trackingHistory.length > 0 && (
+            <div className="border border-border rounded-lg p-4">
+              <h3 className="text-sm font-semibold mb-2">История отслеживания</h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {trackingHistory.map((event, i) => (
+                  <div key={i} className="flex gap-3 text-xs">
+                    <span className="text-muted-foreground whitespace-nowrap shrink-0">
+                      {event.date ? new Date(event.date).toLocaleString("ru-RU", {
+                        day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                      }) : "—"}
+                    </span>
+                    {event.cityName && (
+                      <span className="text-muted-foreground shrink-0">{event.cityName}</span>
+                    )}
+                    <span className="font-medium">{event.name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

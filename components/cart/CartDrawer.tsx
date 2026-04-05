@@ -22,8 +22,6 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   const total = totalPrice()
   const afterDiscount = total - promoDiscount
-  const deliveryPrice = afterDiscount >= 3000 ? 0 : 300
-  const finalTotal = afterDiscount + deliveryPrice
 
   return (
     <>
@@ -95,8 +93,9 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     </button>
                     <span className="w-7 text-center text-sm font-medium">{item.quantity}</span>
                     <button
-                      onClick={() => updateQuantity(item.variantId, item.quantity + 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
+                      onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
+                      disabled={item.quantity >= 99}
+                      className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
@@ -123,16 +122,11 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Доставка</span>
-                <span>{deliveryPrice === 0 ? "Бесплатно" : `${deliveryPrice}₽`}</span>
+                <span className="text-xs text-muted-foreground">при оформлении</span>
               </div>
-              {deliveryPrice > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Бесплатная доставка от 3000₽ (ещё {3000 - afterDiscount}₽)
-                </p>
-              )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
                 <span>Итого</span>
-                <span className="text-primary">{finalTotal}₽</span>
+                <span className="text-primary">{afterDiscount}₽</span>
               </div>
             </div>
 
