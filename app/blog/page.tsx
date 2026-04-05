@@ -6,6 +6,7 @@ import { getArticleCategories } from "@/lib/dal/article-categories"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { BlogHero } from "@/components/blog/BlogHero"
+import { BrewingGuides } from "@/components/blog/BrewingGuides"
 import { CategoryTabs } from "@/components/blog/CategoryTabs"
 import { ArticleGrid } from "@/components/blog/ArticleGrid"
 
@@ -45,6 +46,7 @@ export default async function BlogPage({
       <Header />
       <main className="pt-16">
         <BlogHero />
+        <BrewingGuides />
 
         <section className="py-12 sm:py-16">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
