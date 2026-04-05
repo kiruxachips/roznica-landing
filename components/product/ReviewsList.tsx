@@ -26,7 +26,7 @@ function getInitials(name: string): string {
 
 export function ReviewsList({ reviews }: { reviews: Review[] }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {reviews.map((review, i) => (
         <div key={review.id} className="bg-white border border-border/60 rounded-2xl p-5 hover:shadow-sm transition-shadow">
           <div className="flex items-start gap-3 mb-3">

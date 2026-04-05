@@ -22,7 +22,7 @@ interface FeaturedProduct {
   minOldPrice: number | null
   reviewCount: number
   averageRating: number | null
-  firstVariant: { id: string; weight: string; price: number; stock: number } | null
+  firstVariant: { id: string; weight: string; price: number; oldPrice: number | null; stock: number } | null
 }
 
 // Static fallback data (used if DB is not available)
@@ -41,7 +41,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2200,
     reviewCount: 24,
     averageRating: 5,
-    firstVariant: null,
+    firstVariant: null as { id: string; weight: string; price: number; oldPrice: number | null; stock: number } | null,
   },
   {
     id: "2",
@@ -57,7 +57,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2200,
     reviewCount: 31,
     averageRating: 5,
-    firstVariant: null,
+    firstVariant: null as { id: string; weight: string; price: number; oldPrice: number | null; stock: number } | null,
   },
   {
     id: "3",
@@ -73,7 +73,7 @@ const staticProducts: FeaturedProduct[] = [
     minOldPrice: 2000,
     reviewCount: 18,
     averageRating: 5,
-    firstVariant: null,
+    firstVariant: null as { id: string; weight: string; price: number; oldPrice: number | null; stock: number } | null,
   },
 ]
 

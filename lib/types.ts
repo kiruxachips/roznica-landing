@@ -13,8 +13,8 @@ export interface ProductCard {
   minOldPrice: number | null
   reviewCount: number
   averageRating: number | null
-  firstVariant: { id: string; weight: string; price: number; stock: number } | null
-  variants?: { id: string; weight: string; price: number; stock: number }[]
+  firstVariant: { id: string; weight: string; price: number; oldPrice: number | null; stock: number } | null
+  variants?: { id: string; weight: string; price: number; oldPrice: number | null; stock: number }[]
 }
 
 export interface ProductDetail {

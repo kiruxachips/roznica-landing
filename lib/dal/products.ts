@@ -120,8 +120,8 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     primaryImageAlt: p.images[0]?.alt ?? null,
     minPrice: p.variants[0]?.price ?? null,
     minOldPrice: p.variants[0]?.oldPrice ?? null,
-    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, stock: p.variants[0].stock } : null,
-    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, stock: v.stock })),
+    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, oldPrice: p.variants[0].oldPrice, stock: p.variants[0].stock } : null,
+    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, oldPrice: v.oldPrice, stock: v.stock })),
     reviewCount: p.reviews.length,
     averageRating:
       p.reviews.length > 0
@@ -222,7 +222,7 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
       primaryImageAlt: p.images[0]?.alt ?? null,
       minPrice: displayVariant?.price ?? null,
       minOldPrice: displayVariant?.oldPrice ?? null,
-      firstVariant: displayVariant ? { id: displayVariant.id, weight: displayVariant.weight, price: displayVariant.price, stock: displayVariant.stock } : null,
+      firstVariant: displayVariant ? { id: displayVariant.id, weight: displayVariant.weight, price: displayVariant.price, oldPrice: displayVariant.oldPrice, stock: displayVariant.stock } : null,
       reviewCount: p.reviews.length,
       averageRating:
         p.reviews.length > 0

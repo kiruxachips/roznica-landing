@@ -88,11 +88,23 @@ export function ProductTabs({
         {active === "description" && (
           fullDescription ? (
             <div className="max-w-3xl">
-              {fullDescription.split("\n\n").map((paragraph, i) => (
-                <p key={i} className="text-muted-foreground leading-relaxed mb-4 last:mb-0 text-[15px]">
-                  {paragraph.trim()}
-                </p>
-              ))}
+              {fullDescription.split("\n\n").map((paragraph, i) => {
+                const text = paragraph.trim()
+                if (!text) return null
+                // First paragraph — lead style
+                if (i === 0) {
+                  return (
+                    <p key={i} className="text-foreground text-lg leading-relaxed mb-6 font-medium">
+                      {text}
+                    </p>
+                  )
+                }
+                return (
+                  <p key={i} className="text-muted-foreground leading-[1.8] mb-5 last:mb-0 text-[15px] border-l-2 border-primary/15 pl-4">
+                    {text}
+                  </p>
+                )
+              })}
             </div>
           ) : (
             <p className="text-muted-foreground">Подробное описание отсутствует.</p>

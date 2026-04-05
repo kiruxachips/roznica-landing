@@ -163,9 +163,9 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                   <span className="text-lg font-bold text-primary">
                     {selected?.price}₽
                   </span>
-                  {product.minOldPrice && product.minOldPrice > (selected?.price ?? 0) && (
+                  {selected?.oldPrice && selected.oldPrice > selected.price && (
                     <span className="text-xs text-muted-foreground line-through">
-                      {product.minOldPrice}₽
+                      {selected.oldPrice}₽
                     </span>
                   )}
                 </div>
@@ -186,9 +186,9 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                     {selected.price}₽
                   </span>
                 )}
-                {product.minOldPrice && product.minOldPrice > (selected?.price ?? 0) && (
+                {selected?.oldPrice && selected.oldPrice > selected.price && (
                   <span className="text-xs text-muted-foreground line-through">
-                    {product.minOldPrice}₽
+                    {selected.oldPrice}₽
                   </span>
                 )}
               </div>

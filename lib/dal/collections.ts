@@ -86,9 +86,9 @@ export async function getCollectionsWithProducts(): Promise<
             minPrice: p.variants[0]?.price ?? null,
             minOldPrice: p.variants[0]?.oldPrice ?? null,
             firstVariant: p.variants[0]
-              ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, stock: p.variants[0].stock }
+              ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, oldPrice: p.variants[0].oldPrice, stock: p.variants[0].stock }
               : null,
-            variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, stock: v.stock })),
+            variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, oldPrice: v.oldPrice, stock: v.stock })),
             reviewCount,
             averageRating,
           }

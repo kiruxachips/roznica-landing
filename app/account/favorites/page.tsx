@@ -43,7 +43,7 @@ function toProductCard(product: {
     primaryImageAlt: product.images[0]?.alt ?? null,
     minPrice: product.variants[0]?.price ?? null,
     minOldPrice: product.variants[0]?.oldPrice ?? null,
-    firstVariant: product.variants[0] ? { id: product.variants[0].id, weight: product.variants[0].weight, price: product.variants[0].price, stock: product.variants[0].stock } : null,
+    firstVariant: product.variants[0] ? { id: product.variants[0].id, weight: product.variants[0].weight, price: product.variants[0].price, oldPrice: product.variants[0].oldPrice, stock: product.variants[0].stock } : null,
     reviewCount: product.reviews.length,
     averageRating: avgRating,
   }
