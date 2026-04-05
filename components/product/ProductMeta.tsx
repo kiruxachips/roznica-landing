@@ -1,4 +1,4 @@
-import { MapPin, Mountain, Sprout, Factory } from "lucide-react"
+import { MapPin, Mountain, Sprout, Factory, Flame, Home } from "lucide-react"
 
 interface ProductMetaProps {
   origin: string | null
@@ -15,9 +15,9 @@ export function ProductMeta({ origin, region, altitude, roastLevel, processingMe
     { label: "Страна", value: origin, icon: MapPin },
     { label: "Регион", value: region, icon: MapPin },
     { label: "Высота", value: altitude, icon: Mountain },
-    { label: "Обжарка", value: roastLevel, icon: Sprout },
+    { label: "Обжарка", value: roastLevel, icon: Flame },
     { label: "Обработка", value: processingMethod, icon: Factory },
-    { label: "Ферма", value: farm, icon: Sprout },
+    { label: "Ферма", value: farm, icon: Home },
   ].filter((item) => item.value)
 
   if (items.length === 0) return null
@@ -37,16 +37,23 @@ export function ProductMeta({ origin, region, altitude, roastLevel, processingMe
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {items.map((item) => (
-        <div key={item.label} className="flex items-start gap-2 p-3 rounded-xl bg-secondary/50">
-          <item.icon className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">{item.label}</p>
-            <p className="text-sm font-medium">{item.value}</p>
+    <div>
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
+        Характеристики
+      </h3>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {items.map((item) => (
+          <div key={item.label} className="flex items-start gap-3 p-4 rounded-2xl bg-secondary/40 border border-border/30">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <item.icon className="w-4 h-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">{item.label}</p>
+              <p className="text-sm font-semibold mt-0.5">{item.value}</p>
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }

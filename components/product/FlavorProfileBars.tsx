@@ -10,11 +10,18 @@ interface FlavorProfileBarsProps {
 }
 
 const barItems = [
-  { key: "acidity", label: "Кислотность" },
-  { key: "sweetness", label: "Сладость" },
-  { key: "bitterness", label: "Горечь" },
-  { key: "body", label: "Тело" },
+  { key: "acidity", label: "Кислотность", color: "bg-amber-500" },
+  { key: "sweetness", label: "Сладость", color: "bg-emerald-500" },
+  { key: "bitterness", label: "Горечь", color: "bg-rose-500" },
+  { key: "body", label: "Тело", color: "bg-sky-600" },
 ] as const
+
+function getIntensity(value: number): string {
+  if (value <= 25) return "Низкая"
+  if (value <= 50) return "Средняя"
+  if (value <= 75) return "Высокая"
+  return "Яркая"
+}
 
 export function FlavorProfileBars({ acidity, sweetness, bitterness, body }: FlavorProfileBarsProps) {
   const values = { acidity, sweetness, bitterness, body }
@@ -41,23 +48,23 @@ export function FlavorProfileBars({ acidity, sweetness, bitterness, body }: Flav
 
   return (
     <div ref={ref}>
-      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-3">
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-4">
         Профиль вкуса
       </h3>
-      <div className="space-y-2.5">
-        {barItems.map(({ key, label }) => {
+      <div className="space-y-3">
+        {barItems.map(({ key, label, color }) => {
           const value = values[key]
           if (value === null) return null
           return (
             <div key={key} className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground w-28 flex-shrink-0">{label}</span>
-              <div className="flex-1 h-2 bg-secondary rounded-full overflow-hidden">
+              <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-1000 ease-out"
+                  className={`h-full rounded-full transition-all duration-1000 ease-out ${color}`}
                   style={{ width: visible ? `${value}%` : "0%" }}
                 />
               </div>
-              <span className="text-xs text-muted-foreground w-8 text-right">{value}</span>
+              <span className="text-xs text-muted-foreground w-16 text-right">{getIntensity(value)}</span>
             </div>
           )
         })}

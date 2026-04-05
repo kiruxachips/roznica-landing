@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Star } from "lucide-react"
+import { Star, MessageSquare, List, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ProductMeta } from "@/components/product/ProductMeta"
 import { BrewingMethods } from "@/components/product/BrewingMethods"
@@ -48,28 +48,37 @@ export function ProductTabs({
       ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
       : null
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "description", label: "Описание" },
-    { id: "meta", label: "Характеристики" },
-    { id: "reviews", label: `Отзывы${reviews.length > 0 ? ` (${reviews.length})` : ""}` },
+  const tabs: { id: Tab; label: string; icon: typeof FileText; count?: number }[] = [
+    { id: "description", label: "Описание", icon: FileText },
+    { id: "meta", label: "Характеристики", icon: List },
+    { id: "reviews", label: "Отзывы", icon: MessageSquare, count: reviews.length },
   ]
 
   return (
-    <div className="mt-12 sm:mt-16">
+    <div className="mt-12 sm:mt-16" id="product-tabs">
       {/* Tab bar */}
-      <div className="flex border-b border-border">
+      <div className="flex gap-1 bg-secondary/50 rounded-2xl p-1.5 max-w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
             className={cn(
-              "px-5 py-3 text-sm font-medium transition-colors relative",
+              "flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-medium transition-all",
               active === tab.id
-                ? "text-primary after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary"
+                ? "bg-white text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
+            <tab.icon className="w-4 h-4 hidden sm:block" />
             {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span className={cn(
+                "text-xs px-1.5 py-0.5 rounded-full",
+                active === tab.id ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              )}>
+                {tab.count}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -78,8 +87,12 @@ export function ProductTabs({
       <div className="pt-8">
         {active === "description" && (
           fullDescription ? (
-            <div className="max-w-3xl text-muted-foreground leading-relaxed whitespace-pre-line">
-              {fullDescription}
+            <div className="max-w-3xl">
+              {fullDescription.split("\n\n").map((paragraph, i) => (
+                <p key={i} className="text-muted-foreground leading-relaxed mb-4 last:mb-0 text-[15px]">
+                  {paragraph.trim()}
+                </p>
+              ))}
             </div>
           ) : (
             <p className="text-muted-foreground">Подробное описание отсутствует.</p>
@@ -104,18 +117,26 @@ export function ProductTabs({
           <div>
             {reviews.length > 0 ? (
               <>
+                {/* Rating summary */}
                 {avgRating && (
-                  <div className="flex items-center gap-2 mb-6">
-                    <div className="flex">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={i < Math.round(avgRating) ? "w-5 h-5 fill-amber-400 text-amber-400" : "w-5 h-5 text-muted-foreground/30"}
-                        />
-                      ))}
+                  <div className="flex items-center gap-4 mb-8 p-5 bg-secondary/30 rounded-2xl max-w-md">
+                    <div className="text-center">
+                      <p className="text-4xl font-bold text-foreground">{avgRating}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">из 5</p>
                     </div>
-                    <span className="text-lg font-bold">{avgRating}</span>
-                    <span className="text-sm text-muted-foreground">из 5 ({reviews.length} отзывов)</span>
+                    <div>
+                      <div className="flex mb-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            className={i < Math.round(avgRating) ? "w-5 h-5 fill-amber-400 text-amber-400" : "w-5 h-5 text-muted-foreground/20"}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {reviews.length} {reviews.length === 1 ? "отзыв" : reviews.length < 5 ? "отзыва" : "отзывов"}
+                      </p>
+                    </div>
                   </div>
                 )}
                 <ReviewsList reviews={reviews} />

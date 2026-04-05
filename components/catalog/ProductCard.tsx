@@ -159,9 +159,16 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                 ))}
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-primary">
-                  {selected?.price}₽
-                </span>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-bold text-primary">
+                    {selected?.price}₽
+                  </span>
+                  {product.minOldPrice && product.minOldPrice > (selected?.price ?? 0) && (
+                    <span className="text-xs text-muted-foreground line-through">
+                      {product.minOldPrice}₽
+                    </span>
+                  )}
+                </div>
                 <button
                   onClick={handleQuickAdd}
                   className="h-10 px-4 bg-primary text-white rounded-lg text-sm font-medium flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
@@ -177,6 +184,11 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                 {selected && (
                   <span className="text-lg font-bold text-primary">
                     {selected.price}₽
+                  </span>
+                )}
+                {product.minOldPrice && product.minOldPrice > (selected?.price ?? 0) && (
+                  <span className="text-xs text-muted-foreground line-through">
+                    {product.minOldPrice}₽
                   </span>
                 )}
               </div>
