@@ -1,12 +1,13 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { X } from "lucide-react"
 
 interface BrewingMethod {
   id: string
   name: string
-  icon: string
+  iconSrc: string
   grind: string
   ratio: string
   temp: string
@@ -18,7 +19,7 @@ const methods: BrewingMethod[] = [
   {
     id: "turka",
     name: "Турка",
-    icon: "☕",
+    iconSrc: "/images/brewing/tyrka.svg",
     grind: "Пыль (очень мелкий)",
     ratio: "15 г / 200 мл",
     temp: "Мин. нагрев",
@@ -34,7 +35,7 @@ const methods: BrewingMethod[] = [
   {
     id: "french-press",
     name: "Френч-пресс",
-    icon: "🫖",
+    iconSrc: "/images/brewing/french.svg",
     grind: "Крупный (морская соль)",
     ratio: "21 г / 350 мл",
     temp: "95°C",
@@ -50,7 +51,7 @@ const methods: BrewingMethod[] = [
   {
     id: "moka",
     name: "Мока",
-    icon: "⬡",
+    iconSrc: "/images/brewing/moka.svg",
     grind: "Средне-мелкий",
     ratio: "До краёв фильтра",
     temp: "На огне",
@@ -66,7 +67,7 @@ const methods: BrewingMethod[] = [
   {
     id: "espresso",
     name: "Эспрессо",
-    icon: "☕",
+    iconSrc: "/images/brewing/ecspresso.svg",
     grind: "Мелкий (под машину)",
     ratio: "18 г → 30 г",
     temp: "~93°C",
@@ -82,7 +83,7 @@ const methods: BrewingMethod[] = [
   {
     id: "pourover",
     name: "Воронка",
-    icon: "△",
+    iconSrc: "/images/brewing/voronka.svg",
     grind: "Средне-крупный",
     ratio: "27 г / 500 мл",
     temp: "92–95°C",
@@ -98,7 +99,7 @@ const methods: BrewingMethod[] = [
   {
     id: "aeropress",
     name: "Аэропресс",
-    icon: "⇩",
+    iconSrc: "/images/brewing/aero.svg",
     grind: "Средний",
     ratio: "18 г / 180 мл",
     temp: "90°C",
@@ -114,7 +115,7 @@ const methods: BrewingMethod[] = [
   {
     id: "cup",
     name: "Чашка",
-    icon: "☕",
+    iconSrc: "/images/brewing/cup.svg",
     grind: "Средний",
     ratio: "12 г / 200 мл",
     temp: "93–95°C",
@@ -130,7 +131,7 @@ const methods: BrewingMethod[] = [
   {
     id: "auto",
     name: "Автомат",
-    icon: "⚙",
+    iconSrc: "/images/brewing/automat.svg",
     grind: "Под машину",
     ratio: "По инструкции",
     temp: "По машине",
@@ -217,10 +218,16 @@ export function BrewingGuides() {
               <button
                 key={method.id}
                 onClick={() => setActiveMethod(method)}
-                className="group flex flex-col items-center gap-2 p-3 sm:p-4 rounded-2xl bg-white border border-border/50 hover:border-primary/30 hover:shadow-md transition-all"
+                className="group flex flex-col items-center gap-2.5 p-3 sm:p-4 rounded-2xl bg-white border border-border/50 hover:bg-foreground hover:text-white hover:border-foreground transition-all duration-200"
               >
-                <span className="text-2xl sm:text-3xl">{method.icon}</span>
-                <span className="text-[11px] sm:text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center leading-tight">
+                <Image
+                  src={method.iconSrc}
+                  alt={method.name}
+                  width={48}
+                  height={48}
+                  className="w-10 h-10 sm:w-12 sm:h-12 opacity-70 group-hover:opacity-100 group-hover:invert transition-all"
+                />
+                <span className="text-[11px] sm:text-xs font-medium text-muted-foreground group-hover:text-white transition-colors text-center leading-tight">
                   {method.name}
                 </span>
               </button>
