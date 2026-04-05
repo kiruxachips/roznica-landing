@@ -1,8 +1,11 @@
 /**
  * Runtime validation of critical environment variables.
- * Imported in app/layout.tsx so it runs once on server startup.
+ * Imported in app/layout.tsx so it runs on server startup.
+ * Skipped during `next build` (NEXT_PHASE === phase-production-build).
  */
-if (process.env.NODE_ENV === "production") {
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build"
+
+if (process.env.NODE_ENV === "production" && !isBuildPhase) {
   const required = [
     "DATABASE_URL",
     "NEXTAUTH_SECRET",
