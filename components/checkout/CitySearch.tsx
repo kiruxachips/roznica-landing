@@ -22,6 +22,7 @@ export function CitySearch() {
 
   const city = useDeliveryStore((s) => s.city)
   const cityCode = useDeliveryStore((s) => s.cityCode)
+  const region = useDeliveryStore((s) => s.region)
   const postalCode = useDeliveryStore((s) => s.postalCode)
   const setCity = useDeliveryStore((s) => s.setCity)
   const setPostalCode = useDeliveryStore((s) => s.setPostalCode)
@@ -45,6 +46,7 @@ export function CitySearch() {
         cityCode: cityCode || undefined,
         postalCode: postalCode || undefined,
         city: city || undefined,
+        region: region || undefined,
         cartTotal,
         weight: cartWeight || undefined,
       }),
@@ -115,7 +117,7 @@ export function CitySearch() {
   }, [])
 
   function handleSelect(c: CityResult) {
-    setCity(c.city, c.code)
+    setCity(c.city, c.code, c.region)
     if (c.postalCodes?.[0]) {
       setPostalCode(c.postalCodes[0])
     }

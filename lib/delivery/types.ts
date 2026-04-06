@@ -4,6 +4,7 @@ export interface DeliveryRateRequest {
   toCityCode?: string
   toPostalCode?: string
   toCity?: string
+  toRegion?: string
   weight: number // grams
   length?: number // cm
   width?: number // cm

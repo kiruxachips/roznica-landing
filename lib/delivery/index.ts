@@ -40,6 +40,7 @@ export async function calculateDeliveryRates(params: {
   toCityCode?: string
   toPostalCode?: string
   toCity?: string
+  toRegion?: string
   cartWeight?: number
   cartTotal?: number
 }): Promise<DeliveryRate[]> {
@@ -56,6 +57,7 @@ export async function calculateDeliveryRates(params: {
     toCityCode: params.toCityCode,
     toPostalCode: params.toPostalCode,
     toCity: params.toCity,
+    toRegion: params.toRegion,
     weight,
     length: parseInt(settings.default_length_cm) || 20,
     width: parseInt(settings.default_width_cm) || 15,
@@ -99,7 +101,8 @@ export async function calculateDeliveryRates(params: {
   if (settings.courier_enabled === "true") {
     providers.push(
       createCourierProvider({
-        price: parseInt(settings.courier_price) || 300,
+        price: parseInt(settings.courier_price) || 500,
+        regionPrice: parseInt(settings.courier_region_price) || 700,
         city: settings.courier_city || "Калининград",
         freeThreshold: parseInt(settings.courier_free_threshold) || parseInt(settings.free_delivery_threshold) || 3000,
       }).calculateRates(req)

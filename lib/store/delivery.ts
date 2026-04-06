@@ -28,8 +28,9 @@ interface DeliveryState {
   // City
   city: string
   cityCode: string
+  region: string
   postalCode: string
-  setCity: (city: string, cityCode: string) => void
+  setCity: (city: string, cityCode: string, region?: string) => void
   setPostalCode: (postalCode: string) => void
 
   // Rates
@@ -63,8 +64,9 @@ interface DeliveryState {
 export const useDeliveryStore = create<DeliveryState>()(persist((set) => ({
   city: "",
   cityCode: "",
+  region: "",
   postalCode: "",
-  setCity: (city, cityCode) => set({ city, cityCode }),
+  setCity: (city, cityCode, region) => set({ city, cityCode, region: region || "" }),
   setPostalCode: (postalCode) => set({ postalCode }),
 
   rates: [],
@@ -91,6 +93,7 @@ export const useDeliveryStore = create<DeliveryState>()(persist((set) => ({
     set({
       city: "",
       cityCode: "",
+      region: "",
       postalCode: "",
       rates: [],
       ratesLoading: false,
