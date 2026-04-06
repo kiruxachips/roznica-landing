@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer"
 export const metadata: Metadata = {
   title: "Политика конфиденциальности | Millor Coffee",
   description: "Политика конфиденциальности и обработки персональных данных сайта Millor Coffee",
+  alternates: { canonical: "/privacy" },
 }
 
 export default function PrivacyPage() {

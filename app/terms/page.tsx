@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/Footer"
 export const metadata: Metadata = {
   title: "Пользовательское соглашение | Millor Coffee",
   description: "Пользовательское соглашение сайта Millor Coffee",
+  alternates: { canonical: "/terms" },
 }
 
 export default function TermsPage() {

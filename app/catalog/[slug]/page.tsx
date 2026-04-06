@@ -34,10 +34,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: product.metaTitle || `${product.name} — купить кофе | Millor Coffee`,
     description: product.metaDescription || product.description,
+    alternates: { canonical: `/catalog/${slug}` },
     openGraph: {
       title: product.metaTitle || `${product.name} | Millor Coffee`,
       description: product.metaDescription || product.description,
       images: product.images[0]?.url ? [{ url: product.images[0].url }] : undefined,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: product.metaTitle || `${product.name} | Millor Coffee`,
+      description: product.metaDescription || product.description,
+      images: product.images[0]?.url ? [product.images[0].url] : undefined,
     },
   }
 }
@@ -74,6 +81,16 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       : undefined,
   }
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Главная", item: "https://millor-coffee.ru" },
+      { "@type": "ListItem", position: 2, name: "Каталог", item: "https://millor-coffee.ru/catalog" },
+      { "@type": "ListItem", position: 3, name: product.name, item: `https://millor-coffee.ru/catalog/${slug}` },
+    ],
+  }
+
   const avgRating = product.reviews.length > 0
     ? Math.round((product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length) * 10) / 10
     : null
@@ -84,6 +101,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       <main className="pt-16">
         {/* JSON-LD */}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
         {/* Breadcrumbs */}
         <div className="bg-secondary/30">

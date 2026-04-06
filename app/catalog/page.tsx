@@ -13,9 +13,20 @@ import { ProductGrid } from "@/components/catalog/ProductGrid"
 import { EmptyState } from "@/components/catalog/EmptyState"
 import { CollectionSection } from "@/components/catalog/CollectionSection"
 
-export const metadata: Metadata = {
-  title: "Каталог свежеобжаренного кофе | Millor Coffee",
-  description: "Выберите свежеобжаренный кофе в зёрнах для дома. Арабика из Бразилии, Перу, Эфиопии. Доставка по России.",
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const page = Number(params.page) || 1
+  const canonical = page > 1 ? `/catalog?page=${page}` : "/catalog"
+
+  return {
+    title: "Каталог свежеобжаренного кофе | Millor Coffee",
+    description: "Выберите свежеобжаренный кофе в зёрнах для дома. Арабика из Бразилии, Перу, Эфиопии. Доставка по России.",
+    alternates: { canonical },
+  }
 }
 
 export default async function CatalogPage({

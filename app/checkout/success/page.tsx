@@ -6,6 +6,7 @@ import { Footer } from "@/components/layout/Footer"
 
 export const metadata: Metadata = {
   title: "Заказ принят | Millor Coffee",
+  robots: { index: false, follow: false },
 }
 
 export default async function CheckoutSuccessPage({

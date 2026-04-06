@@ -10,9 +10,20 @@ import { BrewingGuides } from "@/components/blog/BrewingGuides"
 import { CategoryTabs } from "@/components/blog/CategoryTabs"
 import { ArticleGrid } from "@/components/blog/ArticleGrid"
 
-export const metadata: Metadata = {
-  title: "Журнал о кофе | Millor Coffee",
-  description: "Статьи о кофе, обжарке, способах приготовления и кофейной культуре от Millor Coffee.",
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}): Promise<Metadata> {
+  const params = await searchParams
+  const page = Number(params.page) || 1
+  const canonical = page > 1 ? `/blog?page=${page}` : "/blog"
+
+  return {
+    title: "Журнал о кофе | Millor Coffee",
+    description: "Статьи о кофе, обжарке, способах приготовления и кофейной культуре от Millor Coffee.",
+    alternates: { canonical },
+  }
 }
 
 export default async function BlogPage({

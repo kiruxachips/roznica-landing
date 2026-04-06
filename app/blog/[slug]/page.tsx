@@ -27,12 +27,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: article.metaTitle || `${article.title} | Журнал Millor Coffee`,
     description: article.metaDescription || article.excerpt,
+    alternates: { canonical: `/blog/${slug}` },
     openGraph: {
       title: article.metaTitle || `${article.title} | Millor Coffee`,
       description: article.metaDescription || article.excerpt,
       images: article.coverImage ? [{ url: article.coverImage }] : undefined,
       type: "article",
       publishedTime: article.publishedAt?.toISOString(),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: article.metaTitle || `${article.title} | Millor Coffee`,
+      description: article.metaDescription || article.excerpt,
+      images: article.coverImage ? [article.coverImage] : undefined,
     },
   }
 }
@@ -61,11 +68,22 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
     },
   }
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Главная", item: "https://millor-coffee.ru" },
+      { "@type": "ListItem", position: 2, name: "Блог", item: "https://millor-coffee.ru/blog" },
+      { "@type": "ListItem", position: 3, name: article.title, item: `https://millor-coffee.ru/blog/${slug}` },
+    ],
+  }
+
   return (
     <>
       <Header />
       <main className="pt-16">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
         {/* Cover image */}
         {article.coverImage && (
