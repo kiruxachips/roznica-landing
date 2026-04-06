@@ -50,7 +50,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
 
   return (
     <Link href={`/catalog/${product.slug}`} className="group block">
-      <div className="overflow-hidden rounded-xl bg-white border border-border/50 shadow-sm hover:shadow-md transition-all duration-300">
+      <div className="h-full flex flex-col overflow-hidden rounded-xl bg-white border border-border/50 shadow-sm hover:shadow-md transition-all duration-300">
         {/* Image */}
         <div className="relative aspect-[4/5] bg-neutral-50 overflow-hidden">
           {product.primaryImage ? (
@@ -86,7 +86,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
         </div>
 
         {/* Content */}
-        <div className="p-3 sm:p-4">
+        <div className="p-3 sm:p-4 flex flex-col flex-1">
           {/* Rating */}
           <div className="flex items-center gap-0.5 mb-1.5">
             {Array.from({ length: 5 }).map((_, i) => {
@@ -141,6 +141,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
           )}
 
           {/* Variant selector + price + add to cart */}
+          <div className="mt-auto pt-1">
           {availableVariants.length > 1 ? (
             <div className="space-y-2.5">
               <div className="flex flex-wrap gap-1.5">
@@ -203,6 +204,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
               )}
             </div>
           )}
+          </div>
         </div>
       </div>
     </Link>
