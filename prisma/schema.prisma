@@ -389,3 +389,19 @@ model DeliveryMarkupRule {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model DeliveryRule {
+  id               String   @id @default(cuid())
+  name             String
+  carrier          String   // "pochta" | "cdek" | "courier" | "all"
+  deliveryType     String?  // "pvz" | "door" | null = any
+  minCartTotal     Int?     // cart total >= X
+  maxDeliveryPrice Int?     // calculated delivery price < Y
+  city             String?  // specific city name (exact match)
+  action           String   // "free" | "discount" | "disable"
+  discountAmount   Int?     // for "discount" action: reduce by N₽
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}

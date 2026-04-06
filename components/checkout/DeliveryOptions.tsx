@@ -24,7 +24,7 @@ const CARRIERS: CarrierInfo[] = [
     id: "pochta",
     name: "Почта России",
     icon: <Package className="w-5 h-5" />,
-    badge: "Бесплатно от 3000₽",
+    badge: "",
     badgeClass: "bg-green-50 text-green-700",
   },
   {

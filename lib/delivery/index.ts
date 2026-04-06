@@ -1,9 +1,9 @@
 import type { DeliveryRate, DeliveryRateRequest } from "./types"
-import { getDeliverySettings, getMarkupRules, getDefaultSenderLocation } from "@/lib/dal/delivery-settings"
+import { getDeliverySettings, getMarkupRules, getDefaultSenderLocation, getDeliveryRules } from "@/lib/dal/delivery-settings"
 import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
 import { createCourierProvider } from "./courier"
-import type { DeliveryMarkupRule } from "@prisma/client"
+import type { DeliveryMarkupRule, DeliveryRule } from "@prisma/client"
 
 function applyMarkups(
   rates: DeliveryRate[],
@@ -36,6 +36,65 @@ function applyMarkups(
   })
 }
 
+function applyDeliveryRules(
+  rates: DeliveryRate[],
+  rules: DeliveryRule[],
+  cartTotal: number,
+  city?: string
+): DeliveryRate[] {
+  // First pass: check "disable" rules — remove matching rates entirely
+  const disableRules = rules.filter((r) => r.action === "disable")
+  let filtered = rates.filter((rate) => {
+    for (const rule of disableRules) {
+      if (matchesRule(rule, rate, cartTotal, city)) return false
+    }
+    return true
+  })
+
+  // Second pass: apply "free" and "discount" rules
+  const priceRules = rules.filter((r) => r.action === "free" || r.action === "discount")
+  filtered = filtered.map((rate) => {
+    let price = rate.priceWithMarkup
+
+    for (const rule of priceRules) {
+      if (!matchesRule(rule, rate, cartTotal, city)) continue
+
+      // Check maxDeliveryPrice against the ORIGINAL calculated price (before rule adjustments)
+      if (rule.maxDeliveryPrice !== null && rate.priceWithMarkup >= rule.maxDeliveryPrice) continue
+
+      if (rule.action === "free") {
+        price = 0
+        break // Free trumps everything
+      } else if (rule.action === "discount" && rule.discountAmount) {
+        price = Math.max(0, price - rule.discountAmount)
+      }
+    }
+
+    return { ...rate, priceWithMarkup: price }
+  })
+
+  return filtered
+}
+
+function matchesRule(
+  rule: DeliveryRule,
+  rate: DeliveryRate,
+  cartTotal: number,
+  city?: string
+): boolean {
+  // Carrier match
+  if (rule.carrier !== "all" && rule.carrier !== rate.carrier) return false
+  // Delivery type match
+  if (rule.deliveryType && rule.deliveryType !== rate.deliveryType) return false
+  // Min cart total
+  if (rule.minCartTotal !== null && cartTotal < rule.minCartTotal) return false
+  // City match (case-insensitive)
+  if (rule.city && city && rule.city.toLowerCase() !== city.toLowerCase()) return false
+  if (rule.city && !city) return false
+
+  return true
+}
+
 export async function calculateDeliveryRates(params: {
   toCityCode?: string
   toPostalCode?: string
@@ -45,7 +104,8 @@ export async function calculateDeliveryRates(params: {
   cartTotal?: number
 }): Promise<DeliveryRate[]> {
   const settings = await getDeliverySettings()
-  const rules = await getMarkupRules()
+  const markupRules = await getMarkupRules()
+  const deliveryRules = await getDeliveryRules()
   const sender = getDefaultSenderLocation(settings)
 
   const weight = params.cartWeight || parseInt(settings.default_weight_grams) || 300
@@ -118,21 +178,13 @@ export async function calculateDeliveryRates(params: {
     }
   }
 
-  // Apply free delivery threshold from global settings
-  const freeThreshold = parseInt(settings.free_delivery_threshold) || 0
+  const withMarkups = applyMarkups(allRates, markupRules, cartTotal, weight)
 
-  const withMarkups = applyMarkups(allRates, rules, cartTotal, weight)
-
-  // Apply free delivery threshold
-  const final = withMarkups.map((rate) => {
-    if (freeThreshold > 0 && cartTotal >= freeThreshold && rate.carrier !== "courier") {
-      return { ...rate, priceWithMarkup: 0 }
-    }
-    return rate
-  })
+  // Apply conditional delivery rules (free delivery, discounts, disabling)
+  const withRules = applyDeliveryRules(withMarkups, deliveryRules, cartTotal, params.toCity)
 
   // Sort by price
-  return final.sort((a, b) => a.priceWithMarkup - b.priceWithMarkup)
+  return withRules.sort((a, b) => a.priceWithMarkup - b.priceWithMarkup)
 }
 
 // Re-export providers for shipment creation

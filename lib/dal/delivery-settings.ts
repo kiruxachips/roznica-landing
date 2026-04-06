@@ -76,3 +76,10 @@ export async function getMarkupRules(carrier?: string) {
     orderBy: { sortOrder: "asc" },
   })
 }
+
+export async function getDeliveryRules() {
+  return prisma.deliveryRule.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+  })
+}
