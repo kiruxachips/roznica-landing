@@ -9,7 +9,16 @@ export function ArticleCard({ article }: { article: ArticleCardType }) {
       <article className="bg-white rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow">
         {/* Cover image */}
         <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-          {article.coverImage ? (
+          {article.coverImage?.endsWith(".mp4") ? (
+            <video
+              src={article.coverImage}
+              muted
+              autoPlay
+              loop
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : article.coverImage ? (
             <Image
               src={article.coverImage}
               alt={article.title}
