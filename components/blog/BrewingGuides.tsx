@@ -218,14 +218,14 @@ export function BrewingGuides() {
               <button
                 key={method.id}
                 onClick={() => setActiveMethod(method)}
-                className="group flex flex-col items-center gap-2.5 p-3 sm:p-4 rounded-2xl bg-white border border-border/50 hover:bg-foreground hover:text-white hover:border-foreground transition-all duration-200"
+                className="group flex flex-col items-center gap-2.5 p-4 sm:p-5 rounded-2xl bg-white border border-border/50 hover:bg-foreground hover:text-white hover:border-foreground transition-all duration-200"
               >
                 <Image
                   src={method.iconSrc}
                   alt={method.name}
-                  width={48}
-                  height={48}
-                  className="w-10 h-10 sm:w-12 sm:h-12 opacity-70 group-hover:opacity-100 group-hover:invert transition-all"
+                  width={64}
+                  height={64}
+                  className="w-12 h-12 sm:w-16 sm:h-16 opacity-70 group-hover:opacity-100 group-hover:invert transition-all"
                 />
                 <span className="text-[11px] sm:text-xs font-medium text-muted-foreground group-hover:text-white transition-colors text-center leading-tight">
                   {method.name}
