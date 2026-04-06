@@ -1,5 +1,6 @@
 import Image from "next/image"
 import { Coffee, Leaf, Timer, Heart } from "lucide-react"
+import { CoffeeShopsMap } from "./CoffeeShopsMap"
 
 export function About() {
   return (
@@ -20,6 +21,8 @@ export function About() {
               Наша миссия — подарить вам ритуал идеального утра.
               Чашка свежеобжаренного кофе дома — это маленькая роскошь на каждый день.
             </p>
+
+            <CoffeeShopsMap />
 
             {/* Stats */}
             <div className="grid grid-cols-2 gap-6">

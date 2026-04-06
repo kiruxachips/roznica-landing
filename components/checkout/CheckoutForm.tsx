@@ -101,9 +101,11 @@ export function CheckoutForm() {
 
     const form = new FormData(e.currentTarget)
     const name = (form.get("name") as string)?.trim()
+    const lastName = (form.get("lastName") as string)?.trim()
     const phone = (form.get("phone") as string)?.trim()
 
     const errors: Record<string, string> = {}
+    if (!lastName) errors.lastName = "Укажите фамилию"
     if (!name) errors.name = "Укажите имя"
     if (!phone) {
       errors.phone = "Укажите телефон"
@@ -145,7 +147,7 @@ export function CheckoutForm() {
           : fullDoorAddress
 
       const result = await createOrder({
-        customerName: form.get("name") as string,
+        customerName: `${lastName} ${name}`,
         customerEmail: (form.get("email") as string) || undefined,
         customerPhone: form.get("phone") as string,
         deliveryAddress: address,
@@ -208,17 +210,32 @@ export function CheckoutForm() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium mb-1">Фамилия *</label>
+              <input
+                name="lastName"
+                required
+                defaultValue={profile?.name?.split(" ").slice(1).join(" ") || ""}
+                onChange={() => setFieldErrors((e) => ({ ...e, lastName: "" }))}
+                className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.lastName ? "border-red-400" : "border-input"}`}
+                placeholder="Иванов"
+              />
+              {fieldErrors.lastName && <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>}
+            </div>
+            <div>
               <label className="block text-sm font-medium mb-1">Имя *</label>
               <input
                 name="name"
                 required
-                defaultValue={profile?.name || ""}
+                defaultValue={profile?.name?.split(" ")[0] || ""}
                 onChange={() => setFieldErrors((e) => ({ ...e, name: "" }))}
                 className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.name ? "border-red-400" : "border-input"}`}
-                placeholder="Иван Иванов"
+                placeholder="Иван"
               />
               {fieldErrors.name && <p className="text-xs text-red-600 mt-1">{fieldErrors.name}</p>}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Телефон *</label>
               <input
@@ -232,17 +249,16 @@ export function CheckoutForm() {
               />
               {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              name="email"
-              type="email"
-              defaultValue={profile?.email || ""}
-              className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="email@example.com"
-            />
+            <div>
+              <label className="block text-sm font-medium mb-1">Email</label>
+              <input
+                name="email"
+                type="email"
+                defaultValue={profile?.email || ""}
+                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                placeholder="email@example.com"
+              />
+            </div>
           </div>
 
           <h2 className="text-lg font-semibold pt-2">Доставка</h2>
