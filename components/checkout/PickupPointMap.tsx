@@ -195,10 +195,21 @@ export function PickupPointMap() {
       )}
 
       {!listView && !mapError && apiKey ? (
-        <div
-          ref={mapRef}
-          className="w-full h-52 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"
-        />
+        <div className="relative">
+          <div
+            ref={mapRef}
+            className="w-full h-52 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"
+          />
+          {scriptLoaded === false && (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              Загружаем карту...
+            </div>
+          )}
+        </div>
+      ) : mapError && !listView ? (
+        <div className="w-full h-32 rounded-xl border border-border flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Не удалось загрузить карту. <button type="button" onClick={() => setListView(true)} className="text-primary underline">Показать список</button></p>
+        </div>
       ) : (
         <div className="max-h-60 overflow-y-auto border border-border rounded-xl divide-y divide-border">
           {pickupPoints.slice(0, 50).map((point) => (
