@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json([])
-  } catch {
+  } catch (error) {
+    console.error("[pickup-points] Error fetching pickup points:", error)
     return NextResponse.json([], { status: 500 })
   }
 }
