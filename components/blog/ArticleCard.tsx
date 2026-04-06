@@ -5,8 +5,8 @@ import { Calendar, Clock } from "lucide-react"
 
 export function ArticleCard({ article }: { article: ArticleCardType }) {
   return (
-    <Link href={`/blog/${article.slug}`} className="group block">
-      <article className="bg-white rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow">
+    <Link href={`/blog/${article.slug}`} className="group block h-full">
+      <article className="bg-white rounded-xl overflow-hidden border border-border shadow-sm hover:shadow-md transition-shadow h-full flex flex-col">
         {/* Cover image */}
         <div className="relative aspect-[16/9] overflow-hidden bg-muted">
           {article.coverImage?.endsWith(".mp4") ? (
@@ -36,14 +36,14 @@ export function ArticleCard({ article }: { article: ArticleCardType }) {
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-5">
+        <div className="p-4 sm:p-5 flex flex-col flex-1">
           <h3 className="font-serif text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors mb-2">
             {article.title}
           </h3>
           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
             {article.excerpt}
           </p>
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mt-auto pt-2">
             {article.publishedAt && (
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5" />
