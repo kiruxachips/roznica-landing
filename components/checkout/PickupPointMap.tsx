@@ -45,6 +45,7 @@ export function PickupPointMap() {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<YMap | null>(null)
   const [listView, setListView] = useState(false)
+  const [mapError, setMapError] = useState(false)
 
   // Load public settings (API key)
   useEffect(() => {
@@ -86,48 +87,61 @@ export function PickupPointMap() {
     script.src = `https://api-maps.yandex.ru/v3/?apikey=${apiKey}&lang=ru_RU`
     script.async = true
     script.onload = () => setScriptLoaded(true)
+    script.onerror = () => setMapError(true)
     document.head.appendChild(script)
+
+    // Fallback to list if script takes too long
+    const timeout = setTimeout(() => {
+      if (!scriptLoaded) setMapError(true)
+    }, 8000)
+    return () => clearTimeout(timeout)
   }, [apiKey, scriptLoaded])
 
   // Init map
   const initMap = useCallback(async () => {
     if (!scriptLoaded || !mapRef.current || pickupPoints.length === 0) return
-    if (!window.ymaps3) return
+    if (!window.ymaps3) { setMapError(true); return }
 
-    await window.ymaps3.ready
+    try {
+      await window.ymaps3.ready
 
-    // Destroy prev
-    if (mapInstanceRef.current) {
-      mapInstanceRef.current.destroy()
-      mapInstanceRef.current = null
-    }
+      // Destroy prev
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.destroy()
+        mapInstanceRef.current = null
+      }
 
-    const center = [pickupPoints[0].lng, pickupPoints[0].lat]
-    const map = new window.ymaps3.YMap(mapRef.current, {
-      location: { center, zoom: 12 },
-    })
-
-    map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
-    map.addChild(new window.ymaps3.YMapDefaultFeaturesLayer())
-
-    // Add markers (limit to 100 for performance)
-    const points = pickupPoints.slice(0, 100)
-    for (const point of points) {
-      const el = document.createElement("div")
-      el.className = "ymaps-marker"
-      el.style.cssText =
-        "width:24px;height:24px;background:#8B4513;border-radius:50%;border:2px solid white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.3);"
-      el.title = point.name
-
-      const marker = new window.ymaps3.YMapMarker({
-        coordinates: [point.lng, point.lat],
-        onClick: () => selectPickupPoint(point),
+      const center = [pickupPoints[0].lng, pickupPoints[0].lat]
+      const map = new window.ymaps3.YMap(mapRef.current, {
+        location: { center, zoom: 12 },
       })
-      marker.element.appendChild(el)
-      map.addChild(marker)
-    }
 
-    mapInstanceRef.current = map
+      map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
+      map.addChild(new window.ymaps3.YMapDefaultFeaturesLayer())
+
+      // Add markers (limit to 100 for performance)
+      const points = pickupPoints.slice(0, 100)
+      for (const point of points) {
+        const el = document.createElement("div")
+        el.className = "ymaps-marker"
+        el.style.cssText =
+          "width:24px;height:24px;background:#2d6b4a;border-radius:50%;border:2px solid white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.3);"
+        el.title = point.name
+
+        const marker = new window.ymaps3.YMapMarker({
+          coordinates: [point.lng, point.lat],
+          onClick: () => selectPickupPoint(point),
+        })
+        marker.element.appendChild(el)
+        map.addChild(marker)
+      }
+
+      mapInstanceRef.current = map
+      setMapError(false)
+    } catch (err) {
+      console.error("Yandex Maps init error:", err)
+      setMapError(true)
+    }
   }, [scriptLoaded, pickupPoints, selectPickupPoint])
 
   useEffect(() => {
@@ -178,7 +192,7 @@ export function PickupPointMap() {
         </div>
       )}
 
-      {!listView && apiKey ? (
+      {!listView && !mapError && apiKey ? (
         <div
           ref={mapRef}
           className="w-full h-52 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"

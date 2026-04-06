@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import Image from "next/image"
 import Link from "next/link"
+import { MapPin } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { createOrder } from "@/lib/actions/orders"
@@ -134,10 +135,14 @@ export function CheckoutForm() {
       }
 
       // Build delivery address from selected option
+      const rawAddress = doorAddress || (form.get("address") as string) || ""
+      const fullDoorAddress = deliveryCity && rawAddress
+        ? `${deliveryCity}, ${rawAddress}`
+        : rawAddress || undefined
       const address =
         selectedRate?.deliveryType === "pvz" && selectedPickupPoint
           ? `ПВЗ: ${selectedPickupPoint.name}, ${selectedPickupPoint.address}`
-          : doorAddress || (form.get("address") as string) || undefined
+          : fullDoorAddress
 
       const result = await createOrder({
         customerName: form.get("name") as string,
@@ -267,12 +272,18 @@ export function CheckoutForm() {
                   ))}
                 </select>
               )}
+              {deliveryCity && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-secondary/50 rounded-t-xl border border-b-0 border-input text-sm text-muted-foreground">
+                  <MapPin className="w-4 h-4 shrink-0" />
+                  <span>{deliveryCity}{deliveryPostalCode ? `, ${deliveryPostalCode}` : ""}</span>
+                </div>
+              )}
               <textarea
                 name="address"
                 rows={2}
                 value={doorAddress}
                 onChange={(e) => setDoorAddress(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className={`w-full px-4 py-3 border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary ${deliveryCity ? "rounded-b-xl" : "rounded-xl"}`}
                 placeholder="Улица, дом, квартира"
               />
             </div>

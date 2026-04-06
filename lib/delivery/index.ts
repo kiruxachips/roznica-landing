@@ -85,8 +85,8 @@ export async function calculateDeliveryRates(params: {
     )
   }
 
-  // Pochta RF
-  if (settings.pochta_enabled === "true" && params.toPostalCode) {
+  // Pochta RF — works with postal code or city name (provider looks up postal code)
+  if (settings.pochta_enabled === "true" && (params.toPostalCode || params.toCity)) {
     providers.push(
       createPochtaProvider({
         accessToken: settings.pochta_access_token || undefined,
