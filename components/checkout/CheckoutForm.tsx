@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import Image from "next/image"
 import Link from "next/link"
-import { MapPin } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { createOrder } from "@/lib/actions/orders"
 import { BonusSelector } from "./BonusSelector"
 import { CitySearch } from "./CitySearch"
+import { AddressInput } from "./AddressInput"
 import { DeliveryOptions } from "./DeliveryOptions"
 import { PickupPointMap } from "./PickupPointMap"
 
@@ -248,46 +248,11 @@ export function CheckoutForm() {
           <h2 className="text-lg font-semibold pt-2">Доставка</h2>
 
           <CitySearch />
+          <AddressInput />
           <DeliveryOptions />
 
           {selectedRate?.deliveryType === "pvz" && <PickupPointMap />}
 
-          {selectedRate?.deliveryType === "door" && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Адрес доставки *</label>
-              {savedAddresses.length > 0 && (
-                <select
-                  className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary mb-2"
-                  defaultValue=""
-                  onChange={(e) => {
-                    const addr = savedAddresses.find((a) => a.id === e.target.value)
-                    if (addr) setDoorAddress(addr.fullAddress)
-                  }}
-                >
-                  <option value="">Выбрать из сохранённых...</option>
-                  {savedAddresses.map((addr) => (
-                    <option key={addr.id} value={addr.id}>
-                      {addr.title}: {addr.fullAddress.slice(0, 60)}{addr.fullAddress.length > 60 ? "..." : ""}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {deliveryCity && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-secondary/50 rounded-t-xl border border-b-0 border-input text-sm text-muted-foreground">
-                  <MapPin className="w-4 h-4 shrink-0" />
-                  <span>{deliveryCity}{deliveryPostalCode ? `, ${deliveryPostalCode}` : ""}</span>
-                </div>
-              )}
-              <textarea
-                name="address"
-                rows={2}
-                value={doorAddress}
-                onChange={(e) => setDoorAddress(e.target.value)}
-                className={`w-full px-4 py-3 border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary ${deliveryCity ? "rounded-b-xl" : "rounded-xl"}`}
-                placeholder="Улица, дом, квартира"
-              />
-            </div>
-          )}
 
           <div>
             <label className="block text-sm font-medium mb-1">Комментарий</label>

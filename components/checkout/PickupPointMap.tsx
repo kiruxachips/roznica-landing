@@ -44,7 +44,7 @@ export function PickupPointMap() {
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<YMap | null>(null)
-  const [listView, setListView] = useState(false)
+  const [listView, setListView] = useState(true)
   const [mapError, setMapError] = useState(false)
 
   // Load public settings (API key)

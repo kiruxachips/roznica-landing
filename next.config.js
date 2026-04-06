@@ -29,7 +29,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://yastatic.net",
               "img-src 'self' data: blob: https://mc.yandex.ru https://api-maps.yandex.ru https://*.maps.yandex.net https://yastatic.net https://millor-shop.ru",
               "font-src 'self' data:",
-              "connect-src 'self' https://mc.yandex.ru https://api-maps.yandex.ru https://*.maps.yandex.net https://yastatic.net",
+              "connect-src 'self' https://mc.yandex.ru https://api-maps.yandex.ru https://*.maps.yandex.net https://geocode-maps.yandex.ru https://yastatic.net",
               "frame-src https://yoomoney.ru https://telegram.org",
               "worker-src 'self' blob:",
               "object-src 'none'",

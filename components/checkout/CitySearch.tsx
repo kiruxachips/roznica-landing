@@ -162,18 +162,6 @@ export function CitySearch() {
         </div>
       )}
 
-      {city && (
-        <div className="mt-2">
-          <label className="block text-sm font-medium mb-1">Почтовый индекс</label>
-          <input
-            type="text"
-            value={postalCode}
-            onChange={(e) => setPostalCode(e.target.value)}
-            className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Для расчёта Почты России"
-          />
-        </div>
-      )}
     </div>
   )
 }
