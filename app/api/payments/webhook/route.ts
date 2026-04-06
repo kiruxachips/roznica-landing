@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail } from "@/lib/email"
+import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, type OrderEmailData } from "@/lib/email"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { getPayment } from "@/lib/yookassa"
 
@@ -64,7 +64,8 @@ export async function POST(request: NextRequest) {
     where: { paymentId },
     include: {
       user: { select: { email: true, name: true, notifyOrderStatus: true } },
-      items: { select: { variantId: true, quantity: true } },
+      items: { select: { variantId: true, quantity: true, name: true, weight: true, price: true } },
+      promoCode: { select: { code: true } },
     },
   })
 
@@ -104,19 +105,33 @@ export async function POST(request: NextRequest) {
       }),
     ])
 
-    // Send email notification
-    if (order.user?.email && order.user.notifyOrderStatus) {
-      try {
-        await sendOrderStatusEmail({
-          to: order.user.email,
-          customerName: order.user.name || "Клиент",
-          orderNumber: order.orderNumber,
-          newStatus: "paid",
-        })
-      } catch (e) {
-        console.error("Failed to send payment email:", e)
-      }
+    // Build email data for detailed payment notifications
+    const emailData: OrderEmailData = {
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      customerEmail: order.customerEmail || undefined,
+      customerPhone: order.customerPhone,
+      items: order.items.map((i) => ({ name: i.name, weight: i.weight, price: i.price, quantity: i.quantity })),
+      subtotal: order.subtotal,
+      discount: order.discount,
+      deliveryPrice: order.deliveryPrice,
+      total: order.total,
+      bonusUsed: order.bonusUsed,
+      promoCode: order.promoCode?.code,
+      deliveryMethod: order.deliveryMethod || undefined,
+      deliveryType: order.deliveryType || undefined,
+      deliveryAddress: order.deliveryAddress || undefined,
+      pickupPointName: order.pickupPointName || undefined,
+      destinationCity: order.destinationCity || undefined,
+      estimatedDelivery: order.estimatedDelivery || undefined,
+      paymentMethod: order.paymentMethod || undefined,
     }
+
+    // Send payment success emails (customer + admin, non-blocking)
+    Promise.allSettled([
+      emailData.customerEmail ? sendPaymentSuccessEmail(emailData) : Promise.resolve(),
+      sendAdminPaymentSuccessEmail(emailData),
+    ]).catch((e) => console.error("Failed to send payment emails:", e))
 
     // Auto-create shipment with carrier
     try {

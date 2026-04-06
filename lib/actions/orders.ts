@@ -6,7 +6,7 @@ import type { OrderData } from "@/lib/types"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail, sendOrderConfirmationEmail } from "@/lib/email"
+import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmail, type OrderEmailData } from "@/lib/email"
 import { createPayment, createRefund } from "@/lib/yookassa"
 import { headers } from "next/headers"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
@@ -57,21 +57,34 @@ export async function createOrder(data: OrderData) {
   const order = await createOrderDAL(data)
   revalidatePath("/admin/orders")
 
-  // Send order confirmation email
-  if (data.customerEmail) {
-    try {
-      const itemsSummary = data.items.map((i) => `${i.name} (${i.weight}) x${i.quantity}`).join(", ")
-      await sendOrderConfirmationEmail({
-        to: data.customerEmail,
-        customerName: data.customerName,
-        orderNumber: order.orderNumber,
-        total: order.total,
-        itemsSummary,
-      })
-    } catch (e) {
-      console.error("Failed to send order confirmation email:", e)
-    }
+  // Build email data with full order details
+  const emailData: OrderEmailData = {
+    orderNumber: order.orderNumber,
+    customerName: data.customerName,
+    customerEmail: data.customerEmail,
+    customerPhone: data.customerPhone,
+    items: data.items.map((i) => ({ name: i.name, weight: i.weight, price: i.price, quantity: i.quantity })),
+    subtotal: order.subtotal,
+    discount: order.discount,
+    deliveryPrice: order.deliveryPrice,
+    total: order.total,
+    bonusUsed: order.bonusUsed,
+    promoCode: data.promoCode,
+    deliveryMethod: data.deliveryMethod,
+    deliveryType: data.deliveryType,
+    deliveryAddress: data.deliveryAddress,
+    pickupPointName: data.pickupPointName,
+    destinationCity: data.destinationCity,
+    estimatedDelivery: data.estimatedDelivery,
+    paymentMethod: data.paymentMethod,
+    notes: data.notes,
   }
+
+  // Send customer confirmation + admin notification (non-blocking)
+  Promise.allSettled([
+    sendOrderConfirmationEmail(emailData),
+    sendAdminNewOrderEmail(emailData),
+  ]).catch((e) => console.error("Failed to send order emails:", e))
 
   // Online payment via YooKassa
   if (data.paymentMethod === "online") {

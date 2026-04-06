@@ -28,24 +28,30 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
         </div>
 
         {/* Payment info */}
-        {order.paymentId && (
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
-            <h2 className="text-lg font-semibold mb-4">Оплата</h2>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">ID платежа:</span>
-                <p className="font-medium font-mono text-xs mt-0.5">{order.paymentId}</p>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Статус платежа:</span>
-                <p className="font-medium mt-0.5">{order.paymentStatus || "—"}</p>
-              </div>
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+          <h2 className="text-lg font-semibold mb-4">Оплата</h2>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Способ оплаты:</span>
+              <p className="font-medium mt-0.5">{order.paymentMethod === "online" ? "Онлайн (YooKassa)" : "При получении"}</p>
             </div>
+            {order.paymentId && (
+              <>
+                <div>
+                  <span className="text-muted-foreground">Статус платежа:</span>
+                  <p className="font-medium mt-0.5">{order.paymentStatus || "—"}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground">ID платежа:</span>
+                  <p className="font-medium font-mono text-xs mt-0.5">{order.paymentId}</p>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Delivery info */}
-        {order.deliveryMethod && order.deliveryMethod !== "courier" && (
+        {order.deliveryMethod && (
           <OrderDeliverySection
             orderId={order.id}
             deliveryMethod={order.deliveryMethod}
