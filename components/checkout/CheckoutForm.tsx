@@ -192,7 +192,7 @@ export function CheckoutForm() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Form */}
       <div className="lg:col-span-2">
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm space-y-5">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-5">
           <h2 className="text-lg font-semibold">Контактные данные</h2>
 
           {isCustomer && profile && (
@@ -336,7 +336,7 @@ export function CheckoutForm() {
           <button
             type="submit"
             disabled={loading || !agreed || !selectedRate}
-            className="w-full h-14 bg-primary text-primary-foreground rounded-xl text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="w-full h-14 bg-primary text-primary-foreground rounded-xl text-sm sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {loading
               ? "Оформление..."

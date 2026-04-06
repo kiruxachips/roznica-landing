@@ -159,7 +159,7 @@ export function PickupPointMap() {
         <button
           type="button"
           onClick={() => setListView(!listView)}
-          className="text-xs text-primary hover:underline"
+          className="text-xs text-primary hover:underline px-3 py-1.5 rounded-lg border border-primary/20"
         >
           {listView ? "Карта" : "Список"}
         </button>
@@ -181,7 +181,7 @@ export function PickupPointMap() {
       {!listView && apiKey ? (
         <div
           ref={mapRef}
-          className="w-full h-64 rounded-xl overflow-hidden border border-border"
+          className="w-full h-52 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"
         />
       ) : (
         <div className="max-h-60 overflow-y-auto border border-border rounded-xl divide-y divide-border">

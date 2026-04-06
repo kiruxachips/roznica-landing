@@ -135,37 +135,37 @@ export default async function OrderDetailPage({
       </div>
 
       {/* Delivery info */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
         <h2 className="font-semibold mb-3">Информация о доставке</h2>
         <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
             <span className="text-muted-foreground">Получатель</span>
             <span>{order.customerName}</span>
           </div>
-          <div className="flex justify-between">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
             <span className="text-muted-foreground">Телефон</span>
             <span>{order.customerPhone}</span>
           </div>
           {order.customerEmail && (
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Email</span>
               <span>{order.customerEmail}</span>
             </div>
           )}
           {order.deliveryMethod && (
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Способ доставки</span>
               <span>{order.deliveryMethod === "cdek" ? "СДЭК" : order.deliveryMethod === "pochta" ? "Почта России" : order.deliveryMethod === "courier" ? "Курьер" : order.deliveryMethod}</span>
             </div>
           )}
           {order.trackingNumber && (
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5">
               <span className="text-muted-foreground">Трек-номер</span>
               <span className="font-mono text-sm">{order.trackingNumber}</span>
             </div>
           )}
           {order.carrierStatus && (
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5">
               <span className="text-muted-foreground">Статус доставки</span>
               <div className="flex items-center gap-2">
                 <span>{order.carrierStatus}</span>
@@ -191,15 +191,15 @@ export default async function OrderDetailPage({
             </a>
           )}
           {order.deliveryAddress && (
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Адрес</span>
-              <span className="text-right max-w-[60%]">{order.deliveryAddress}</span>
+              <span className="sm:text-right sm:max-w-[60%]">{order.deliveryAddress}</span>
             </div>
           )}
           {order.notes && (
-            <div className="flex justify-between">
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Комментарий</span>
-              <span className="text-right max-w-[60%]">{order.notes}</span>
+              <span className="sm:text-right sm:max-w-[60%]">{order.notes}</span>
             </div>
           )}
         </div>

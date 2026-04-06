@@ -83,14 +83,14 @@ export function StickyAddToCart({
           </div>
 
           {/* Weight pills */}
-          <div className="flex gap-1.5">
+          <div className="flex gap-1 sm:gap-1.5 overflow-x-auto">
             {variants.map((v, i) => (
               <button
                 key={v.id}
                 onClick={() => setSelectedIndex(i)}
                 disabled={v.stock === 0}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all",
+                  "px-2 sm:px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium border transition-all flex-shrink-0",
                   i === selectedIndex
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/30",
@@ -107,7 +107,7 @@ export function StickyAddToCart({
             onClick={handleAddToCart}
             disabled={selected.stock === 0}
             className={cn(
-              "flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] whitespace-nowrap",
+              "flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] whitespace-nowrap",
               added
                 ? "bg-green-600 text-white"
                 : "bg-primary text-primary-foreground hover:bg-primary/90",

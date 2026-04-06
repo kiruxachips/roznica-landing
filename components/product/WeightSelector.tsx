@@ -52,18 +52,18 @@ export function WeightSelector({ variants, productId, productName, productSlug, 
   }
 
   return (
-    <div className="flex items-end gap-6 pt-2">
+    <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6 pt-2">
       {/* Weight */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Вес</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {variants.map((variant, i) => (
             <button
               key={variant.id}
               onClick={() => setSelectedIndex(i)}
               disabled={variant.stock === 0}
               className={cn(
-                "px-6 py-4 rounded-xl text-base font-medium border-2 transition-all",
+                "px-4 py-3 sm:px-6 sm:py-4 rounded-xl text-sm sm:text-base font-medium border-2 transition-all",
                 i === selectedIndex
                   ? "border-primary bg-primary/5 text-primary"
                   : "border-border text-muted-foreground hover:border-primary/30",

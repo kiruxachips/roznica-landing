@@ -87,7 +87,7 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
           <select
             value={activeSort ?? ""}
             onChange={(e) => updateParams("sort", e.target.value || undefined)}
-            className="h-8 px-2.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="h-10 sm:h-8 px-3 sm:px-2.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {sortOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -158,7 +158,7 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
     <button
       onClick={onClick}
       className={cn(
-        "px-3 py-1 rounded-full text-xs font-medium transition-all",
+        "px-3 py-2 sm:py-1 rounded-full text-xs font-medium transition-all",
         active
           ? "bg-primary text-primary-foreground shadow-sm"
           : "bg-secondary/70 text-muted-foreground hover:bg-secondary hover:text-foreground"

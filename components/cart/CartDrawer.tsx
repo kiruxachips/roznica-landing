@@ -81,21 +81,21 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 </div>
 
                 <div className="flex flex-col items-end justify-between">
-                  <button onClick={() => removeItem(item.variantId)} className="p-1 text-muted-foreground hover:text-red-500">
-                    <Trash2 className="w-3.5 h-3.5" />
+                  <button onClick={() => removeItem(item.variantId)} className="p-2 text-muted-foreground hover:text-red-500">
+                    <Trash2 className="w-4 h-4" />
                   </button>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
-                      className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
+                      className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
                     >
-                      <Minus className="w-3 h-3" />
+                      <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="w-7 text-center text-sm font-medium">{item.quantity}</span>
+                    <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                     <button
                       onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
                       disabled={item.quantity >= 99}
-                      className="w-7 h-7 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
+                      className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
                     >
                       <Plus className="w-3 h-3" />
                     </button>
