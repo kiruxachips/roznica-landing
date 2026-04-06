@@ -145,8 +145,10 @@ export function PickupPointMap() {
   }, [scriptLoaded, pickupPoints, selectPickupPoint])
 
   useEffect(() => {
-    initMap()
-  }, [initMap])
+    if (!listView) {
+      initMap()
+    }
+  }, [listView, initMap])
 
   if (selectedRate?.deliveryType !== "pvz") return null
 
