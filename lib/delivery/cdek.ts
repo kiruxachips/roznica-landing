@@ -172,7 +172,7 @@ export function createCdekProvider(config: {
 
     async getPickupPoints(cityCode: string): Promise<PickupPoint[]> {
       const data = await cdekFetch(
-        `/v2/deliverypoints?city_code=${cityCode}&type=PVZ,POSTAMAT&is_handout=true`,
+        `/v2/deliverypoints?city_code=${cityCode}&type=PVZ&type=POSTAMAT&is_handout=true`,
         opts
       )
 
