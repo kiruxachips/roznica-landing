@@ -14,12 +14,22 @@ interface CartState {
   clearCart: () => void
   totalItems: () => number
   totalPrice: () => number
+  /** Total weight in grams with 20% packaging buffer */
+  totalWeight: () => number
   setPromo: (code: string, type: "percent" | "fixed", value: number, discount: number) => void
   clearPromo: () => void
 }
 
 function calcSubtotal(items: CartItem[]) {
   return items.reduce((sum, i) => sum + i.price * i.quantity, 0)
+}
+
+/** Parse weight string like "250г", "500г", "1кг" into grams */
+function parseWeightGrams(w: string): number {
+  const n = parseFloat(w.replace(",", "."))
+  if (isNaN(n)) return 0
+  if (w.includes("кг")) return Math.round(n * 1000)
+  return Math.round(n) // already grams
 }
 
 function recalcPromoDiscount(
@@ -90,6 +100,10 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
       totalPrice: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      totalWeight: () => {
+        const net = get().items.reduce((sum, i) => sum + parseWeightGrams(i.weight) * i.quantity, 0)
+        return Math.ceil(net * 1.2) // +20% packaging buffer
+      },
 
       setPromo: (code, type, value, discount) =>
         set({

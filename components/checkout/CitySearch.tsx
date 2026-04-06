@@ -31,6 +31,7 @@ export function CitySearch() {
   const selectRate = useDeliveryStore((s) => s.selectRate)
 
   const cartTotal = useCartStore((s) => s.totalPrice)()
+  const cartWeight = useCartStore((s) => s.totalWeight)()
 
   // Fetch rates when city changes
   useEffect(() => {
@@ -45,6 +46,7 @@ export function CitySearch() {
         postalCode: postalCode || undefined,
         city: city || undefined,
         cartTotal,
+        weight: cartWeight || undefined,
       }),
     })
       .then((r) => r.ok ? r.json() : Promise.reject())
@@ -63,7 +65,7 @@ export function CitySearch() {
     // city is intentionally excluded — cityCode is the unique identifier;
     // city name is sent in the body but shouldn't trigger re-fetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityCode, postalCode, cartTotal])
+  }, [cityCode, postalCode, cartTotal, cartWeight])
 
   // Debounced city search
   useEffect(() => {
