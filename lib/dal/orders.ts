@@ -225,12 +225,12 @@ export async function getOrdersByUserId(userId: string, { page = 1, limit = 10 }
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   pending: ["paid", "confirmed", "cancelled"],
-  paid: ["confirmed", "cancelled"],
-  confirmed: ["shipped", "cancelled"],
-  shipped: ["delivered"],
-  delivered: [],
+  paid: ["pending", "confirmed", "cancelled"],
+  confirmed: ["pending", "shipped", "cancelled"],
+  shipped: ["confirmed", "delivered"],
+  delivered: ["shipped"],
   payment_failed: ["pending", "cancelled"],
-  cancelled: [],
+  cancelled: ["pending"],
 }
 
 export async function updateOrderStatus(id: string, status: string, changedBy?: string) {

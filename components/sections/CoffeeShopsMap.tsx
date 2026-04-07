@@ -61,7 +61,7 @@ export function CoffeeShopsMap() {
   const [apiKey, setApiKey] = useState("")
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<any>(null)
+  const mapInstanceRef = useRef<YMapInstance | null>(null)
 
   // Fetch API key
   useEffect(() => {
@@ -87,11 +87,10 @@ export function CoffeeShopsMap() {
   }, [apiKey, scriptLoaded])
 
   const initMap = useCallback(async () => {
-    const ymaps3 = (window as any).ymaps3
-    if (!scriptLoaded || !mapRef.current || !ymaps3) return
+    if (!scriptLoaded || !mapRef.current || !window.ymaps3) return
 
     try {
-      await ymaps3.ready
+      await window.ymaps3.ready
 
       if (mapInstanceRef.current) {
         mapInstanceRef.current.destroy()
@@ -99,12 +98,12 @@ export function CoffeeShopsMap() {
       }
 
       const cityCenter = CITY_CENTERS[selectedCity] || { lat: 54.72, lng: 20.51, zoom: 12 }
-      const map = new ymaps3.YMap(mapRef.current, {
+      const map = new window.ymaps3.YMap(mapRef.current, {
         location: { center: [cityCenter.lng, cityCenter.lat], zoom: cityCenter.zoom },
       })
 
-      map.addChild(new ymaps3.YMapDefaultSchemeLayer())
-      map.addChild(new ymaps3.YMapDefaultFeaturesLayer())
+      map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
+      map.addChild(new window.ymaps3.YMapDefaultFeaturesLayer())
 
       const cityShops = SHOPS.filter((s) => {
         if (selectedCity === "Калининград") {
@@ -119,7 +118,7 @@ export function CoffeeShopsMap() {
         el.style.cssText = "width:28px;height:28px;background:#2d6b4a;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;position:relative;"
         el.title = `${shop.city}, ${shop.address}`
 
-        const marker = new ymaps3.YMapMarker({ coordinates: [shop.lng, shop.lat] })
+        const marker = new window.ymaps3.YMapMarker({ coordinates: [shop.lng, shop.lat] })
         marker.element.appendChild(el)
         map.addChild(marker)
       }

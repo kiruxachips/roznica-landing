@@ -3,32 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useDeliveryStore } from "@/lib/store/delivery"
 
-declare global {
-  interface Window {
-    ymaps3?: {
-      ready: Promise<void>
-      YMap: new (
-        el: HTMLElement,
-        props: { location: { center: number[]; zoom: number } }
-      ) => YMap
-      YMapDefaultSchemeLayer: new () => unknown
-      YMapDefaultFeaturesLayer: new () => unknown
-      YMapMarker: new (props: { coordinates: number[]; onClick?: () => void }) => YMapMarker
-    }
-  }
-}
-
-interface YMap {
-  addChild(child: unknown): void
-  removeChild(child: unknown): void
-  update(props: { location: { center: number[]; zoom: number } }): void
-  destroy(): void
-}
-
-interface YMapMarker {
-  element: HTMLElement
-}
-
 export function PickupPointMap() {
   const city = useDeliveryStore((s) => s.city)
   const cityCode = useDeliveryStore((s) => s.cityCode)
@@ -43,7 +17,7 @@ export function PickupPointMap() {
   const [apiKey, setApiKey] = useState("")
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
-  const mapInstanceRef = useRef<YMap | null>(null)
+  const mapInstanceRef = useRef<YMapInstance | null>(null)
   const [listView, setListView] = useState(true)
   const [mapError, setMapError] = useState(false)
 

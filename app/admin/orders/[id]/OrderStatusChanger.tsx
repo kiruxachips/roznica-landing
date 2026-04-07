@@ -5,23 +5,23 @@ import { useRouter } from "next/navigation"
 import { updateOrderStatus } from "@/lib/actions/orders"
 
 const statuses = [
-  { value: "pending", label: "Новый", color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
-  { value: "paid", label: "Оплачен", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  { value: "confirmed", label: "Подтверждён", color: "bg-blue-50 text-blue-700 border-blue-200" },
-  { value: "shipped", label: "Отправлен", color: "bg-purple-50 text-purple-700 border-purple-200" },
-  { value: "delivered", label: "Доставлен", color: "bg-green-50 text-green-700 border-green-200" },
-  { value: "payment_failed", label: "Ошибка оплаты", color: "bg-orange-50 text-orange-700 border-orange-200" },
-  { value: "cancelled", label: "Отменён", color: "bg-red-50 text-red-700 border-red-200" },
+  { value: "pending", label: "Новый", color: "bg-yellow-50 text-yellow-700 border-yellow-200", order: 0 },
+  { value: "paid", label: "Оплачен", color: "bg-emerald-50 text-emerald-700 border-emerald-200", order: 1 },
+  { value: "confirmed", label: "Подтверждён", color: "bg-blue-50 text-blue-700 border-blue-200", order: 2 },
+  { value: "shipped", label: "Отправлен", color: "bg-purple-50 text-purple-700 border-purple-200", order: 3 },
+  { value: "delivered", label: "Доставлен", color: "bg-green-50 text-green-700 border-green-200", order: 4 },
+  { value: "payment_failed", label: "Ошибка оплаты", color: "bg-orange-50 text-orange-700 border-orange-200", order: -1 },
+  { value: "cancelled", label: "Отменён", color: "bg-red-50 text-red-700 border-red-200", order: -1 },
 ]
 
 const allowedTransitions: Record<string, string[]> = {
   pending: ["paid", "confirmed", "cancelled"],
-  paid: ["confirmed", "cancelled"],
-  confirmed: ["shipped", "cancelled"],
-  shipped: ["delivered"],
-  delivered: [],
+  paid: ["pending", "confirmed", "cancelled"],
+  confirmed: ["pending", "shipped", "cancelled"],
+  shipped: ["confirmed", "delivered"],
+  delivered: ["shipped"],
   payment_failed: ["pending", "cancelled"],
-  cancelled: [],
+  cancelled: ["pending"],
 }
 
 export function OrderStatusChanger({ orderId, currentStatus }: { orderId: string; currentStatus: string }) {
@@ -58,16 +58,24 @@ export function OrderStatusChanger({ orderId, currentStatus }: { orderId: string
         )}
         {statuses
           .filter((s) => allowed.includes(s.value))
-          .map((s) => (
-            <button
-              key={s.value}
-              onClick={() => handleChange(s.value)}
-              disabled={saving}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium border bg-muted text-muted-foreground border-border hover:bg-muted/80 transition-colors disabled:opacity-70"
-            >
-              {saving ? "..." : `→ ${s.label}`}
-            </button>
-          ))}
+          .map((s) => {
+            const currentOrder = statuses.find((st) => st.value === currentStatus)?.order ?? 0
+            const isBackward = s.order >= 0 && currentOrder >= 0 && s.order < currentOrder
+            return (
+              <button
+                key={s.value}
+                onClick={() => handleChange(s.value)}
+                disabled={saving}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors disabled:opacity-70 ${
+                  isBackward
+                    ? "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                    : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                }`}
+              >
+                {saving ? "..." : `${isBackward ? "←" : "→"} ${s.label}`}
+              </button>
+            )
+          })}
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
