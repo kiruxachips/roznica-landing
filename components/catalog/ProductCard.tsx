@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Star, MapPin, Flame, ShoppingCart } from "lucide-react"
+import { Star, ShoppingCart } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { FavoriteButton } from "@/components/account/FavoriteButton"
 import { useCartStore } from "@/lib/store/cart"
@@ -48,9 +48,11 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
     setSelectedIdx(idx)
   }
 
+  const metaLine = [product.origin, product.roastLevel].filter(Boolean).join(" · ")
+
   return (
-    <Link href={`/catalog/${product.slug}`} className="group block">
-      <div className="h-full flex flex-col overflow-hidden rounded-xl bg-white border border-border/50 shadow-sm hover:shadow-md transition-all duration-300">
+    <Link href={`/catalog/${product.slug}`} className="group block h-full">
+      <div className="h-full flex flex-col overflow-hidden rounded-xl bg-white border border-border/60 shadow-sm hover:shadow-md hover:border-border transition-all duration-300">
         {/* Image */}
         <div className="relative aspect-[4/5] bg-neutral-50 overflow-hidden">
           {product.primaryImage ? (
@@ -67,18 +69,18 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
             </div>
           )}
           {product.badge && (
-            <Badge className="absolute top-2.5 left-2.5 z-10 bg-white text-foreground border-0 shadow-sm text-xs font-semibold">
+            <Badge className="absolute top-2 left-2 z-10 bg-white text-foreground border-0 shadow-sm text-[10px] sm:text-[11px] font-semibold px-2 py-0.5">
               {product.badge}
             </Badge>
           )}
           {favorited !== undefined && (
-            <div className="absolute top-2.5 right-2.5 z-10">
+            <div className="absolute top-2 right-2 z-10">
               <FavoriteButton productId={product.id} isFavorited={favorited} />
             </div>
           )}
           {outOfStock && (
-            <div className={`absolute top-2.5 ${favorited !== undefined ? "left-auto right-2.5 top-12" : "right-2.5"} z-10`}>
-              <Badge className="bg-red-50 text-red-700 border-0 shadow-sm text-xs font-semibold">
+            <div className="absolute bottom-2 left-2 z-10">
+              <Badge className="bg-red-50 text-red-700 border-0 shadow-sm text-[10px] sm:text-[11px] font-semibold px-2 py-0.5">
                 Нет в наличии
               </Badge>
             </div>
@@ -86,69 +88,65 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
         </div>
 
         {/* Content */}
-        <div className="p-3 sm:p-4 flex flex-col flex-1">
-          {/* Rating */}
-          <div className="flex items-center gap-0.5 mb-1.5">
-            {Array.from({ length: 5 }).map((_, i) => {
-              const filled = product.averageRating !== null && i < Math.round(product.averageRating)
-              return (
-                <Star
-                  key={i}
-                  className={filled ? "w-3 h-3 fill-amber-400 text-amber-400" : "w-3 h-3 text-muted-foreground/30"}
-                />
-              )
-            })}
-            {product.reviewCount > 0 && (
-              <span className="text-[11px] text-muted-foreground ml-1">({product.reviewCount})</span>
+        <div className="p-3 sm:p-4 flex flex-col flex-1 gap-1.5 sm:gap-2">
+          {/* Rating — fixed height for alignment */}
+          <div className="flex items-center gap-0.5 h-4">
+            {product.averageRating !== null ? (
+              <>
+                {Array.from({ length: 5 }).map((_, i) => {
+                  const filled = i < Math.round(product.averageRating!)
+                  return (
+                    <Star
+                      key={i}
+                      className={filled ? "w-3 h-3 fill-amber-400 text-amber-400" : "w-3 h-3 fill-muted text-muted"}
+                    />
+                  )
+                })}
+                {product.reviewCount > 0 && (
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground ml-1">({product.reviewCount})</span>
+                )}
+              </>
+            ) : (
+              <span className="text-[10px] sm:text-[11px] text-muted-foreground">Нет отзывов</span>
             )}
           </div>
 
-          {/* Name */}
-          <h3 className="font-serif text-sm sm:text-base font-bold text-foreground mb-1 group-hover:text-primary transition-colors line-clamp-2">
+          {/* Name — 2 lines forced for card height uniformity */}
+          <h3 className="font-serif text-sm sm:text-base font-bold text-foreground leading-snug line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem] group-hover:text-primary transition-colors">
             {product.name}
           </h3>
 
-          {/* Meta */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-muted-foreground mb-2">
-            {product.origin && (
-              <span className="flex items-center gap-0.5">
-                <MapPin className="w-3 h-3" />
-                {product.origin}
+          {/* Origin · roast — single line */}
+          <p className="text-[11px] sm:text-xs text-muted-foreground truncate min-h-[1rem]">
+            {metaLine || "\u00A0"}
+          </p>
+
+          {/* Flavor notes — fixed single row, max 2 chips */}
+          <div className="flex flex-wrap gap-1 min-h-[20px]">
+            {product.flavorNotes.slice(0, 2).map((note) => (
+              <span
+                key={note}
+                className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-full"
+              >
+                {note}
               </span>
-            )}
-            {product.roastLevel && (
-              <span className="flex items-center gap-0.5">
-                <Flame className="w-3 h-3" />
-                {product.roastLevel}
+            ))}
+            {product.flavorNotes.length > 2 && (
+              <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground">
+                +{product.flavorNotes.length - 2}
               </span>
             )}
           </div>
 
-          {/* Flavor notes */}
-          {product.flavorNotes.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2.5">
-              {product.flavorNotes.slice(0, 3).map((note) => (
-                <span key={note} className="px-2 py-0.5 rounded-full bg-secondary text-[11px] text-muted-foreground">
-                  {note}
-                </span>
-              ))}
-              {product.flavorNotes.length > 3 && (
-                <span className="px-2 py-0.5 rounded-full bg-secondary text-[11px] text-muted-foreground">
-                  +{product.flavorNotes.length - 3}
-                </span>
-              )}
-            </div>
-          )}
-
           {/* Variant selector + price + add to cart */}
-          <div className="mt-auto pt-1 space-y-2">
+          <div className="mt-auto pt-2 space-y-2 border-t border-border/40">
             {availableVariants.length > 1 && (
               <div className="flex flex-wrap gap-1">
                 {availableVariants.map((v, i) => (
                   <button
                     key={v.id}
                     onClick={(e) => handleVariantClick(e, i)}
-                    className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
+                    className={`px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[11px] sm:text-xs font-medium transition-colors ${
                       selectedIdx === i
                         ? "bg-primary text-white"
                         : "bg-secondary text-muted-foreground hover:bg-secondary/80"

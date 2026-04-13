@@ -29,10 +29,10 @@ export function UserMenu() {
     return (
       <Link
         href="/auth/login"
-        className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-muted-foreground hover:bg-muted transition-colors"
+        className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-muted transition-colors"
         title="Войти"
       >
-        <User className="w-5 h-5" />
+        <User className="w-5 h-5" strokeWidth={1.75} />
       </Link>
     )
   }
@@ -49,7 +49,7 @@ export function UserMenu() {
     <div ref={menuRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-10 h-10 rounded-xl bg-primary/10 text-primary font-medium text-sm flex items-center justify-center hover:bg-primary/20 transition-colors"
+        className="w-10 h-10 rounded-xl bg-primary/10 text-primary font-semibold text-xs flex items-center justify-center hover:bg-primary/20 transition-colors"
         title="Аккаунт"
       >
         {initials}

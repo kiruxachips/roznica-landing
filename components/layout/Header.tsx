@@ -54,28 +54,28 @@ export function Header() {
             </div>
 
             {/* CTA + Cart + User */}
-            <div className="hidden md:flex md:items-center gap-3">
+            <div className="hidden md:flex md:items-center gap-1.5 lg:gap-2">
               <UserMenu />
               <CartButton onClick={openCart} />
               <Link
                 href="/catalog"
-                className={cn(buttonVariants({ size: "lg" }))}
+                className={cn(buttonVariants({ size: "lg" }), "ml-2")}
               >
                 В каталог
               </Link>
             </div>
 
             {/* Mobile: user + cart + menu */}
-            <div className="md:hidden flex items-center gap-2">
+            <div className="md:hidden flex items-center gap-1">
               <UserMenu />
               <CartButton onClick={openCart} />
               <button
                 type="button"
-                className="inline-flex items-center justify-center rounded-md p-2 text-foreground hover:bg-muted transition-colors"
+                className="inline-flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-muted transition-colors"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               >
                 <span className="sr-only">Открыть меню</span>
-                {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {mobileMenuOpen ? <X className="w-5 h-5" strokeWidth={1.75} /> : <Menu className="w-5 h-5" strokeWidth={1.75} />}
               </button>
             </div>
           </div>
