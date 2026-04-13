@@ -46,7 +46,7 @@ export default async function ThankYouPage({
   return (
     <>
       <Header />
-      <main className="pt-24 pb-16 min-h-screen bg-secondary/20">
+      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 min-h-screen bg-secondary/20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <ThankYouContent
             shouldTrack={shouldTrack}

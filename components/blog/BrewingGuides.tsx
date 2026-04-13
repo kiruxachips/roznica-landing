@@ -151,44 +151,44 @@ function GuideModal({ method, onClose }: { method: BrewingMethod; onClose: () =>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className="relative bg-white rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl"
+        className="relative bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full max-h-[90vh] sm:max-h-[85vh] overflow-y-auto shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-white rounded-t-3xl border-b border-border/50 px-6 py-4 flex items-center justify-between">
+        <div className="sticky top-0 bg-white rounded-t-2xl sm:rounded-t-3xl border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-xl font-bold">{method.name}</h2>
+            <h2 className="font-serif text-lg sm:text-xl font-bold">{method.name}</h2>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors"
+            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Quick params */}
-        <div className="px-6 py-4 grid grid-cols-2 gap-3">
-          <div className="bg-secondary/50 rounded-xl p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Помол</p>
-            <p className="text-sm font-medium mt-0.5">{method.grind}</p>
+        <div className="px-4 sm:px-6 py-4 grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="bg-secondary/50 rounded-xl p-2.5 sm:p-3">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider">Помол</p>
+            <p className="text-xs sm:text-sm font-medium mt-0.5">{method.grind}</p>
           </div>
-          <div className="bg-secondary/50 rounded-xl p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Пропорции</p>
-            <p className="text-sm font-medium mt-0.5">{method.ratio}</p>
+          <div className="bg-secondary/50 rounded-xl p-2.5 sm:p-3">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider">Пропорции</p>
+            <p className="text-xs sm:text-sm font-medium mt-0.5">{method.ratio}</p>
           </div>
-          <div className="bg-secondary/50 rounded-xl p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Температура</p>
-            <p className="text-sm font-medium mt-0.5">{method.temp}</p>
+          <div className="bg-secondary/50 rounded-xl p-2.5 sm:p-3">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider">Температура</p>
+            <p className="text-xs sm:text-sm font-medium mt-0.5">{method.temp}</p>
           </div>
-          <div className="bg-secondary/50 rounded-xl p-3">
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Время</p>
-            <p className="text-sm font-medium mt-0.5">{method.time}</p>
+          <div className="bg-secondary/50 rounded-xl p-2.5 sm:p-3">
+            <p className="text-[10px] sm:text-[11px] text-muted-foreground uppercase tracking-wider">Время</p>
+            <p className="text-xs sm:text-sm font-medium mt-0.5">{method.time}</p>
           </div>
         </div>
 
         {/* Steps */}
-        <div className="px-6 pb-6 space-y-3">
+        <div className="px-4 sm:px-6 pb-5 sm:pb-6 space-y-3">
           {method.content.map((step, i) => (
             <div key={i} className="flex gap-3">
               <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -208,26 +208,26 @@ export function BrewingGuides() {
 
   return (
     <>
-      <section className="py-10 sm:py-12 bg-secondary/30">
+      <section className="py-8 sm:py-12 bg-secondary/30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-center mb-8">
+          <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-center mb-6 sm:mb-8 px-2">
             Приготовление кофе разными способами
           </h2>
-          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3 sm:gap-4 max-w-3xl mx-auto">
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 sm:gap-4 max-w-3xl mx-auto">
             {methods.map((method) => (
               <button
                 key={method.id}
                 onClick={() => setActiveMethod(method)}
-                className="group flex flex-col items-center gap-2.5 p-4 sm:p-5 rounded-2xl bg-white border border-border/50 hover:bg-foreground hover:text-white hover:border-foreground transition-all duration-200"
+                className="group flex flex-col items-center gap-1.5 sm:gap-2.5 p-2.5 sm:p-5 rounded-xl sm:rounded-2xl bg-white border border-border/50 hover:bg-foreground hover:text-white hover:border-foreground transition-all duration-200"
               >
                 <Image
                   src={method.iconSrc}
                   alt={method.name}
                   width={64}
                   height={64}
-                  className="w-12 h-12 sm:w-16 sm:h-16 opacity-70 group-hover:opacity-100 group-hover:invert transition-all"
+                  className="w-10 h-10 sm:w-16 sm:h-16 opacity-70 group-hover:opacity-100 group-hover:invert transition-all"
                 />
-                <span className="text-[11px] sm:text-xs font-medium text-muted-foreground group-hover:text-white transition-colors text-center leading-tight">
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground group-hover:text-white transition-colors text-center leading-tight">
                   {method.name}
                 </span>
               </button>

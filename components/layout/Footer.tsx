@@ -24,8 +24,8 @@ export function Footer() {
 
   return (
     <footer className="bg-coffee-900 text-white relative overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 sm:gap-6 md:gap-8">
           {/* Brand */}
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center mb-4">
@@ -37,7 +37,7 @@ export function Footer() {
                 className="brightness-0 invert"
               />
             </Link>
-            <p className="text-coffee-300 text-sm max-w-md mb-6">
+            <p className="text-coffee-300 text-sm max-w-md mb-5">
               Свежеобжаренный премиальный кофе из лучших плантаций мира.
               Обжариваем под каждый заказ и доставляем по всей России.
             </p>
@@ -121,11 +121,11 @@ export function Footer() {
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-white/10 mt-10 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-coffee-400 text-sm">
+        <div className="border-t border-white/10 mt-8 pt-6 sm:mt-10 sm:pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
+          <p className="text-coffee-400 text-xs sm:text-sm">
             © {currentYear} Millor Coffee. Все права защищены.
           </p>
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-sm">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:gap-6 text-xs sm:text-sm">
             <Link
               href="/privacy"
               className="text-coffee-400 hover:text-white transition-colors"

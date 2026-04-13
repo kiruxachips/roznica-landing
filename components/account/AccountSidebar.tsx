@@ -57,32 +57,34 @@ export function AccountSidebar() {
       </aside>
 
       {/* Mobile tabs */}
-      <div className="lg:hidden flex gap-2 mb-6 overflow-x-auto pb-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white text-muted-foreground hover:bg-muted"
-              )}
-            >
-              <item.icon className="w-4 h-4" />
-              {item.name}
-            </Link>
-          )
-        })}
-        <button
-          onClick={() => signOut({ callbackUrl: "/" })}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm text-muted-foreground bg-white hover:bg-muted whitespace-nowrap transition-colors"
-        >
-          <LogOut className="w-4 h-4" />
-          Выйти
-        </button>
+      <div className="lg:hidden -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-colors snap-start",
+                  isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white text-muted-foreground hover:bg-muted"
+                )}
+              >
+                <item.icon className="w-4 h-4 shrink-0" />
+                {item.name}
+              </Link>
+            )
+          })}
+          <button
+            onClick={() => signOut({ callbackUrl: "/" })}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm text-muted-foreground bg-white hover:bg-muted whitespace-nowrap transition-colors snap-start"
+          >
+            <LogOut className="w-4 h-4 shrink-0" />
+            Выйти
+          </button>
+        </div>
       </div>
     </>
   )

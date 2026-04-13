@@ -89,20 +89,20 @@ export async function Products() {
   const products = await getProducts()
 
   return (
-    <section id="products" className="py-20 sm:py-28 bg-secondary/30">
+    <section id="products" className="py-16 sm:py-20 lg:py-28 bg-secondary/30">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-4">
+        <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16">
+          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
             Хиты продаж
           </h2>
-          <p className="text-muted-foreground text-lg">
+          <p className="text-muted-foreground text-base sm:text-lg">
             Самые популярные сорта для дома. Выгодная фасовка 1 кг
           </p>
         </div>
 
         {/* Products Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 max-w-5xl mx-auto">
           {products.map((product) => (
             <div key={product.id}>
               <Link href={`/catalog/${product.slug}`}>

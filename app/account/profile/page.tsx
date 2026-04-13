@@ -19,7 +19,7 @@ export default async function ProfilePage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-serif font-bold mb-6">Профиль</h1>
+      <h1 className="text-xl sm:text-2xl font-serif font-bold mb-5 sm:mb-6">Профиль</h1>
       <ProfileForm
         user={{
           name: user.name,

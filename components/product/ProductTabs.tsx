@@ -55,15 +55,15 @@ export function ProductTabs({
   ]
 
   return (
-    <div className="mt-12 sm:mt-16" id="product-tabs">
+    <div className="mt-10 sm:mt-16" id="product-tabs">
       {/* Tab bar */}
-      <div className="flex gap-1 bg-secondary/50 rounded-2xl p-1.5 max-w-fit">
+      <div className="flex gap-1 bg-secondary/50 rounded-2xl p-1 sm:p-1.5 overflow-x-auto -mx-1 px-1 sm:overflow-visible sm:max-w-fit">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActive(tab.id)}
             className={cn(
-              "flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-medium transition-all",
+              "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap",
               active === tab.id
                 ? "bg-white text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -84,7 +84,7 @@ export function ProductTabs({
       </div>
 
       {/* Tab content */}
-      <div className="pt-8">
+      <div className="pt-6 sm:pt-8">
         {active === "description" && (
           fullDescription ? (
             <div className="max-w-3xl">
@@ -94,13 +94,13 @@ export function ProductTabs({
                 // First paragraph — lead style
                 if (i === 0) {
                   return (
-                    <p key={i} className="text-foreground text-lg leading-relaxed mb-6 font-medium">
+                    <p key={i} className="text-foreground text-base sm:text-lg leading-relaxed mb-5 sm:mb-6 font-medium">
                       {text}
                     </p>
                   )
                 }
                 return (
-                  <p key={i} className="text-muted-foreground leading-[1.8] mb-5 last:mb-0 text-[15px] border-l-2 border-primary/15 pl-4">
+                  <p key={i} className="text-muted-foreground leading-[1.7] sm:leading-[1.8] mb-4 sm:mb-5 last:mb-0 text-sm sm:text-[15px] border-l-2 border-primary/15 pl-3 sm:pl-4">
                     {text}
                   </p>
                 )

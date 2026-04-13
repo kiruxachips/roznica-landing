@@ -64,16 +64,16 @@ export default async function FavoritesPage({
 
   return (
     <div>
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-        <h1 className="text-xl font-serif font-bold">Избранное</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
+        <h1 className="text-lg sm:text-xl font-serif font-bold">Избранное</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           {total > 0 ? `${total} товаров` : "Пока пусто"}
         </p>
       </div>
 
       {favorites.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4">
             {favorites.map((fav) => (
               <ProductCard
                 key={fav.id}
@@ -84,7 +84,7 @@ export default async function FavoritesPage({
           </div>
 
           {totalPages > 1 && (
-            <div className="flex justify-center gap-2 mt-8">
+            <div className="flex flex-wrap justify-center gap-2 mt-8">
               {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
                 <Link
                   key={p}
@@ -102,8 +102,8 @@ export default async function FavoritesPage({
           )}
         </>
       ) : (
-        <div className="bg-white rounded-2xl shadow-sm p-12 text-center">
-          <Heart className="w-12 h-12 text-muted-foreground/30 mx-auto mb-4" />
+        <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-12 text-center">
+          <Heart className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground/30 mx-auto mb-4" />
           <p className="text-muted-foreground mb-4">
             Вы ещё не добавили товары в избранное
           </p>

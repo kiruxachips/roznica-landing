@@ -73,7 +73,7 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-8">
+    <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8">
       <h1 className="text-2xl font-serif font-bold text-center mb-2">Восстановление пароля</h1>
 
       {step === "email" && (

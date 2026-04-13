@@ -87,7 +87,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
         {/* Cover image */}
         {article.coverImage && (
-          <div className="relative w-full h-64 sm:h-80 md:h-96 bg-muted">
+          <div className="relative w-full h-48 sm:h-80 md:h-96 bg-muted">
             <Image
               src={article.coverImage}
               alt={article.title}
@@ -100,33 +100,33 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
         {/* Breadcrumbs */}
         <div className="bg-secondary/30">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
               <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <Link href="/blog" className="hover:text-primary transition-colors">Блог</Link>
-              <ChevronRight className="w-3.5 h-3.5" />
-              <span className="text-foreground font-medium line-clamp-1">{article.title}</span>
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="text-foreground font-medium truncate">{article.title}</span>
             </nav>
           </div>
         </div>
 
         {/* Article */}
-        <article className="py-12 sm:py-16">
+        <article className="py-8 sm:py-16">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
             {/* Meta line */}
-            <div className="flex flex-wrap items-center gap-3 mb-6">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-5 sm:mb-6">
               {article.category && (
                 <Link
                   href={`/blog?category=${article.category.slug}`}
-                  className="px-2.5 py-1 bg-primary/10 text-primary rounded-md text-sm font-medium hover:bg-primary/20 transition-colors"
+                  className="px-2.5 py-1 bg-primary/10 text-primary rounded-md text-xs sm:text-sm font-medium hover:bg-primary/20 transition-colors"
                 >
                   {article.category.name}
                 </Link>
               )}
               {article.publishedAt && (
-                <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
+                <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   {new Date(article.publishedAt).toLocaleDateString("ru-RU", {
                     day: "numeric",
                     month: "long",
@@ -134,24 +134,24 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
                   })}
                 </span>
               )}
-              <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" />
+              <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {article.readingTime} мин чтения
               </span>
-              <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                <Eye className="w-4 h-4" />
+              <span className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {article.viewCount}
               </span>
             </div>
 
             {/* Title */}
-            <h1 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold text-foreground mb-8">
+            <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
               {article.title}
             </h1>
 
             {/* Content */}
             <div
-              className="prose prose-lg max-w-none prose-headings:font-serif prose-a:text-primary prose-img:rounded-lg"
+              className="prose prose-base sm:prose-lg max-w-none prose-headings:font-serif prose-a:text-primary prose-img:rounded-lg break-words"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
 
@@ -174,12 +174,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
         {/* Related articles */}
         {relatedArticles.length > 0 && (
-          <section className="py-12 sm:py-16 bg-secondary/30">
+          <section className="py-8 sm:py-16 bg-secondary/30">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              <h2 className="font-serif text-2xl sm:text-3xl font-bold text-foreground mb-8">
+              <h2 className="font-serif text-xl sm:text-3xl font-bold text-foreground mb-5 sm:mb-8">
                 Читайте также
               </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {relatedArticles.map((a) => (
                   <ArticleCard key={a.id} article={a} />
                 ))}

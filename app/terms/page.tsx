@@ -14,20 +14,20 @@ export default function TermsPage() {
   return (
     <>
       <Header />
-      <main className="pt-24 pb-16 bg-secondary/20 min-h-screen">
+      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 bg-secondary/20 min-h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           {/* Back Link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-8"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-5 sm:mb-8"
           >
             <ArrowLeft className="w-4 h-4" />
             Вернуться на главную
           </Link>
 
           {/* Content */}
-          <article className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm p-8 sm:p-12">
-            <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-8">
+          <article className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm p-5 sm:p-8 lg:p-12">
+            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
               Пользовательское соглашение
             </h1>
 

@@ -20,22 +20,22 @@ export default async function CheckoutSuccessPage({
   return (
     <>
       <Header />
-      <main className="pt-24 pb-16 min-h-screen flex items-center">
+      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 min-h-screen flex items-center">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-md mx-auto text-center">
-            <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-10 h-10 text-green-600" />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5 sm:mb-6">
+              <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-600" />
             </div>
 
-            <h1 className="font-serif text-3xl font-bold mb-4">Заказ принят!</h1>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Заказ принят!</h1>
 
             {orderNumber && (
-              <p className="text-lg text-muted-foreground mb-2">
+              <p className="text-base sm:text-lg text-muted-foreground mb-2">
                 Номер заказа: <span className="font-semibold text-foreground">{orderNumber}</span>
               </p>
             )}
 
-            <p className="text-muted-foreground mb-8">
+            <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
               Мы свяжемся с вами в ближайшее время для подтверждения заказа.
               Обычно это занимает не более 1-2 часов в рабочее время.
             </p>

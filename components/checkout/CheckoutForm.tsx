@@ -196,10 +196,10 @@ export function CheckoutForm() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
       {/* Form */}
       <div className="lg:col-span-2">
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-5">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-4 sm:space-y-5">
           <h2 className="text-lg font-semibold">Контактные данные</h2>
 
           {isCustomer && profile && (
@@ -328,7 +328,7 @@ export function CheckoutForm() {
           <button
             type="submit"
             disabled={loading || !agreed || !selectedRate}
-            className="w-full h-14 bg-primary text-primary-foreground rounded-xl text-sm sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="w-full h-12 sm:h-14 bg-primary text-primary-foreground rounded-xl text-base sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
             {loading
               ? "Оформление..."
@@ -341,7 +341,7 @@ export function CheckoutForm() {
 
       {/* Order summary */}
       <div className="lg:col-span-1">
-        <div className="bg-white rounded-2xl p-6 shadow-sm sticky top-24">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:sticky lg:top-24">
           <h2 className="text-lg font-semibold mb-4">Ваш заказ</h2>
           <div className="space-y-3 mb-4">
             {items.map((item) => (

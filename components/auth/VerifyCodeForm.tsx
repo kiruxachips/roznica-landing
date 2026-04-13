@@ -86,13 +86,13 @@ export function VerifyCodeForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-8">
+    <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8">
       <h1 className="text-2xl font-serif font-bold text-center mb-2">Подтверждение email</h1>
-      <p className="text-sm text-muted-foreground text-center mb-6">
+      <p className="text-sm text-muted-foreground text-center mb-6 break-words">
         Введите код, отправленный на <span className="font-medium text-foreground">{email}</span>
       </p>
 
-      <div className="flex justify-center gap-2 mb-6" onPaste={handlePaste}>
+      <div className="flex justify-center gap-1.5 sm:gap-2 mb-6" onPaste={handlePaste}>
         {code.map((digit, i) => (
           <input
             key={i}
@@ -103,7 +103,7 @@ export function VerifyCodeForm() {
             value={digit}
             onChange={(e) => handleChange(i, e.target.value)}
             onKeyDown={(e) => handleKeyDown(i, e)}
-            className="w-12 h-14 text-center text-xl font-bold rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-bold rounded-xl border border-input focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={loading}
           />
         ))}

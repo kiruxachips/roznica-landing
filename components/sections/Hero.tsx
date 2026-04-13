@@ -15,14 +15,14 @@ export function Hero() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Heading */}
-          <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-6 animate-fade-in [animation-delay:100ms]">
+          <h1 className="font-serif text-[2rem] leading-[1.15] sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-5 sm:mb-6 animate-fade-in [animation-delay:100ms]">
             Свежеобжаренный{" "}
             <span className="text-primary">кофе</span>{" "}
             для дома с доставкой
           </h1>
 
           {/* Subheading */}
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in [animation-delay:200ms]">
+          <p className="text-base sm:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 sm:mb-10 animate-fade-in [animation-delay:200ms]">
             Попробуйте настоящий specialty-кофе у себя дома.
             Обжариваем под ваш заказ — вы получаете кофе
             максимальной свежести.
@@ -46,7 +46,7 @@ export function Hero() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-8 max-w-lg mx-auto mt-16 animate-fade-in [animation-delay:400ms]">
+          <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-lg mx-auto mt-12 sm:mt-16 animate-fade-in [animation-delay:400ms]">
             <div className="text-center">
               <div className="font-serif text-3xl sm:text-4xl font-bold text-primary">15+</div>
               <div className="text-sm text-muted-foreground mt-1">сортов</div>
@@ -63,8 +63,8 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+      {/* Scroll indicator (desktop only) */}
+      <div className="hidden md:block absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
         <div className="w-6 h-10 border-2 border-muted-foreground/30 rounded-full flex justify-center pt-2">
           <div className="w-1 h-2 bg-muted-foreground/50 rounded-full" />
         </div>

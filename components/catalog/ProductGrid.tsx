@@ -37,7 +37,7 @@ export function ProductGrid({ products, currentPage, totalPages, favoriteIds, se
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-16">
+        <div className="flex flex-wrap justify-center gap-2 mt-10 sm:mt-16">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Link
               key={page}

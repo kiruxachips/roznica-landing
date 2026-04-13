@@ -19,9 +19,9 @@ export default async function NotificationsPage() {
 
   return (
     <div>
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-        <h1 className="text-xl font-serif font-bold">Уведомления</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
+        <h1 className="text-lg sm:text-xl font-serif font-bold">Уведомления</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Настройте, какие email-уведомления вы хотите получать
         </p>
       </div>

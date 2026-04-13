@@ -105,28 +105,28 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
         {/* Breadcrumbs */}
         <div className="bg-secondary/30">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+            <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
               <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
-              <ChevronRight className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
               <Link href="/catalog" className="hover:text-primary transition-colors">Каталог</Link>
-              <ChevronRight className="w-3.5 h-3.5" />
-              <span className="text-foreground font-medium">{product.name}</span>
+              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+              <span className="text-foreground font-medium truncate">{product.name}</span>
             </nav>
           </div>
         </div>
 
         {/* Product section */}
-        <section className="py-8 sm:py-10">
+        <section className="py-6 sm:py-10 pb-24 sm:pb-10">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-10 lg:gap-12">
               {/* Gallery — sticky on desktop */}
               <div className="lg:col-span-5 lg:sticky lg:top-20 lg:self-start">
                 <ProductGallery images={product.images} productName={product.name} />
               </div>
 
               {/* Info */}
-              <div className="lg:col-span-7 space-y-6">
+              <div className="lg:col-span-7 space-y-5 sm:space-y-6">
                 {/* Badge */}
                 {product.badge && (
                   <span className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
@@ -136,7 +136,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
                 {/* Name */}
                 <div className="flex items-start gap-3">
-                  <h1 className="font-serif text-3xl sm:text-4xl font-bold text-foreground flex-1">
+                  <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground flex-1 leading-tight">
                     {product.name}
                   </h1>
                   {isCustomer && (

@@ -44,7 +44,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <Clock className="w-10 h-10 text-amber-600" />
           </div>
-          <h1 className="font-serif text-3xl font-bold mb-2">Оплата не завершена</h1>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Оплата не завершена</h1>
           <p className="text-muted-foreground">
             Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> ожидает оплаты
           </p>
@@ -81,7 +81,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <XCircle className="w-10 h-10 text-red-600" />
           </div>
-          <h1 className="font-serif text-3xl font-bold mb-2">Оплата не прошла</h1>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Оплата не прошла</h1>
           <p className="text-muted-foreground">
             Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> не был оплачен
           </p>
@@ -125,7 +125,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       </div>
 
       {/* Order details */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm mb-6">
+      <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-sm mb-5 sm:mb-6">
         <div className="flex items-center gap-2 mb-5">
           <Package className="w-5 h-5 text-primary" />
           <h2 className="text-lg font-semibold">Состав заказа</h2>
@@ -166,7 +166,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       </div>
 
       {/* Contact info */}
-      <div className="bg-white rounded-2xl p-6 sm:p-8 shadow-sm mb-8">
+      <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-sm mb-6 sm:mb-8">
         <h2 className="text-lg font-semibold mb-4">Данные получателя</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div>
@@ -187,7 +187,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       </div>
 
       {/* What's next */}
-      <div className="bg-primary/5 rounded-2xl p-6 sm:p-8 mb-8">
+      <div className="bg-primary/5 rounded-2xl p-4 sm:p-8 mb-6 sm:mb-8">
         <h2 className="font-semibold mb-3">Что дальше?</h2>
         <ul className="space-y-2 text-sm text-muted-foreground">
           <li>Мы свяжемся с вами в течение 1-2 часов для подтверждения заказа</li>

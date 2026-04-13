@@ -74,23 +74,23 @@ export function StickyAddToCart({
         visible ? "translate-y-0" : "translate-y-full"
       )}
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3 py-3">
+      <div className="container mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3">
           {/* Product name */}
-          <div className="flex-1 min-w-0 hidden sm:block">
+          <div className="flex-1 min-w-0 hidden md:block">
             <p className="text-sm font-semibold text-foreground truncate">{productName}</p>
             <p className="text-xs text-muted-foreground">{selected.weight}</p>
           </div>
 
           {/* Weight pills */}
-          <div className="flex gap-1 sm:gap-1.5 overflow-x-auto">
+          <div className="flex gap-1 sm:gap-1.5 overflow-x-auto -mx-1 px-1 scrollbar-hide flex-shrink min-w-0">
             {variants.map((v, i) => (
               <button
                 key={v.id}
                 onClick={() => setSelectedIndex(i)}
                 disabled={v.stock === 0}
                 className={cn(
-                  "px-2 sm:px-3 py-2 sm:py-1.5 rounded-lg text-xs font-medium border transition-all flex-shrink-0",
+                  "px-2 sm:px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex-shrink-0",
                   i === selectedIndex
                     ? "border-primary bg-primary/5 text-primary"
                     : "border-border text-muted-foreground hover:border-primary/30",
@@ -107,7 +107,7 @@ export function StickyAddToCart({
             onClick={handleAddToCart}
             disabled={selected.stock === 0}
             className={cn(
-              "flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] whitespace-nowrap",
+              "flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all active:scale-[0.98] whitespace-nowrap shrink-0 ml-auto",
               added
                 ? "bg-green-600 text-white"
                 : "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -120,7 +120,7 @@ export function StickyAddToCart({
               <>
                 <span>{selected.price}₽</span>
                 <ShoppingCart className="w-4 h-4" />
-                <span>В корзину</span>
+                <span className="hidden sm:inline">В корзину</span>
               </>
             )}
           </button>

@@ -50,11 +50,11 @@ export default async function OrderDetailPage({
         Мои заказы
       </Link>
 
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-xl font-serif font-bold">{order.orderNumber}</h1>
-            <p className="text-sm text-muted-foreground">{date}</p>
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
+        <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-serif font-bold break-words">{order.orderNumber}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">{date}</p>
           </div>
           <OrderStatusBadge status={order.status} />
         </div>

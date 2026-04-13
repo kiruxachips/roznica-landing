@@ -172,7 +172,7 @@ export function PickupPointMap() {
         <div className="relative">
           <div
             ref={mapRef}
-            className="w-full h-52 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"
+            className="w-full h-48 sm:h-64 md:h-80 rounded-xl overflow-hidden border border-border"
           />
           {scriptLoaded === false && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">

@@ -21,18 +21,18 @@ export function OrderCard({ id, orderNumber, status, total, itemCount, createdAt
   return (
     <Link
       href={`/account/orders/${id}`}
-      className="block bg-white rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow"
+      className="block bg-white rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow"
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0">
           <span className="font-medium text-sm">{orderNumber}</span>
           <OrderStatusBadge status={status} />
         </div>
-        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
       </div>
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
         <span>{date}</span>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <span>{itemCount} {itemCount === 1 ? "товар" : itemCount < 5 ? "товара" : "товаров"}</span>
           <span className="font-medium text-foreground">{total}₽</span>
         </div>

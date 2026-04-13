@@ -31,9 +31,9 @@ export default async function AccountPage() {
   if (!user) redirect("/auth/login")
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h1 className="text-2xl font-serif font-bold mb-1">
+    <div className="space-y-5 sm:space-y-6">
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-serif font-bold mb-1">
           {user.name ? `Привет, ${user.name}!` : "Личный кабинет"}
         </h1>
         <p className="text-muted-foreground text-sm">
@@ -43,7 +43,7 @@ export default async function AccountPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <Link
           href="/account/profile"
           className="bg-white rounded-2xl shadow-sm p-5 hover:shadow-md transition-shadow flex items-center gap-4"

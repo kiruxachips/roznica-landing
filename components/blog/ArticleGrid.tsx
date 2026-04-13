@@ -19,14 +19,14 @@ export function ArticleGrid({ articles, currentPage, totalPages, baseSearchParam
 
   return (
     <div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {articles.map((article) => (
           <ArticleCard key={article.id} article={article} />
         ))}
       </div>
 
       {totalPages > 1 && (
-        <div className="flex justify-center gap-2 mt-16">
+        <div className="flex flex-wrap justify-center gap-2 mt-10 sm:mt-16">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
             <Link
               key={page}

@@ -12,9 +12,9 @@ export default function CartRoute() {
   return (
     <>
       <Header />
-      <main className="pt-24 pb-16 bg-secondary/20 min-h-screen">
+      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 bg-secondary/20 min-h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h1 className="font-serif text-3xl font-bold mb-8">Корзина</h1>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-5 sm:mb-8">Корзина</h1>
           <CartPage />
         </div>
       </main>

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 export function Contact() {
   return (
-    <section id="contact" className="py-20 sm:py-28 bg-gradient-to-br from-primary via-coffee-700 to-coffee-900 text-white relative overflow-hidden">
+    <section id="contact" className="py-16 sm:py-20 lg:py-28 bg-gradient-to-br from-primary via-coffee-700 to-coffee-900 text-white relative overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-white blur-3xl" />
@@ -15,12 +15,12 @@ export function Contact() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-3xl mx-auto text-center">
           {/* Heading */}
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-bold mb-6">
+          <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6">
             Попробуйте specialty-кофе у себя дома
           </h2>
 
           {/* Subheading */}
-          <p className="text-lg sm:text-xl text-white/80 mb-10 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-white/80 mb-8 sm:mb-10 max-w-2xl mx-auto">
             Идеальный кофе для дома — это просто. Закажите сейчас и получите бесплатную доставку от 3000₽.
             Мы обжарим кофе специально для вас!
           </p>

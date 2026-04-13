@@ -79,11 +79,11 @@ export function CartPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
       {/* Items list */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className="lg:col-span-2 space-y-3 sm:space-y-4">
         {items.map((item) => (
-          <div key={item.variantId} className="bg-white rounded-2xl p-4 sm:p-5 shadow-sm flex gap-4">
+          <div key={item.variantId} className="bg-white rounded-2xl p-3 sm:p-5 shadow-sm flex gap-3 sm:gap-4">
             {item.image && (
               <Link href={`/catalog/${item.slug}`}>
                 <Image
@@ -136,7 +136,7 @@ export function CartPage() {
 
       {/* Summary */}
       <div className="lg:col-span-1">
-        <div className="bg-white rounded-2xl p-6 shadow-sm sticky top-24 space-y-5">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:sticky lg:top-24 space-y-5">
           {/* Promo code */}
           <div>
             <h3 className="text-sm font-medium mb-2">Промокод</h3>

@@ -22,14 +22,14 @@ export default async function BonusesPage() {
 
   return (
     <div>
-      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6">
-        <h1 className="text-xl font-serif font-bold">Бонусная программа</h1>
-        <p className="text-sm text-muted-foreground mt-1">
+      <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
+        <h1 className="text-lg sm:text-xl font-serif font-bold">Бонусная программа</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Копите бонусы и оплачивайте ими до 50% заказа
         </p>
       </div>
 
-      <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-6 mb-6">
+      <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-2xl p-4 sm:p-6 mb-5 sm:mb-6">
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
             <Gift className="w-5 h-5 text-primary" />

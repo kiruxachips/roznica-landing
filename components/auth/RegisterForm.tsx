@@ -49,7 +49,7 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-8">
+    <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8">
       <h1 className="text-2xl font-serif font-bold text-center mb-6">Регистрация</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">

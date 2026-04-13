@@ -91,9 +91,9 @@ export function ProfileForm({ user }: ProfileFormProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Profile info */}
-      <form onSubmit={handleProfileSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+      <form onSubmit={handleProfileSubmit} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
         <h2 className="text-lg font-semibold">Личные данные</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -155,7 +155,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
       {/* Connected accounts */}
       {user.accounts.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-sm p-6">
+        <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
           <h2 className="text-lg font-semibold mb-3">Связанные аккаунты</h2>
           <div className="space-y-2">
             {user.accounts.map((acc) => (
@@ -169,7 +169,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
       )}
 
       {/* Change password */}
-      <form onSubmit={handlePasswordSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
+      <form onSubmit={handlePasswordSubmit} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
         <h2 className="text-lg font-semibold">
           {user.passwordHash ? "Изменить пароль" : "Установить пароль"}
         </h2>

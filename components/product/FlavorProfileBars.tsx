@@ -56,15 +56,15 @@ export function FlavorProfileBars({ acidity, sweetness, bitterness, body }: Flav
           const value = values[key]
           if (value === null) return null
           return (
-            <div key={key} className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground w-28 flex-shrink-0">{label}</span>
+            <div key={key} className="flex items-center gap-2 sm:gap-3">
+              <span className="text-xs sm:text-sm text-muted-foreground w-20 sm:w-28 flex-shrink-0">{label}</span>
               <div className="flex-1 h-2.5 bg-secondary rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all duration-1000 ease-out ${color}`}
                   style={{ width: visible ? `${value}%` : "0%" }}
                 />
               </div>
-              <span className="text-xs text-muted-foreground w-16 text-right">{getIntensity(value)}</span>
+              <span className="text-[11px] sm:text-xs text-muted-foreground w-14 sm:w-16 text-right">{getIntensity(value)}</span>
             </div>
           )
         })}

@@ -109,7 +109,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
           </h3>
 
           {/* Meta */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] sm:text-xs text-muted-foreground mb-2">
             {product.origin && (
               <span className="flex items-center gap-0.5">
                 <MapPin className="w-3 h-3" />
@@ -141,15 +141,14 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
           )}
 
           {/* Variant selector + price + add to cart */}
-          <div className="mt-auto pt-1">
-          {availableVariants.length > 1 ? (
-            <div className="space-y-2.5">
-              <div className="flex flex-wrap gap-1.5">
+          <div className="mt-auto pt-1 space-y-2">
+            {availableVariants.length > 1 && (
+              <div className="flex flex-wrap gap-1">
                 {availableVariants.map((v, i) => (
                   <button
                     key={v.id}
                     onClick={(e) => handleVariantClick(e, i)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
                       selectedIdx === i
                         ? "bg-primary text-white"
                         : "bg-secondary text-muted-foreground hover:bg-secondary/80"
@@ -159,36 +158,17 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                   </button>
                 ))}
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-lg font-bold text-primary">
-                    {selected?.price}₽
-                  </span>
-                  {selected?.oldPrice && selected.oldPrice > selected.price && (
-                    <span className="text-xs text-muted-foreground line-through">
-                      {selected.oldPrice}₽
-                    </span>
-                  )}
-                </div>
-                <button
-                  onClick={handleQuickAdd}
-                  className="h-10 px-4 bg-primary text-white rounded-lg text-sm font-medium flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
-                >
-                  <ShoppingCart className="w-4 h-4" />
-                  В корзину
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="flex items-baseline gap-1.5">
+            )}
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-baseline gap-1 min-w-0">
                 {selected && (
-                  <span className="text-lg font-bold text-primary">
+                  <span className="text-base sm:text-lg font-bold text-primary leading-none">
                     {selected.price}₽
                   </span>
                 )}
                 {selected?.oldPrice && selected.oldPrice > selected.price && (
-                  <span className="text-xs text-muted-foreground line-through">
+                  <span className="text-[11px] sm:text-xs text-muted-foreground line-through truncate">
                     {selected.oldPrice}₽
                   </span>
                 )}
@@ -196,14 +176,14 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
               {!outOfStock && selected && (
                 <button
                   onClick={handleQuickAdd}
-                  className="h-10 px-4 bg-primary text-white rounded-lg text-sm font-medium flex items-center gap-1.5 hover:bg-primary/90 transition-colors"
+                  aria-label="В корзину"
+                  className="shrink-0 h-9 w-9 sm:h-10 sm:w-auto sm:px-4 bg-primary text-white rounded-lg text-sm font-medium flex items-center justify-center sm:gap-1.5 hover:bg-primary/90 transition-colors"
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  В корзину
+                  <span className="hidden sm:inline">В корзину</span>
                 </button>
               )}
             </div>
-          )}
           </div>
         </div>
       </div>
