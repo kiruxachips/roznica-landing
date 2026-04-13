@@ -5,6 +5,7 @@ import { SHOP_URL } from "@/lib/constants"
 
 const navigation = [
   { name: "Каталог", href: "/catalog" },
+  { name: "Блог", href: "/blog" },
   { name: "О нас", href: "/#about" },
   { name: "Отзывы", href: "/#testimonials" },
 ]
@@ -19,123 +20,94 @@ function VKIcon({ className }: { className?: string }) {
 }
 
 export function Footer() {
-  // Фиксированный год для избежания hydration mismatch
   const currentYear = 2026
 
   return (
-    <footer className="bg-coffee-900 text-white relative overflow-hidden">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 sm:gap-6 md:gap-8">
-          {/* Brand */}
-          <div className="md:col-span-2">
-            <Link href="/" className="flex items-center mb-4">
+    <footer className="bg-coffee-900 text-white">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* Top row */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 lg:gap-8">
+          {/* Logo + socials */}
+          <div className="flex items-center justify-between lg:justify-start gap-5">
+            <Link href="/" className="flex items-center shrink-0">
               <Image
                 src="/images/logo.webp"
                 alt="Millor Coffee"
-                width={125}
-                height={50}
+                width={110}
+                height={44}
                 className="brightness-0 invert"
               />
             </Link>
-            <p className="text-coffee-300 text-sm max-w-md mb-5">
-              Свежеобжаренный премиальный кофе из лучших плантаций мира.
-              Обжариваем под каждый заказ и доставляем по всей России.
-            </p>
-            {/* Social Links */}
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <a
                 href="https://t.me/coffeemillor"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
                 aria-label="Telegram"
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
               >
-                <Send className="w-5 h-5" />
+                <Send className="w-4 h-4" />
               </a>
               <a
                 href="https://vk.com/coffeemillor"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
                 aria-label="VKontakte"
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors"
               >
-                <VKIcon className="w-5 h-5" />
+                <VKIcon className="w-4 h-4" />
               </a>
             </div>
           </div>
 
           {/* Navigation */}
-          <div>
-            <h3 className="font-semibold mb-4">Навигация</h3>
-            <ul className="space-y-2">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className="text-coffee-300 hover:text-white text-sm transition-colors"
-                  >
-                    {item.name}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <a
-                  href={SHOP_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-coffee-300 hover:text-white text-sm transition-colors"
-                >
-                  Магазин
-                </a>
-              </li>
-            </ul>
-          </div>
+          <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className="text-coffee-300 hover:text-white transition-colors"
+              >
+                {item.name}
+              </Link>
+            ))}
+            <a
+              href={SHOP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-coffee-300 hover:text-white transition-colors"
+            >
+              Магазин
+            </a>
+          </nav>
 
           {/* Contacts */}
-          <div>
-            <h3 className="font-semibold mb-4">Контакты</h3>
-            <ul className="space-y-3">
-              <li>
-                <a
-                  href="tel:+74012375343"
-                  className="flex items-center gap-2 text-coffee-300 hover:text-white text-sm transition-colors"
-                >
-                  <Phone className="w-4 h-4" />
-                  +7 (401) 237 53 43
-                </a>
-              </li>
-              <li>
-                <a
-                  href="mailto:Import@kldrefine.com"
-                  className="flex items-center gap-2 text-coffee-300 hover:text-white text-sm transition-colors"
-                >
-                  <Mail className="w-4 h-4" />
-                  Import@kldrefine.com
-                </a>
-              </li>
-            </ul>
-            <p className="text-coffee-400 text-xs mt-4">
-              Пн-Пт: 9:00 - 18:00
-            </p>
+          <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row flex-wrap gap-x-5 gap-y-1.5 text-sm">
+            <a
+              href="tel:+74012375343"
+              className="flex items-center gap-1.5 text-coffee-300 hover:text-white transition-colors"
+            >
+              <Phone className="w-3.5 h-3.5 shrink-0" />
+              +7 (401) 237 53 43
+            </a>
+            <a
+              href="mailto:Import@kldrefine.com"
+              className="flex items-center gap-1.5 text-coffee-300 hover:text-white transition-colors"
+            >
+              <Mail className="w-3.5 h-3.5 shrink-0" />
+              Import@kldrefine.com
+            </a>
           </div>
         </div>
 
         {/* Bottom */}
-        <div className="border-t border-white/10 mt-8 pt-6 sm:mt-10 sm:pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
-          <p className="text-coffee-400 text-xs sm:text-sm">
-            © {currentYear} Millor Coffee. Все права защищены.
-          </p>
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 sm:gap-6 text-xs sm:text-sm">
-            <Link
-              href="/privacy"
-              className="text-coffee-400 hover:text-white transition-colors"
-            >
+        <div className="border-t border-white/10 mt-5 pt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-xs text-coffee-400">
+          <p>© {currentYear} Millor Coffee · Пн-Пт 9:00-18:00</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/privacy" className="hover:text-white transition-colors">
               Политика конфиденциальности
             </Link>
-            <Link
-              href="/terms"
-              className="text-coffee-400 hover:text-white transition-colors"
-            >
+            <Link href="/terms" className="hover:text-white transition-colors">
               Пользовательское соглашение
             </Link>
           </div>
