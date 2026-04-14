@@ -1,90 +1,102 @@
 import Link from "next/link"
-import { Star, Flame, Truck, ShieldCheck } from "lucide-react"
+import { Star, Coffee, Truck, ShieldCheck } from "lucide-react"
 import { getShopStats } from "@/lib/dal/stats"
+
+type Accent = "amber" | "primary"
+
+interface Item {
+  accent: Accent
+  icon: React.ReactNode
+  primary: string
+  secondary: string
+  href?: string
+}
 
 export async function SocialProofStrip() {
   const { reviewsCount, averageRating, activeProductsCount } = await getShopStats()
 
   const hasRealRating = averageRating !== null && reviewsCount >= 3
 
-  const items = [
-    // 1. Rating — real data if we have reviews, otherwise 5-star visual with "новый"
-    hasRealRating
-      ? {
-          accent: "amber" as const,
-          icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" strokeWidth={1.75} />,
-          primary: averageRating!.toFixed(1),
-          secondary: `${reviewsCount} ${reviewsCount === 1 ? "отзыв" : reviewsCount < 5 ? "отзыва" : "отзывов"}`,
-          href: "#testimonials",
-        }
-      : {
-          accent: "amber" as const,
-          icon: <Star className="w-5 h-5 fill-amber-400 text-amber-400" strokeWidth={1.75} />,
-          primary: "5,0",
-          secondary: "оценка клиентов",
-          href: "#testimonials",
-        },
-    // 2. Catalog depth — real product count
+  const ratingPrimary = hasRealRating ? averageRating!.toFixed(1).replace(".", ",") : "5,0"
+  const ratingSecondary = hasRealRating
+    ? `из 5 · ${reviewsCount} ${reviewsCount === 1 ? "отзыв" : reviewsCount < 5 ? "отзыва" : "отзывов"}`
+    : "средняя оценка клиентов"
+
+  const items: Item[] = [
     {
-      accent: "primary" as const,
-      icon: <Flame className="w-5 h-5 text-primary" strokeWidth={1.75} />,
-      primary: activeProductsCount > 0 ? `${activeProductsCount} сортов` : "Свежая обжарка",
-      secondary: "моноарабика под заказ",
+      accent: "amber",
+      icon: <Star className="w-6 h-6 sm:w-7 sm:h-7 fill-amber-400 text-amber-400" strokeWidth={1.5} />,
+      primary: ratingPrimary,
+      secondary: ratingSecondary,
+      href: "#testimonials",
     },
-    // 3. Delivery
     {
-      accent: "primary" as const,
-      icon: <Truck className="w-5 h-5 text-primary" strokeWidth={1.75} />,
+      accent: "primary",
+      icon: <Coffee className="w-6 h-6 sm:w-7 sm:h-7 text-primary" strokeWidth={1.5} />,
+      primary: activeProductsCount > 0 ? `${activeProductsCount}` : "Свежая",
+      secondary: activeProductsCount > 0 ? "сортов моноарабики" : "обжарка под заказ",
+    },
+    {
+      accent: "primary",
+      icon: <Truck className="w-6 h-6 sm:w-7 sm:h-7 text-primary" strokeWidth={1.5} />,
       primary: "2–3 дня",
-      secondary: "СДЭК, Почта, курьер",
+      secondary: "СДЭК · Почта · курьер",
     },
-    // 4. Payment
     {
-      accent: "primary" as const,
-      icon: <ShieldCheck className="w-5 h-5 text-primary" strokeWidth={1.75} />,
+      accent: "primary",
+      icon: <ShieldCheck className="w-6 h-6 sm:w-7 sm:h-7 text-primary" strokeWidth={1.5} />,
       primary: "ЮKassa",
-      secondary: "карты, СБП, ЮMoney",
+      secondary: "карты · СБП · ЮMoney",
     },
   ]
 
   return (
-    <section aria-label="Показатели доверия" className="bg-white border-y border-border/60">
+    <section
+      aria-label="Показатели доверия"
+      className="bg-gradient-to-b from-white to-secondary/20 border-y border-border/60"
+    >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="-mx-4 sm:mx-0 overflow-x-auto scrollbar-hide">
-          <ul className="flex items-center justify-start sm:justify-between lg:justify-center gap-8 sm:gap-10 lg:gap-14 px-4 sm:px-0 py-4 sm:py-5 whitespace-nowrap">
-            {items.map((item, i) => {
-              const content = (
-                <>
-                  <span className="w-10 h-10 rounded-xl bg-secondary/70 flex items-center justify-center shrink-0">
-                    {item.icon}
+        <ul className="grid grid-cols-2 lg:grid-cols-4 lg:divide-x divide-border/50 -mx-4 sm:mx-0">
+          {items.map((item, i) => {
+            const inner = (
+              <div className="flex items-center gap-3 sm:gap-4 py-5 sm:py-7 px-4 sm:px-6 lg:px-8 min-w-0">
+                <span
+                  className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                    item.accent === "amber" ? "bg-amber-50" : "bg-primary/10"
+                  }`}
+                >
+                  {item.icon}
+                </span>
+                <div className="flex flex-col leading-tight min-w-0">
+                  <span className="font-serif font-bold text-xl sm:text-2xl lg:text-3xl text-foreground truncate">
+                    {item.primary}
                   </span>
-                  <div className="flex flex-col leading-tight">
-                    <span className="text-sm sm:text-base font-bold text-foreground">
-                      {item.primary}
-                    </span>
-                    <span className="text-[11px] sm:text-xs text-muted-foreground">
-                      {item.secondary}
-                    </span>
-                  </div>
-                </>
-              )
-              return (
-                <li key={i} className="shrink-0">
-                  {"href" in item && item.href ? (
-                    <Link
-                      href={item.href}
-                      className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3">{content}</div>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+                  <span className="text-[11px] sm:text-xs text-muted-foreground mt-1 truncate">
+                    {item.secondary}
+                  </span>
+                </div>
+              </div>
+            )
+
+            return (
+              <li
+                key={i}
+                className={`relative ${i % 2 === 1 ? "" : "border-r lg:border-r-0"} ${i < 2 ? "border-b lg:border-b-0" : ""} border-border/50`}
+              >
+                {item.href ? (
+                  <Link
+                    href={item.href}
+                    className="block hover:bg-white/50 transition-colors"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  inner
+                )}
+              </li>
+            )
+          })}
+        </ul>
       </div>
     </section>
   )
