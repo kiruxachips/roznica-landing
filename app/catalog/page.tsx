@@ -59,7 +59,8 @@ export default async function CatalogPage({
     !hasActiveFilters ? getCollectionsWithProducts() : Promise.resolve([]),
   ])
 
-  const favoriteIds = isCustomer ? new Set(favIds) : undefined
+  const favoriteIds = isCustomer ? favIds : undefined
+  const favoriteSet = favoriteIds ? new Set(favoriteIds) : undefined
   const totalPages = Math.ceil(total / 12)
 
   return (
@@ -83,7 +84,7 @@ export default async function CatalogPage({
                     slug={c.slug}
                     emoji={c.emoji}
                     products={c.products}
-                    favoritedIds={favoriteIds}
+                    favoritedIds={favoriteSet}
                   />
                 ))}
               </div>

@@ -1,4 +1,7 @@
-import Link from "next/link"
+"use client"
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Loader2 } from "lucide-react"
 import { ProductCard } from "./ProductCard"
 import type { ProductCard as ProductCardType } from "@/lib/types"
 
@@ -6,52 +9,120 @@ interface ProductGridProps {
   products: ProductCardType[]
   currentPage: number
   totalPages: number
-  favoriteIds?: Set<string>
+  favoriteIds?: string[]
   searchParams?: Record<string, string | undefined>
 }
 
-function buildPageUrl(page: number, searchParams?: Record<string, string | undefined>) {
-  const params = new URLSearchParams()
-  if (searchParams) {
-    for (const [key, value] of Object.entries(searchParams)) {
-      if (value && key !== "page") params.set(key, value)
-    }
-  }
-  if (page > 1) params.set("page", String(page))
-  const qs = params.toString()
-  return `/catalog${qs ? `?${qs}` : ""}`
-}
+export function ProductGrid({
+  products: initialProducts,
+  currentPage,
+  totalPages,
+  favoriteIds,
+  searchParams,
+}: ProductGridProps) {
+  const [items, setItems] = useState(initialProducts)
+  const [page, setPage] = useState(currentPage)
+  const [loading, setLoading] = useState(false)
+  const [hasMore, setHasMore] = useState(currentPage < totalPages)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
-export function ProductGrid({ products, currentPage, totalPages, favoriteIds, searchParams }: ProductGridProps) {
+  // Build a Set for O(1) favorited lookup
+  const favoriteSet = useMemo(
+    () => (favoriteIds ? new Set(favoriteIds) : undefined),
+    [favoriteIds]
+  )
+
+  // Reset state whenever the server-rendered first page changes
+  // (happens when filters/sort/collection in URL change)
+  useEffect(() => {
+    setItems(initialProducts)
+    setPage(currentPage)
+    setHasMore(currentPage < totalPages)
+  }, [initialProducts, currentPage, totalPages])
+
+  const loadMore = useCallback(async () => {
+    if (loading || !hasMore) return
+    setLoading(true)
+    try {
+      const next = page + 1
+      const params = new URLSearchParams()
+      if (searchParams) {
+        for (const [key, value] of Object.entries(searchParams)) {
+          if (value && key !== "page") params.set(key, value)
+        }
+      }
+      params.set("page", String(next))
+
+      const res = await fetch(`/api/catalog/products?${params.toString()}`)
+      if (!res.ok) throw new Error("bad response")
+      const data = (await res.json()) as {
+        products: ProductCardType[]
+        hasMore: boolean
+      }
+
+      setItems((prev) => [...prev, ...data.products])
+      setPage(next)
+      setHasMore(data.hasMore)
+    } catch {
+      // swallow — user can retry by scrolling or clicking
+    } finally {
+      setLoading(false)
+    }
+  }, [loading, hasMore, page, searchParams])
+
+  // IntersectionObserver on sentinel for auto-load
+  useEffect(() => {
+    if (!hasMore || loading) return
+    const el = sentinelRef.current
+    if (!el) return
+
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore()
+      },
+      { rootMargin: "400px 0px" }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [hasMore, loading, loadMore])
+
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-        {products.map((product) => (
+        {items.map((product) => (
           <ProductCard
             key={product.id}
             product={product}
-            favorited={favoriteIds ? favoriteIds.has(product.id) : undefined}
+            favorited={favoriteSet ? favoriteSet.has(product.id) : undefined}
           />
         ))}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 mt-10 sm:mt-16">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Link
-              key={page}
-              href={buildPageUrl(page, searchParams)}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                page === currentPage
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-              }`}
+      {hasMore && (
+        <div
+          ref={sentinelRef}
+          className="flex flex-col items-center justify-center py-10"
+        >
+          {loading ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} />
+              Загружаем ещё...
+            </div>
+          ) : (
+            <button
+              onClick={loadMore}
+              className="h-11 px-6 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
-              {page}
-            </Link>
-          ))}
+              Показать ещё
+            </button>
+          )}
         </div>
+      )}
+
+      {!hasMore && items.length > 12 && (
+        <p className="text-center text-xs sm:text-sm text-muted-foreground py-6">
+          Это все сорта. {items.length} {items.length === 1 ? "товар" : items.length < 5 ? "товара" : "товаров"}.
+        </p>
       )}
     </div>
   )
