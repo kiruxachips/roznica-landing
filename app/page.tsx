@@ -7,7 +7,6 @@ import { About } from "@/components/sections/About"
 import { Testimonials } from "@/components/sections/Testimonials"
 import { Contact } from "@/components/sections/Contact"
 import { SocialProofStrip } from "@/components/home/SocialProofStrip"
-import { FreshnessBadge } from "@/components/home/FreshnessBadge"
 import { CategoryTiles } from "@/components/home/CategoryTiles"
 import { TasteQuiz } from "@/components/home/TasteQuiz"
 import { FeaturedBlog } from "@/components/home/FeaturedBlog"
@@ -19,7 +18,6 @@ export default function Home() {
       <Header />
       <main className="pb-20 md:pb-0">
         <Hero />
-        <FreshnessBadge />
         <SocialProofStrip />
         <CategoryTiles />
         <Features />

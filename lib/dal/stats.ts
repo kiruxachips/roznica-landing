@@ -4,6 +4,7 @@ export interface ShopStats {
   reviewsCount: number
   averageRating: number | null
   ordersCount: number
+  activeProductsCount: number
 }
 
 /**
@@ -12,7 +13,7 @@ export interface ShopStats {
  */
 export async function getShopStats(): Promise<ShopStats> {
   try {
-    const [reviews, orders] = await Promise.all([
+    const [reviews, orders, productsCount] = await Promise.all([
       prisma.review.findMany({
         where: { isVisible: true },
         select: { rating: true },
@@ -22,6 +23,7 @@ export async function getShopStats(): Promise<ShopStats> {
           status: { in: ["delivered", "shipped", "paid", "confirmed"] },
         },
       }),
+      prisma.product.count({ where: { isActive: true } }),
     ])
 
     const reviewsCount = reviews.length
@@ -34,8 +36,9 @@ export async function getShopStats(): Promise<ShopStats> {
       reviewsCount,
       averageRating,
       ordersCount: orders,
+      activeProductsCount: productsCount,
     }
   } catch {
-    return { reviewsCount: 0, averageRating: null, ordersCount: 0 }
+    return { reviewsCount: 0, averageRating: null, ordersCount: 0, activeProductsCount: 0 }
   }
 }
