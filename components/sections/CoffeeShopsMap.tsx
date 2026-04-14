@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { X, MapPin } from "lucide-react"
+import { X, MapPin, Navigation } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Shop {
   city: string
@@ -45,8 +46,6 @@ const SHOPS: Shop[] = [
   { city: "Новосибирск", address: "Красный проспект, 70", lat: 55.043077, lng: 82.917573 },
 ]
 
-const CITIES = [...new Set(SHOPS.map((s) => s.city))]
-
 // City centers for zoom
 const CITY_CENTERS: Record<string, { lat: number; lng: number; zoom: number }> = {
   "Санкт-Петербург": { lat: 59.916, lng: 30.4, zoom: 11 },
@@ -54,14 +53,24 @@ const CITY_CENTERS: Record<string, { lat: number; lng: number; zoom: number }> =
   "Новосибирск": { lat: 55.048, lng: 82.918, zoom: 13 },
 }
 
+function shopKey(shop: Shop) {
+  return `${shop.city}|${shop.address}`
+}
+
+function belongsToKaliningrad(city: string) {
+  return !["Санкт-Петербург", "Новосибирск"].includes(city)
+}
 
 export function CoffeeShopsMap() {
   const [open, setOpen] = useState(false)
   const [selectedCity, setSelectedCity] = useState("Калининград")
+  const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState("")
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<YMapInstance | null>(null)
+  const markersRef = useRef<Map<string, HTMLDivElement>>(new Map())
+  const listRef = useRef<HTMLDivElement>(null)
 
   // Fetch API key
   useEffect(() => {
@@ -86,6 +95,13 @@ export function CoffeeShopsMap() {
     document.head.appendChild(script)
   }, [apiKey, scriptLoaded])
 
+  const cityShops = SHOPS.filter((s) => {
+    if (selectedCity === "Калининград") return belongsToKaliningrad(s.city)
+    return s.city === selectedCity
+  })
+
+  const selectedShop = selectedKey ? cityShops.find((s) => shopKey(s) === selectedKey) ?? null : null
+
   const initMap = useCallback(async () => {
     if (!scriptLoaded || !mapRef.current || !window.ymaps3) return
 
@@ -96,6 +112,7 @@ export function CoffeeShopsMap() {
         mapInstanceRef.current.destroy()
         mapInstanceRef.current = null
       }
+      markersRef.current.clear()
 
       const cityCenter = CITY_CENTERS[selectedCity] || { lat: 54.72, lng: 20.51, zoom: 12 }
       const map = new window.ymaps3.YMap(mapRef.current, {
@@ -105,22 +122,35 @@ export function CoffeeShopsMap() {
       map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
       map.addChild(new window.ymaps3.YMapDefaultFeaturesLayer())
 
-      const cityShops = SHOPS.filter((s) => {
-        if (selectedCity === "Калининград") {
-          // Include Kaliningrad oblast towns
-          return !["Санкт-Петербург", "Новосибирск"].includes(s.city)
-        }
+      const shops = SHOPS.filter((s) => {
+        if (selectedCity === "Калининград") return belongsToKaliningrad(s.city)
         return s.city === selectedCity
       })
 
-      for (const shop of cityShops) {
+      for (const shop of shops) {
+        const key = shopKey(shop)
         const el = document.createElement("div")
-        el.style.cssText = "width:28px;height:28px;background:#2d6b4a;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer;position:relative;"
-        el.title = `${shop.city}, ${shop.address}`
+        el.style.cssText = [
+          "width:30px",
+          "height:30px",
+          "background:#2d6b4a",
+          "border-radius:50%",
+          "border:3px solid white",
+          "box-shadow:0 2px 10px rgba(0,0,0,0.35)",
+          "cursor:pointer",
+          "position:relative",
+          "transition:transform 200ms ease, background 200ms ease",
+        ].join(";")
+        el.title = `${shop.city !== selectedCity && selectedCity === "Калининград" ? shop.city + ", " : ""}${shop.address}`
+        el.addEventListener("click", (e) => {
+          e.stopPropagation()
+          setSelectedKey(key)
+        })
 
         const marker = new window.ymaps3.YMapMarker({ coordinates: [shop.lng, shop.lat] })
         marker.element.appendChild(el)
         map.addChild(marker)
+        markersRef.current.set(key, el)
       }
 
       mapInstanceRef.current = map
@@ -133,16 +163,40 @@ export function CoffeeShopsMap() {
     if (open) initMap()
   }, [open, initMap])
 
-  // Update map when city changes
+  // Re-init map on city change + clear selection
   useEffect(() => {
-    if (!open || !mapInstanceRef.current) {
-      initMap()
-      return
-    }
-    // Reinit to update markers
+    if (!open) return
+    setSelectedKey(null)
     initMap()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCity])
+
+  // Visually highlight the selected marker + pan map
+  useEffect(() => {
+    for (const [key, el] of markersRef.current) {
+      const active = key === selectedKey
+      el.style.background = active ? "#1a4d33" : "#2d6b4a"
+      el.style.transform = active ? "scale(1.35)" : "scale(1)"
+      el.style.zIndex = active ? "100" : "1"
+      el.style.boxShadow = active
+        ? "0 0 0 4px rgba(26,77,51,0.25), 0 4px 14px rgba(0,0,0,0.45)"
+        : "0 2px 10px rgba(0,0,0,0.35)"
+    }
+
+    if (selectedShop && mapInstanceRef.current) {
+      mapInstanceRef.current.update({
+        location: { center: [selectedShop.lng, selectedShop.lat], zoom: 15 },
+      })
+    }
+
+    // Scroll list item into view
+    if (selectedKey && listRef.current) {
+      const listItem = listRef.current.querySelector<HTMLElement>(
+        `[data-shop-key="${CSS.escape(selectedKey)}"]`
+      )
+      listItem?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+    }
+  }, [selectedKey, selectedShop])
 
   // Close on Escape
   useEffect(() => {
@@ -160,12 +214,10 @@ export function CoffeeShopsMap() {
     }
   }, [open])
 
-  const cityShops = SHOPS.filter((s) => {
-    if (selectedCity === "Калининград") {
-      return !["Санкт-Петербург", "Новосибирск"].includes(s.city)
-    }
-    return s.city === selectedCity
-  })
+  const cityCounts = ["Калининград", "Санкт-Петербург", "Новосибирск"].map((city) => ({
+    city,
+    count: SHOPS.filter((s) => city === "Калининград" ? belongsToKaliningrad(s.city) : s.city === city).length,
+  }))
 
   return (
     <>
@@ -174,54 +226,51 @@ export function CoffeeShopsMap() {
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-2 px-6 py-3 mt-6 rounded-xl bg-primary text-white font-medium text-sm hover:bg-primary/90 transition-colors"
       >
-        <MapPin className="w-4 h-4" />
+        <MapPin className="w-4 h-4" strokeWidth={1.75} />
         Карта кофе-шопов Millor
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <h2 className="font-serif text-xl font-bold text-foreground">Наши кофе-шопы</h2>
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border shrink-0">
+              <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">Наши кофе-шопы</h2>
               <button
                 onClick={() => setOpen(false)}
                 className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"
+                aria-label="Закрыть"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" strokeWidth={1.75} />
               </button>
             </div>
 
             {/* City tabs */}
-            <div className="flex gap-2 px-6 py-3 border-b border-border overflow-x-auto">
-              {["Калининград", "Санкт-Петербург", "Новосибирск"].map((city) => (
+            <div className="flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 border-b border-border overflow-x-auto scrollbar-hide shrink-0">
+              {cityCounts.map(({ city, count }) => (
                 <button
                   key={city}
                   onClick={() => setSelectedCity(city)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  className={cn(
+                    "h-9 px-4 rounded-lg text-sm font-medium whitespace-nowrap transition-colors shrink-0 inline-flex items-center",
                     selectedCity === city
                       ? "bg-primary text-white"
                       : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-                  }`}
+                  )}
                 >
                   {city}
-                  <span className="ml-1 opacity-60">
-                    ({SHOPS.filter((s) => {
-                      if (city === "Калининград") return !["Санкт-Петербург", "Новосибирск"].includes(s.city)
-                      return s.city === city
-                    }).length})
-                  </span>
+                  <span className="ml-1.5 opacity-60 text-xs">({count})</span>
                 </button>
               ))}
             </div>
 
             {/* Map + List */}
-            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden">
+            <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
               {/* Map */}
-              <div className="flex-1 min-h-[300px] sm:min-h-0">
+              <div className="relative flex-1 min-h-[240px] sm:min-h-0">
                 {apiKey ? (
                   <div ref={mapRef} className="w-full h-full" />
                 ) : (
@@ -229,26 +278,79 @@ export function CoffeeShopsMap() {
                     Загружаем карту...
                   </div>
                 )}
+
+                {/* Selected shop info panel overlay */}
+                {selectedShop && (
+                  <div className="absolute left-2 right-2 bottom-2 sm:left-4 sm:right-4 sm:bottom-4 bg-white rounded-xl shadow-lg border border-border p-3 sm:p-4 flex items-start gap-3 z-10 animate-fade-in">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <MapPin className="w-5 h-5 text-primary" strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">
+                        Кофе-шоп Millor
+                        {selectedShop.city !== selectedCity && ` · ${selectedShop.city}`}
+                      </p>
+                      <p className="text-sm font-semibold text-foreground truncate">{selectedShop.address}</p>
+                    </div>
+                    <a
+                      href={`https://yandex.ru/maps/?rtext=~${selectedShop.lat},${selectedShop.lng}&rtt=auto`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
+                    >
+                      <Navigation className="w-3.5 h-3.5" strokeWidth={1.75} />
+                      <span className="hidden sm:inline">Маршрут</span>
+                    </a>
+                    <button
+                      onClick={() => setSelectedKey(null)}
+                      aria-label="Скрыть"
+                      className="shrink-0 w-9 h-9 rounded-lg text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center"
+                    >
+                      <X className="w-4 h-4" strokeWidth={1.75} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Address list */}
-              <div className="sm:w-72 border-t sm:border-t-0 sm:border-l border-border overflow-y-auto max-h-48 sm:max-h-none">
-                {cityShops.map((shop, i) => (
-                  <div
-                    key={i}
-                    className="px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                      <div>
-                        {shop.city !== selectedCity && shop.city !== "Калининград" && (
-                          <p className="text-xs text-muted-foreground">{shop.city}</p>
+              <div
+                ref={listRef}
+                className="sm:w-72 border-t sm:border-t-0 sm:border-l border-border overflow-y-auto max-h-48 sm:max-h-none shrink-0"
+              >
+                {cityShops.map((shop) => {
+                  const key = shopKey(shop)
+                  const active = key === selectedKey
+                  return (
+                    <button
+                      key={key}
+                      data-shop-key={key}
+                      onClick={() => setSelectedKey(key)}
+                      className={cn(
+                        "w-full text-left px-4 py-3 border-b border-border last:border-0 transition-colors flex items-start gap-2",
+                        active ? "bg-primary/5" : "hover:bg-muted/50"
+                      )}
+                    >
+                      <MapPin
+                        className={cn(
+                          "w-4 h-4 shrink-0 mt-0.5 transition-colors",
+                          active ? "text-primary" : "text-muted-foreground"
                         )}
-                        <p className="text-sm text-foreground">{shop.address}</p>
+                        strokeWidth={1.75}
+                      />
+                      <div className="min-w-0 flex-1">
+                        {shop.city !== selectedCity && selectedCity === "Калининград" && (
+                          <p className="text-[11px] text-muted-foreground">{shop.city}</p>
+                        )}
+                        <p className={cn(
+                          "text-sm truncate",
+                          active ? "text-primary font-semibold" : "text-foreground"
+                        )}>
+                          {shop.address}
+                        </p>
                       </div>
-                    </div>
-                  </div>
-                ))}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
