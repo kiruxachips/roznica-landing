@@ -16,7 +16,7 @@ const ALLOWED_ANSWERS: Record<keyof Answers, Set<string>> = {
   flavor: new Set(["sweet", "fruity", "nutty", "any"]),
   strength: new Set(["light", "medium", "strong"]),
   acidity: new Set(["low", "mid", "high"]),
-  budget: new Set(["low", "mid", "any"]),
+  budget: new Set(["low", "mid", "high", "any"]),
 }
 
 function sanitizeAnswers(raw: unknown): Answers {
@@ -41,7 +41,6 @@ export async function POST(request: Request) {
   }
   const body = sanitizeAnswers(raw)
 
-  // Fetch active products with scorable fields + display data
   const products = await prisma.product.findMany({
     where: { isActive: true },
     include: {
@@ -65,12 +64,13 @@ export async function POST(request: Request) {
     roastLevel: p.roastLevel,
     brewingMethods: p.brewingMethods,
     minPrice: p.variants[0]?.price ?? null,
+    variants: p.variants.map((v) => ({ weight: v.weight, price: v.price })),
   }))
 
   const scored = scoreProducts(scorable, body)
   const picks = pickTopMatches(scored, 3)
   const topIds = picks.map((s) => s.productId)
-  const scoreMap = new Map(picks.map((s) => [s.productId, s.score]))
+  const matchMap = new Map(picks.map((s) => [s.productId, s]))
 
   const byId = new Map(products.map((p) => [p.id, p]))
   const topProducts: ProductCard[] = topIds
@@ -112,7 +112,14 @@ export async function POST(request: Request) {
           : null,
     }))
 
-  const matches = topProducts.map((p) => ({ productId: p.id, score: scoreMap.get(p.id) ?? 0 }))
+  const matches = topProducts.map((p) => {
+    const s = matchMap.get(p.id)
+    return {
+      productId: p.id,
+      score: s?.raw ?? 0,
+      percent: s?.percent ?? 50,
+    }
+  })
 
   return NextResponse.json({ products: topProducts, matches })
 }

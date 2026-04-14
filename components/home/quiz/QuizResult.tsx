@@ -1,13 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { RotateCcw, ArrowRight, Sparkles } from "lucide-react"
+import { RotateCcw, ArrowRight, Sparkles, Trophy, Award, ThumbsUp } from "lucide-react"
 import { ProductCard } from "@/components/catalog/ProductCard"
 import type { ProductCard as ProductCardType } from "@/lib/types"
 
 interface Match {
   productId: string
   score: number
+  percent: number
 }
 
 interface QuizResultProps {
@@ -16,8 +17,29 @@ interface QuizResultProps {
   onRestart: () => void
 }
 
+const TIERS = [
+  {
+    label: "Идеально вам",
+    icon: Trophy,
+    chip: "bg-primary text-white",
+    ring: "ring-2 ring-primary",
+  },
+  {
+    label: "Отличный выбор",
+    icon: Award,
+    chip: "bg-primary/10 text-primary",
+    ring: "ring-1 ring-primary/30",
+  },
+  {
+    label: "Тоже подойдёт",
+    icon: ThumbsUp,
+    chip: "bg-secondary text-muted-foreground",
+    ring: "ring-1 ring-border",
+  },
+] as const
+
 export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
-  const matchMap = new Map(matches.map((m) => [m.productId, m.score]))
+  const matchMap = new Map(matches.map((m) => [m.productId, m]))
 
   if (products.length === 0) {
     return (
@@ -36,32 +58,37 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-5 h-5 text-primary" strokeWidth={1.75} />
         <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
           Вам точно понравится
         </h2>
       </div>
       <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
-        Мы подобрали {products.length} {products.length === 1 ? "сорт" : "сорта"} под ваши предпочтения.
+        {products.length === 1
+          ? "Нашли 1 сорт под ваш вкус."
+          : `Подобрали ${products.length} ${products.length < 5 ? "сорта" : "сортов"} — отсортированы от лучшего совпадения.`}
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
-        {products.map((product) => {
-          const score = matchMap.get(product.id) ?? 0
-          const percent = Math.min(100, Math.max(40, Math.round(score)))
-          const level = percent >= 85 ? "Идеально вам" : percent >= 70 ? "Отличный выбор" : "Подойдёт"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 mb-8">
+        {products.map((product, idx) => {
+          const m = matchMap.get(product.id)
+          const percent = m?.percent ?? 0
+          const tier = TIERS[Math.min(idx, TIERS.length - 1)]
+          const Icon = tier.icon
           return (
-            <div key={product.id} className="relative rounded-xl ring-2 ring-primary/20 p-3 bg-primary/5">
-              <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[11px] sm:text-xs font-semibold text-primary uppercase tracking-wide">
-                  {level}
-                </span>
-                <span className="text-[11px] sm:text-xs font-bold text-primary">
-                  {percent}%
-                </span>
+            <div key={product.id} className="relative">
+              {/* Tier pill above the card */}
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] sm:text-xs font-semibold mb-2 ${tier.chip}`}
+              >
+                <Icon className="w-3.5 h-3.5" strokeWidth={2} />
+                {tier.label}
+                <span className="opacity-70 ml-1">· {percent}%</span>
               </div>
-              <ProductCard product={product} />
+              <div className={`rounded-xl ${tier.ring} transition-shadow`}>
+                <ProductCard product={product} />
+              </div>
             </div>
           )
         })}
