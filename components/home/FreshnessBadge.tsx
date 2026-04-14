@@ -5,9 +5,13 @@ export function FreshnessBadge() {
   const { lastRoastLabel, nextShipmentLabel } = getFreshnessInfo()
 
   return (
-    <section aria-label="Информация о свежести" className="bg-primary/5 border-b border-primary/10">
+    <section
+      aria-label="Информация о свежести"
+      title="Мы обжариваем кофе под каждый заказ — поэтому дата обновляется ежедневно"
+      className="bg-primary/5 border-b border-primary/10"
+    >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-6 py-2.5 sm:py-3 text-center">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-6 py-2.5 sm:py-3 text-center">
           <div className="flex items-center gap-2 text-[13px] sm:text-sm">
             <Flame className="w-4 h-4 text-primary shrink-0" strokeWidth={1.75} />
             <span className="text-muted-foreground">

@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import type { QuizOption } from "./questions"
@@ -13,11 +14,23 @@ interface QuizStepProps {
 }
 
 export function QuizStep({ title, subtitle, options, selected, onSelect }: QuizStepProps) {
+  const btnRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  function handleKeyDown(e: React.KeyboardEvent, index: number) {
+    const keys = ["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"]
+    if (!keys.includes(e.key)) return
+    e.preventDefault()
+    const delta = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1
+    const next = (index + delta + options.length) % options.length
+    btnRefs.current[next]?.focus()
+    onSelect(options[next].id)
+  }
+
   return (
     <div className="animate-fade-in">
-      <h3 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2">
+      <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2">
         {title}
-      </h3>
+      </h2>
       {subtitle && (
         <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
           {subtitle}
@@ -32,17 +45,20 @@ export function QuizStep({ title, subtitle, options, selected, onSelect }: QuizS
           options.length <= 4 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-2 sm:grid-cols-3"
         )}
       >
-        {options.map((opt) => {
+        {options.map((opt, i) => {
           const active = selected === opt.id
           return (
             <button
               key={opt.id}
+              ref={(el) => { btnRefs.current[i] = el }}
               type="button"
               role="radio"
               aria-checked={active}
+              tabIndex={active || (!selected && i === 0) ? 0 : -1}
+              onKeyDown={(e) => handleKeyDown(e, i)}
               onClick={() => onSelect(opt.id)}
               className={cn(
-                "text-left p-3 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3",
+                "text-left p-3 sm:p-4 rounded-xl border-2 transition-all flex items-start gap-3 focus:outline-none focus:ring-2 focus:ring-primary/40",
                 active
                   ? "border-primary bg-primary/5 shadow-sm"
                   : "border-border hover:border-primary/40 hover:bg-secondary/30"

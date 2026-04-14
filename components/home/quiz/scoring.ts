@@ -103,6 +103,8 @@ export interface ScoredProduct {
   score: number // 0..100
 }
 
+export const MIN_MATCH_SCORE = 40
+
 export function scoreProducts(products: ScorableProduct[], answers: Answers): ScoredProduct[] {
   const brewing = answers.brewing ?? "any"
   const flavor = answers.flavor ?? "any"
@@ -121,4 +123,15 @@ export function scoreProducts(products: ScorableProduct[], answers: Answers): Sc
       return { productId: p.id, score }
     })
     .sort((a, b) => b.score - a.score)
+}
+
+/**
+ * Returns top 3 product ids, backfilling with highest-scored remainder if fewer
+ * than 3 items cleared the minimum threshold.
+ */
+export function pickTopMatches(scored: ScoredProduct[], limit = 3): ScoredProduct[] {
+  const primary = scored.filter((s) => s.score >= MIN_MATCH_SCORE).slice(0, limit)
+  if (primary.length >= limit) return primary
+  const extras = scored.filter((s) => s.score < MIN_MATCH_SCORE).slice(0, limit - primary.length)
+  return [...primary, ...extras]
 }

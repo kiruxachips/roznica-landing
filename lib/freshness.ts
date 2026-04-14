@@ -4,14 +4,36 @@
  * We roast-to-order, so "last roast" is effectively today (or the most recent
  * business day). "Next shipment" is the next business day after that.
  *
- * Later we can override these via a SiteSetting table if a human wants manual
- * control from the admin panel.
+ * Dates are computed in Europe/Moscow timezone so the display matches
+ * customer expectations regardless of server timezone.
  */
+
+const TZ = "Europe/Moscow"
 
 const MONTHS_GENITIVE = [
   "января", "февраля", "марта", "апреля", "мая", "июня",
   "июля", "августа", "сентября", "октября", "ноября", "декабря",
 ]
+
+/** Returns a new Date whose local components equal Moscow-time components of `now`. */
+function toMoscow(now: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(now)
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((p) => p.type === type)?.value ?? 0)
+  const d = new Date(0)
+  d.setFullYear(get("year"), get("month") - 1, get("day"))
+  d.setHours(get("hour"), get("minute"), get("second"), 0)
+  return d
+}
 
 function isWeekend(date: Date): boolean {
   const day = date.getDay()
@@ -30,14 +52,6 @@ function nextBusinessDay(date: Date): Date {
   d.setDate(d.getDate() + 1)
   while (isWeekend(d)) d.setDate(d.getDate() + 1)
   return d
-}
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  )
 }
 
 function formatDateRu(date: Date): string {
@@ -66,8 +80,10 @@ export interface FreshnessInfo {
 }
 
 export function getFreshnessInfo(now: Date = new Date()): FreshnessInfo {
+  const moscowNow = toMoscow(now)
+
   // Last roast = today if weekday, else previous business day
-  const lastRoastDate = isWeekend(now) ? previousBusinessDay(now) : new Date(now)
+  const lastRoastDate = isWeekend(moscowNow) ? previousBusinessDay(moscowNow) : new Date(moscowNow)
   lastRoastDate.setHours(0, 0, 0, 0)
 
   // Next shipment = next business day after last roast
@@ -76,9 +92,9 @@ export function getFreshnessInfo(now: Date = new Date()): FreshnessInfo {
   return {
     lastRoastDate,
     nextShipmentDate,
-    lastRoastLabel: formatRelativeRu(lastRoastDate, now),
-    nextShipmentLabel: formatRelativeRu(nextShipmentDate, now),
+    lastRoastLabel: formatRelativeRu(lastRoastDate, moscowNow),
+    nextShipmentLabel: formatRelativeRu(nextShipmentDate, moscowNow),
   }
 }
 
-export { isSameDay, formatDateRu, formatRelativeRu }
+export { formatDateRu, formatRelativeRu }

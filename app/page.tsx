@@ -17,7 +17,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main>
+      <main className="pb-20 md:pb-0">
         <Hero />
         <FreshnessBadge />
         <SocialProofStrip />

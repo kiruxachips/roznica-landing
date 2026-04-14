@@ -38,9 +38,9 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
     <div className="animate-fade-in">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="w-5 h-5 text-primary" strokeWidth={1.75} />
-        <h3 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+        <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
           Вам точно понравится
-        </h3>
+        </h2>
       </div>
       <p className="text-sm sm:text-base text-muted-foreground mb-6 sm:mb-8">
         Мы подобрали {products.length} {products.length === 1 ? "сорт" : "сорта"} под ваши предпочтения.
@@ -49,11 +49,17 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
         {products.map((product) => {
           const score = matchMap.get(product.id) ?? 0
-          const percent = Math.min(99, Math.max(40, Math.round(score)))
+          const percent = Math.min(100, Math.max(40, Math.round(score)))
+          const level = percent >= 85 ? "Идеально вам" : percent >= 70 ? "Отличный выбор" : "Подойдёт"
           return (
-            <div key={product.id} className="relative">
-              <div className="absolute -top-2 left-2 z-20 bg-primary text-white text-[11px] font-bold px-2 py-1 rounded-full shadow-sm">
-                Совпадение {percent}%
+            <div key={product.id} className="relative rounded-xl ring-2 ring-primary/20 p-3 bg-primary/5">
+              <div className="flex items-center justify-between mb-2.5 px-1">
+                <span className="text-[11px] sm:text-xs font-semibold text-primary uppercase tracking-wide">
+                  {level}
+                </span>
+                <span className="text-[11px] sm:text-xs font-bold text-primary">
+                  {percent}%
+                </span>
               </div>
               <ProductCard product={product} />
             </div>

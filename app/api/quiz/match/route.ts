@@ -1,19 +1,45 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { scoreProducts, type ScorableProduct } from "@/components/home/quiz/scoring"
+import {
+  scoreProducts,
+  pickTopMatches,
+  type ScorableProduct,
+} from "@/components/home/quiz/scoring"
 import type { Answers } from "@/components/home/quiz/questions"
 import type { ProductCard } from "@/lib/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
+const ALLOWED_ANSWERS: Record<keyof Answers, Set<string>> = {
+  brewing: new Set(["espresso", "filter", "turka", "french-press", "moka", "aeropress", "any"]),
+  flavor: new Set(["sweet", "fruity", "nutty", "any"]),
+  strength: new Set(["light", "medium", "strong"]),
+  acidity: new Set(["low", "mid", "high"]),
+  budget: new Set(["low", "mid", "any"]),
+}
+
+function sanitizeAnswers(raw: unknown): Answers {
+  if (typeof raw !== "object" || raw === null) return {}
+  const input = raw as Record<string, unknown>
+  const out: Answers = {}
+  for (const key of Object.keys(ALLOWED_ANSWERS) as (keyof Answers)[]) {
+    const value = input[key]
+    if (typeof value === "string" && ALLOWED_ANSWERS[key].has(value)) {
+      out[key] = value
+    }
+  }
+  return out
+}
+
 export async function POST(request: Request) {
-  let body: Answers
+  let raw: unknown
   try {
-    body = await request.json()
+    raw = await request.json()
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
+  const body = sanitizeAnswers(raw)
 
   // Fetch active products with scorable fields + display data
   const products = await prisma.product.findMany({
@@ -42,11 +68,12 @@ export async function POST(request: Request) {
   }))
 
   const scored = scoreProducts(scorable, body)
-  const topIds = scored.slice(0, 3).map((s) => s.productId)
-  const scoreMap = new Map(scored.map((s) => [s.productId, s.score]))
+  const picks = pickTopMatches(scored, 3)
+  const topIds = picks.map((s) => s.productId)
+  const scoreMap = new Map(picks.map((s) => [s.productId, s.score]))
 
   const byId = new Map(products.map((p) => [p.id, p]))
-  const top: ProductCard[] = topIds
+  const topProducts: ProductCard[] = topIds
     .map((id) => byId.get(id))
     .filter((p): p is NonNullable<typeof p> => p !== undefined)
     .map((p) => ({
@@ -85,7 +112,7 @@ export async function POST(request: Request) {
           : null,
     }))
 
-  const matches = top.map((p) => ({ productId: p.id, score: scoreMap.get(p.id) ?? 0 }))
+  const matches = topProducts.map((p) => ({ productId: p.id, score: scoreMap.get(p.id) ?? 0 }))
 
-  return NextResponse.json({ products: top, matches })
+  return NextResponse.json({ products: topProducts, matches })
 }
