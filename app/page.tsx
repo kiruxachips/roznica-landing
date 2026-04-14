@@ -6,6 +6,12 @@ import { Products } from "@/components/sections/Products"
 import { About } from "@/components/sections/About"
 import { Testimonials } from "@/components/sections/Testimonials"
 import { Contact } from "@/components/sections/Contact"
+import { SocialProofStrip } from "@/components/home/SocialProofStrip"
+import { FreshnessBadge } from "@/components/home/FreshnessBadge"
+import { CategoryTiles } from "@/components/home/CategoryTiles"
+import { TasteQuiz } from "@/components/home/TasteQuiz"
+import { FeaturedBlog } from "@/components/home/FeaturedBlog"
+import { StickyMobileCTA } from "@/components/home/StickyMobileCTA"
 
 export default function Home() {
   return (
@@ -13,13 +19,19 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
+        <FreshnessBadge />
+        <SocialProofStrip />
+        <CategoryTiles />
         <Features />
         <Products />
+        <TasteQuiz />
         <About />
         <Testimonials />
+        <FeaturedBlog />
         <Contact />
       </main>
       <Footer />
+      <StickyMobileCTA />
     </>
   )
 }

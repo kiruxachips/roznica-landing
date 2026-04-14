@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 
 export function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-coffee-50 via-white to-secondary">
+    <section data-home-hero className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-coffee-50 via-white to-secondary">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-20 left-10 w-64 h-64 rounded-full bg-primary blur-3xl" />
