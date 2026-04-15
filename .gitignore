@@ -44,3 +44,5 @@ next-env.d.ts
 /lib/generated/prisma
 client_secret_*.json
 *.png
+!public/images/tea/*.png
+!public/images/rastvorimka/*.png
