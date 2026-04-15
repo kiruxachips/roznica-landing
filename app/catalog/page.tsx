@@ -138,7 +138,14 @@ export default async function CatalogPage({
             />
 
             {products.length > 0 ? (
-              <ProductGrid products={products} currentPage={filters.page} totalPages={totalPages} favoriteIds={favoriteIds} searchParams={params} />
+              <ProductGrid
+                key={`${productType ?? "all"}|${params.q ?? ""}|${params.roast ?? ""}|${params.origin ?? ""}|${params.brewing ?? ""}|${params.teaType ?? ""}|${params.form ?? ""}|${params.collection ?? ""}|${params.sort ?? ""}`}
+                products={products}
+                currentPage={filters.page}
+                totalPages={totalPages}
+                favoriteIds={favoriteIds}
+                searchParams={params}
+              />
             ) : (
               <EmptyState />
             )}
