@@ -9,6 +9,8 @@ export async function GET() {
     // (required by JS SDK in browser) — restrict it by HTTP Referer in Yandex console.
     return NextResponse.json({
       freeDeliveryThreshold: parseInt(settings.free_delivery_threshold) || 0,
+      giftThreshold: parseInt(settings.gift_threshold) || 0,
+      giftDescription: settings.gift_description || "Подарок от нас",
       yandexMapsApiKey: settings.yandex_maps_api_key || "",
       cdekEnabled: settings.cdek_enabled === "true",
       pochtaEnabled: settings.pochta_enabled === "true",

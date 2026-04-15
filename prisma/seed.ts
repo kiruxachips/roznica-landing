@@ -283,6 +283,9 @@ async function main() {
     courier_free_threshold: "3000",
     // Yandex Maps
     yandex_maps_api_key: "",
+    // Cart upsell / gift threshold
+    gift_threshold: "5000",
+    gift_description: "Подарок от нас",
   }
 
   for (const [key, value] of Object.entries(deliveryDefaults)) {

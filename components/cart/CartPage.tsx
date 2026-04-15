@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Minus, Plus, Trash2, Tag, X, Loader2 } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
+import { CartGiftProgress } from "./CartGiftProgress"
 
 export function CartPage() {
   const items = useCartStore((s) => s.items)
@@ -178,6 +179,9 @@ export function CartPage() {
             {promoError && <p className="text-xs text-red-600 mt-1.5">{promoError}</p>}
           </div>
 
+          {/* Gift / free delivery progress */}
+          <CartGiftProgress total={subtotal - promoDiscount} />
+
           {/* Totals */}
           <div className="border-t border-border pt-4 space-y-2 text-sm">
             <div className="flex justify-between">
@@ -194,11 +198,6 @@ export function CartPage() {
               <span className="text-muted-foreground">Доставка</span>
               <span>{deliveryPrice === 0 ? "Бесплатно" : `${deliveryPrice}₽`}</span>
             </div>
-            {deliveryPrice > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Бесплатная доставка от 3000₽ (ещё {Math.max(0, 3000 - (subtotal - promoDiscount))}₽)
-              </p>
-            )}
             <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
               <span>Итого</span>
               <span className="text-primary">{finalTotal}₽</span>

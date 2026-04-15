@@ -307,6 +307,26 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               />
             </div>
 
+            <div>
+              <label className={labelClass}>Порог подарка (₽, 0 — отключено)</label>
+              <input
+                className={inputClass}
+                type="number"
+                value={localSettings.gift_threshold || ""}
+                onChange={(e) => set("gift_threshold", e.target.value)}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Описание подарка</label>
+              <input
+                className={inputClass}
+                type="text"
+                placeholder="Подарок от нас"
+                value={localSettings.gift_description || ""}
+                onChange={(e) => set("gift_description", e.target.value)}
+              />
+            </div>
+
             <h3 className="text-md font-semibold pt-2">Габариты по умолчанию</h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>

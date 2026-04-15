@@ -6,6 +6,8 @@ import Link from "next/link"
 import { X, Minus, Plus, Trash2 } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { cn } from "@/lib/utils"
+import { CartGiftProgress } from "./CartGiftProgress"
+import { CartUpsell } from "./CartUpsell"
 
 export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const items = useCartStore((s) => s.items)
@@ -22,6 +24,7 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   const total = totalPrice()
   const afterDiscount = total - promoDiscount
+  const cartProductIds = items.map((i) => i.productId)
 
   return (
     <>
@@ -59,7 +62,8 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               </Link>
             </div>
           ) : (
-            items.map((item) => (
+            <>
+            {items.map((item) => (
               <div key={item.variantId} className="flex gap-3 bg-secondary/30 rounded-xl p-3">
                 {item.image && (
                   <Link href={`/catalog/${item.slug}`} onClick={onClose}>
@@ -102,13 +106,18 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   </div>
                 </div>
               </div>
-            ))
+            ))}
+            <CartUpsell cartProductIds={cartProductIds} onClose={onClose} />
+            </>
           )}
         </div>
 
         {/* Footer */}
         {items.length > 0 && (
           <div className="p-4 border-t border-border space-y-3">
+            {/* Gift / free delivery progress */}
+            <CartGiftProgress total={total} />
+
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Подытог</span>
