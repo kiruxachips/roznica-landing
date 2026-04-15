@@ -58,6 +58,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru" className={`${inter.variable} ${playfair.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://mc.yandex.ru" crossOrigin="" />
+        <link rel="dns-prefetch" href="https://api-maps.yandex.ru" />
+        <link rel="dns-prefetch" href="https://yastatic.net" />
+      </head>
       <body className="min-h-screen antialiased" suppressHydrationWarning>
         <script
           type="application/ld+json"

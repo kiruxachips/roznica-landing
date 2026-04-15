@@ -32,6 +32,17 @@ export function ProductGrid({
     [favoriteIds]
   )
 
+  // Stabilize searchParams: hashing to a string prevents re-renders triggered
+  // by parents passing a new object reference with identical values.
+  const baseQuery = useMemo(() => {
+    if (!searchParams) return ""
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (value && key !== "page") params.set(key, value)
+    }
+    return params.toString()
+  }, [searchParams])
+
   // Reset state whenever the server-rendered first page changes
   // (happens when filters/sort/collection in URL change)
   useEffect(() => {
@@ -45,15 +56,11 @@ export function ProductGrid({
     setLoading(true)
     try {
       const next = page + 1
-      const params = new URLSearchParams()
-      if (searchParams) {
-        for (const [key, value] of Object.entries(searchParams)) {
-          if (value && key !== "page") params.set(key, value)
-        }
-      }
-      params.set("page", String(next))
+      const url = baseQuery
+        ? `/api/catalog/products?${baseQuery}&page=${next}`
+        : `/api/catalog/products?page=${next}`
 
-      const res = await fetch(`/api/catalog/products?${params.toString()}`)
+      const res = await fetch(url)
       if (!res.ok) throw new Error("bad response")
       const data = (await res.json()) as {
         products: ProductCardType[]
@@ -68,7 +75,7 @@ export function ProductGrid({
     } finally {
       setLoading(false)
     }
-  }, [loading, hasMore, page, searchParams])
+  }, [loading, hasMore, page, baseQuery])
 
   // IntersectionObserver on sentinel for auto-load
   useEffect(() => {

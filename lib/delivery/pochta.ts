@@ -1,4 +1,3 @@
-import { XMLParser } from "fast-xml-parser"
 import { fetchWithTimeout } from "./utils"
 import type {
   DeliveryProvider,
@@ -255,6 +254,7 @@ export function createPochtaProvider(config: {
         if (!res.ok) return []
 
         const xml = await res.text()
+        const { XMLParser } = await import("fast-xml-parser")
         const parser = new XMLParser({
           ignoreAttributes: false,
           removeNSPrefix: true,
