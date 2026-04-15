@@ -7,9 +7,15 @@ export function Hero() {
   return (
     <section data-home-hero className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-coffee-50 via-white to-secondary">
       {/* Background Pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-20 left-10 w-64 h-64 rounded-full bg-primary blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-accent blur-3xl" />
+      <div className="absolute inset-0 opacity-5 pointer-events-none" aria-hidden="true">
+        <div
+          className="absolute top-20 left-10 w-64 h-64 rounded-full bg-primary blur-3xl"
+          style={{ willChange: "filter", transform: "translateZ(0)" }}
+        />
+        <div
+          className="absolute bottom-20 right-10 w-96 h-96 rounded-full bg-accent blur-3xl"
+          style={{ willChange: "filter", transform: "translateZ(0)" }}
+        />
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 relative z-10">

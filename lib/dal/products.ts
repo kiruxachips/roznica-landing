@@ -2,6 +2,32 @@ import { prisma } from "@/lib/prisma"
 import type { ProductCard, ProductDetail, ProductFilters } from "@/lib/types"
 import { Prisma } from "@prisma/client"
 
+// Shared select shape for ProductCard listings — keeps payload minimal
+const productCardSelect = {
+  id: true,
+  name: true,
+  slug: true,
+  description: true,
+  origin: true,
+  roastLevel: true,
+  badge: true,
+  flavorNotes: true,
+  images: {
+    where: { isPrimary: true },
+    take: 1,
+    select: { url: true, alt: true },
+  },
+  variants: {
+    where: { isActive: true },
+    orderBy: { price: "asc" },
+    select: { id: true, weight: true, price: true, oldPrice: true, stock: true },
+  },
+  reviews: {
+    where: { isVisible: true },
+    select: { rating: true },
+  },
+} satisfies Prisma.ProductSelect
+
 export async function getProducts(filters: ProductFilters = {}): Promise<{
   products: ProductCard[]
   total: number
@@ -77,11 +103,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     // Step 3: Fetch full data for the current page only.
     const fullItems = await prisma.product.findMany({
       where: { id: { in: pageIds } },
-      include: {
-        images: { where: { isPrimary: true }, take: 1 },
-        variants: { where: { isActive: true }, orderBy: { price: "asc" } },
-        reviews: { where: { isVisible: true }, select: { rating: true } },
-      },
+      select: productCardSelect,
     })
 
     // Preserve sort order (Prisma IN doesn't guarantee order).
@@ -95,11 +117,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
         orderBy,
         skip: (page - 1) * limit,
         take: limit,
-        include: {
-          images: { where: { isPrimary: true }, take: 1 },
-          variants: { where: { isActive: true }, orderBy: { price: "asc" } },
-          reviews: { where: { isVisible: true }, select: { rating: true } },
-        },
+        select: productCardSelect,
       }),
       prisma.product.count({ where }),
     ])
@@ -199,10 +217,13 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
     where: { isActive: true, isFeatured: true },
     orderBy: { sortOrder: "asc" },
     take: limit,
-    include: {
-      images: { where: { isPrimary: true }, take: 1 },
-      variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" } },
-      reviews: { where: { isVisible: true }, select: { rating: true } },
+    select: {
+      ...productCardSelect,
+      variants: {
+        where: { isActive: true },
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, weight: true, price: true, oldPrice: true, stock: true },
+      },
     },
   })
 

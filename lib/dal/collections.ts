@@ -40,16 +40,40 @@ export async function getCollectionsWithProducts(): Promise<
   const collections = await prisma.productCollection.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: "asc" },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      emoji: true,
       products: {
         orderBy: { sortOrder: "asc" },
         take: 10,
-        include: {
+        select: {
           product: {
-            include: {
-              images: { where: { isPrimary: true }, take: 1 },
-              variants: { where: { isActive: true }, orderBy: { price: "asc" } },
-              reviews: { where: { isVisible: true }, select: { rating: true } },
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              description: true,
+              origin: true,
+              roastLevel: true,
+              badge: true,
+              flavorNotes: true,
+              isActive: true,
+              images: {
+                where: { isPrimary: true },
+                take: 1,
+                select: { url: true, alt: true },
+              },
+              variants: {
+                where: { isActive: true },
+                orderBy: { price: "asc" },
+                select: { id: true, weight: true, price: true, oldPrice: true, stock: true },
+              },
+              reviews: {
+                where: { isVisible: true },
+                select: { rating: true },
+              },
             },
           },
         },
