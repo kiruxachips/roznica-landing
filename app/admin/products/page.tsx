@@ -70,9 +70,18 @@ export default async function AdminProductsPage() {
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{product._count.reviews}</td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium ${product.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                    {product.isActive ? "Активен" : "Скрыт"}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`px-2 py-1 rounded-md text-xs font-medium w-fit ${product.isActive ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                      {product.isActive ? "Активен" : "Скрыт"}
+                    </span>
+                    {product.productType !== "coffee" && (
+                      <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium w-fit ${
+                        product.productType === "tea" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                      }`}>
+                        {product.productType === "tea" ? "Чай" : "Растворимая"}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <ProductActions productId={product.id} productName={product.name} />

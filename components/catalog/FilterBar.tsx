@@ -1,8 +1,8 @@
 "use client"
 
 import { useRouter, useSearchParams } from "next/navigation"
-import { useCallback, useState } from "react"
-import { SlidersHorizontal } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Search, SlidersHorizontal, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ProductType } from "@/lib/types"
 
@@ -23,6 +23,7 @@ interface FilterBarProps {
   activeTeaType?: string
   activeForm?: string
   activeSort?: string
+  activeSearch?: string
 }
 
 const TYPE_TABS: { value: ProductType | ""; label: string }[] = [
@@ -56,9 +57,42 @@ export function FilterBar({
   activeTeaType,
   activeForm,
   activeSort,
+  activeSearch,
 }: FilterBarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  // Search state with debounce
+  const [searchValue, setSearchValue] = useState(activeSearch ?? "")
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Cleanup debounce on unmount
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [])
+
+  // Sync if external navigation resets the query
+  useEffect(() => {
+    setSearchValue(activeSearch ?? "")
+  }, [activeSearch])
+
+  const handleSearchChange = useCallback(
+    (value: string) => {
+      setSearchValue(value)
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString())
+        if (value.trim()) {
+          params.set("q", value.trim())
+        } else {
+          params.delete("q")
+        }
+        params.delete("page")
+        router.push(`/catalog?${params.toString()}`)
+      }, 400)
+    },
+    [router, searchParams]
+  )
 
   const updateParams = useCallback(
     (key: string, value: string | undefined) => {
@@ -76,13 +110,14 @@ export function FilterBar({
 
   const switchType = useCallback(
     (type: ProductType) => {
-      // When switching tabs, drop all sub-filters, keep only sort
+      // When switching tabs, drop all sub-filters, keep sort + search
       const params = new URLSearchParams()
       params.set("type", type)
       if (activeSort) params.set("sort", activeSort)
+      if (searchValue.trim()) params.set("q", searchValue.trim())
       router.push(`/catalog?${params.toString()}`)
     },
-    [router, activeSort]
+    [router, activeSort, searchValue]
   )
 
   const hasSubFilters = !!(activeRoast || activeOrigin || activeBrewing || activeTeaType || activeForm)
@@ -91,8 +126,9 @@ export function FilterBar({
     const params = new URLSearchParams()
     if (activeType) params.set("type", activeType)
     if (activeSort) params.set("sort", activeSort)
+    if (searchValue.trim()) params.set("q", searchValue.trim())
     router.push(`/catalog?${params.toString()}`)
-  }, [router, activeType, activeSort])
+  }, [router, activeType, activeSort, searchValue])
 
   const [filtersOpen, setFiltersOpen] = useState(!!hasSubFilters)
 
@@ -114,6 +150,26 @@ export function FilterBar({
             {tab.label}
           </button>
         ))}
+      </div>
+
+      {/* Search input */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+        <input
+          type="search"
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          placeholder="Поиск по каталогу…"
+          className="w-full h-9 pl-9 pr-8 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+        {searchValue && (
+          <button
+            onClick={() => handleSearchChange("")}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Sort + sub-filters toggle */}

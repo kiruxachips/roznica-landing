@@ -7,11 +7,13 @@ import type { ProductType } from "@/lib/types"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-const PAGE_SIZE = 12
+const DEFAULT_PAGE_SIZE = 12
+const MAX_PAGE_SIZE = 48
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1)
+  const PAGE_SIZE = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_PAGE_SIZE))
 
   const rawType = url.searchParams.get("type")
   const productType = (rawType === "coffee" || rawType === "tea" || rawType === "instant")
@@ -26,6 +28,7 @@ export async function GET(request: Request) {
     teaType: url.searchParams.get("teaType") || undefined,
     productForm: url.searchParams.get("form") || undefined,
     collectionSlug: url.searchParams.get("collection") || undefined,
+    search: url.searchParams.get("q") || undefined,
     sort: (url.searchParams.get("sort") as "price-asc" | "price-desc" | "newest" | "popular" | undefined) ?? undefined,
     page,
     limit: PAGE_SIZE,

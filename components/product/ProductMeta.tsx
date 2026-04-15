@@ -1,4 +1,4 @@
-import { MapPin, Mountain, Sprout, Factory, Flame, Home, Package } from "lucide-react"
+import { MapPin, Mountain, Factory, Flame, Home, Package } from "lucide-react"
 
 interface ProductMetaProps {
   productType?: string

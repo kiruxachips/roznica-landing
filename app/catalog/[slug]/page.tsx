@@ -4,7 +4,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { getProductBySlug, getProductSlugs, getRelatedProducts } from "@/lib/dal/products"
+import { getProductBySlug, getRelatedProducts } from "@/lib/dal/products"
 import { isProductFavorited } from "@/lib/dal/favorites"
 import { auth } from "@/lib/auth"
 import { FavoriteButton } from "@/components/account/FavoriteButton"
@@ -18,15 +18,6 @@ import { ProductTabs } from "@/components/product/ProductTabs"
 import { ProductCard } from "@/components/catalog/ProductCard"
 import { Star } from "lucide-react"
 import type { ProductType } from "@/lib/types"
-
-export async function generateStaticParams() {
-  try {
-    const slugs = await getProductSlugs()
-    return slugs.map((slug) => ({ slug }))
-  } catch {
-    return []
-  }
-}
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params

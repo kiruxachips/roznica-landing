@@ -43,7 +43,10 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   if (productType) {
     where.productType = productType
   }
-  if (categorySlug) {
+  if (teaType) {
+    // teaType maps to category slug for tea subcategories — takes precedence over categorySlug
+    where.category = { slug: teaType }
+  } else if (categorySlug) {
     where.category = { slug: categorySlug }
   }
   if (collectionSlug) {
@@ -57,10 +60,6 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   }
   if (brewingMethod) {
     where.brewingMethods = { has: brewingMethod }
-  }
-  if (teaType) {
-    // teaType maps to category slug for tea subcategories
-    where.category = { slug: teaType }
   }
   if (productForm) {
     where.productForm = productForm
@@ -77,7 +76,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
 
   let orderBy: Prisma.ProductOrderByWithRelationInput = { sortOrder: "asc" }
   if (sort === "newest") orderBy = { createdAt: "desc" }
-  if (sort === "popular") orderBy = { sortOrder: "asc" }
+  if (sort === "popular") orderBy = { reviews: { _count: "desc" } }
 
   let items
   let total: number

@@ -21,15 +21,18 @@ const TYPE_TITLES: Record<string, string> = {
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; type?: string }>
+  searchParams: Promise<{ page?: string; type?: string; q?: string }>
 }): Promise<Metadata> {
   const params = await searchParams
   const page = Number(params.page) || 1
   const typeLabel = params.type ? (TYPE_TITLES[params.type] ?? "Каталог") : "Кофе"
+  const title = params.q
+    ? `Поиск: «${params.q}» | Millor Coffee`
+    : `${typeLabel} — каталог | Millor Coffee`
   const canonical = page > 1 ? `/catalog?page=${page}` : "/catalog"
 
   return {
-    title: `${typeLabel} — каталог | Millor Coffee`,
+    title,
     description: "Свежеобжаренный кофе, чай и растворимые напитки. Доставка по России.",
     alternates: { canonical },
   }
@@ -38,7 +41,7 @@ export async function generateMetadata({
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; roast?: string; origin?: string; brewing?: string; teaType?: string; form?: string; sort?: string; page?: string; collection?: string }>
+  searchParams: Promise<{ type?: string; q?: string; roast?: string; origin?: string; brewing?: string; teaType?: string; form?: string; sort?: string; page?: string; collection?: string }>
 }) {
   const params = await searchParams
   const rawType = params.type
@@ -54,12 +57,13 @@ export default async function CatalogPage({
     teaType: params.teaType,
     productForm: params.form,
     collectionSlug: params.collection,
+    search: params.q,
     sort: params.sort as "price-asc" | "price-desc" | "newest" | "popular" | undefined,
     page: Number(params.page) || 1,
     limit: 12,
   }
 
-  const hasActiveFilters = !!(params.roast || params.origin || params.brewing || params.teaType || params.form || params.collection || params.sort)
+  const hasActiveFilters = !!(params.roast || params.origin || params.brewing || params.teaType || params.form || params.collection || params.sort || params.q)
   const showCollections = !hasActiveFilters && (!productType || productType === "coffee")
 
   const session = await auth()
@@ -78,7 +82,9 @@ export default async function CatalogPage({
   const favoriteSet = favoriteIds ? new Set(favoriteIds) : undefined
   const totalPages = Math.ceil(total / 12)
 
-  const heading = productType ? (TYPE_TITLES[productType] ?? "Каталог") : "Каталог"
+  const heading = params.q
+    ? `Результаты поиска: «${params.q}»`
+    : productType ? (TYPE_TITLES[productType] ?? "Каталог") : "Каталог"
   const countLabel = total === 1 ? "1 товар" : total < 5 ? `${total} товара` : `${total} товаров`
 
   return (
@@ -128,6 +134,7 @@ export default async function CatalogPage({
               activeTeaType={params.teaType}
               activeForm={params.form}
               activeSort={params.sort}
+              activeSearch={params.q}
             />
 
             {products.length > 0 ? (
