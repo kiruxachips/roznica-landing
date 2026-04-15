@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Inter, Playfair_Display } from "next/font/google"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"
+import { WebVitals } from "@/components/ui/web-vitals"
 import { SessionProvider } from "@/components/providers/SessionProvider"
 import "./globals.css"
 
@@ -104,6 +105,7 @@ export default function RootLayout({
         </SessionProvider>
         <CookieBanner />
         <Analytics />
+        <WebVitals />
       </body>
     </html>
   )
