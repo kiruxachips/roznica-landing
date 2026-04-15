@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getProducts } from "@/lib/dal/products"
 import { getFavoriteProductIds } from "@/lib/dal/favorites"
 import { auth } from "@/lib/auth"
+import type { ProductType } from "@/lib/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -12,10 +13,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url)
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1)
 
+  const rawType = url.searchParams.get("type")
+  const productType = (rawType === "coffee" || rawType === "tea" || rawType === "instant")
+    ? (rawType as ProductType)
+    : undefined
+
   const filters = {
+    productType,
     roastLevel: url.searchParams.get("roast") || undefined,
     origin: url.searchParams.get("origin") || undefined,
     brewingMethod: url.searchParams.get("brewing") || undefined,
+    teaType: url.searchParams.get("teaType") || undefined,
+    productForm: url.searchParams.get("form") || undefined,
     collectionSlug: url.searchParams.get("collection") || undefined,
     sort: (url.searchParams.get("sort") as "price-asc" | "price-desc" | "newest" | "popular" | undefined) ?? undefined,
     page,

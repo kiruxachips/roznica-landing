@@ -81,6 +81,8 @@ export async function POST(request: Request) {
       name: p.name,
       slug: p.slug,
       description: p.description,
+      productType: p.productType as ProductCard["productType"],
+      productForm: p.productForm,
       origin: p.origin,
       roastLevel: p.roastLevel,
       badge: p.badge,

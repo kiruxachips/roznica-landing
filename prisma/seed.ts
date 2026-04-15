@@ -73,6 +73,42 @@ async function main() {
     },
   })
 
+  // Tea subcategories
+  const chayCategory = await prisma.category.findUnique({ where: { slug: "chay" } })
+  if (chayCategory) {
+    const teaSubcats = [
+      { name: "Чёрный чай", slug: "cherniy-chay", sortOrder: 1 },
+      { name: "Зелёный чай", slug: "zelenyy-chay", sortOrder: 2 },
+      { name: "Улун", slug: "ulon", sortOrder: 3 },
+      { name: "Иван-чай", slug: "ivan-chay", sortOrder: 4 },
+      { name: "Матча", slug: "matcha", sortOrder: 5 },
+      { name: "Пуэр", slug: "puer", sortOrder: 6 },
+    ]
+    for (const sub of teaSubcats) {
+      await prisma.category.upsert({
+        where: { slug: sub.slug },
+        update: {},
+        create: { ...sub, parentId: chayCategory.id, isActive: true },
+      })
+    }
+  }
+
+  // Instant subcategories
+  const instantCategory = await prisma.category.findUnique({ where: { slug: "rastvorimaya-produkciya" } })
+  if (instantCategory) {
+    const instantSubcats = [
+      { name: "Цикорий", slug: "cicory", sortOrder: 1 },
+      { name: "Растворимый кофе", slug: "instant-coffee", sortOrder: 2 },
+    ]
+    for (const sub of instantSubcats) {
+      await prisma.category.upsert({
+        where: { slug: sub.slug },
+        update: {},
+        create: { ...sub, parentId: instantCategory.id, isActive: true },
+      })
+    }
+  }
+
   // Seed products
   const productsData = [
     {

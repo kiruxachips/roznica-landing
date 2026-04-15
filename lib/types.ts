@@ -1,8 +1,12 @@
+export type ProductType = "coffee" | "tea" | "instant"
+
 export interface ProductCard {
   id: string
   name: string
   slug: string
   description: string
+  productType: ProductType
+  productForm: string | null
   origin: string | null
   roastLevel: string | null
   badge: string | null
@@ -23,6 +27,8 @@ export interface ProductDetail {
   slug: string
   description: string
   fullDescription: string | null
+  productType: ProductType
+  productForm: string | null
   origin: string | null
   region: string | null
   farm: string | null
@@ -135,9 +141,12 @@ export interface BonusTransactionInfo {
 export interface ProductFilters {
   categorySlug?: string
   collectionSlug?: string
+  productType?: ProductType
   roastLevel?: string
   origin?: string
   brewingMethod?: string
+  teaType?: string
+  productForm?: string
   search?: string
   sort?: "price-asc" | "price-desc" | "newest" | "popular"
   page?: number

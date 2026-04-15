@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma"
-import type { ProductCard, ProductDetail, ProductFilters } from "@/lib/types"
+import type { ProductCard, ProductDetail, ProductFilters, ProductType } from "@/lib/types"
 import { Prisma } from "@prisma/client"
 
 // Shared select shape for ProductCard listings — keeps payload minimal
@@ -8,6 +8,8 @@ const productCardSelect = {
   name: true,
   slug: true,
   description: true,
+  productType: true,
+  productForm: true,
   origin: true,
   roastLevel: true,
   badge: true,
@@ -32,12 +34,15 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   products: ProductCard[]
   total: number
 }> {
-  const { categorySlug, collectionSlug, roastLevel, origin, brewingMethod, search, sort, page = 1, limit = 12 } = filters
+  const { categorySlug, collectionSlug, productType, roastLevel, origin, brewingMethod, teaType, productForm, search, sort, page = 1, limit = 12 } = filters
 
   const where: Prisma.ProductWhereInput = {
     isActive: true,
   }
 
+  if (productType) {
+    where.productType = productType
+  }
   if (categorySlug) {
     where.category = { slug: categorySlug }
   }
@@ -52,6 +57,13 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   }
   if (brewingMethod) {
     where.brewingMethods = { has: brewingMethod }
+  }
+  if (teaType) {
+    // teaType maps to category slug for tea subcategories
+    where.category = { slug: teaType }
+  }
+  if (productForm) {
+    where.productForm = productForm
   }
   if (search) {
     where.OR = [
@@ -130,6 +142,8 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     name: p.name,
     slug: p.slug,
     description: p.description,
+    productType: p.productType as ProductType,
+    productForm: p.productForm,
     origin: p.origin,
     roastLevel: p.roastLevel,
     badge: p.badge,
@@ -172,6 +186,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     slug: product.slug,
     description: product.description,
     fullDescription: product.fullDescription,
+    productType: product.productType as ProductType,
+    productForm: product.productForm,
     origin: product.origin,
     region: product.region,
     farm: product.farm,
@@ -235,6 +251,8 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
       name: p.name,
       slug: p.slug,
       description: p.description,
+      productType: p.productType as ProductType,
+      productForm: p.productForm,
       origin: p.origin,
       roastLevel: p.roastLevel,
       badge: p.badge,
@@ -261,15 +279,58 @@ export async function getProductSlugs(): Promise<string[]> {
   return products.map((p) => p.slug)
 }
 
-export async function getFilterOptions() {
+export async function getFilterOptions(productType?: ProductType) {
+  const baseWhere: Prisma.ProductWhereInput = {
+    isActive: true,
+    ...(productType ? { productType } : {}),
+  }
+
+  if (productType === "tea") {
+    const [origins, teaCategories] = await Promise.all([
+      prisma.product.findMany({
+        where: { ...baseWhere, origin: { not: null } },
+        select: { origin: true },
+        distinct: ["origin"],
+      }),
+      prisma.category.findMany({
+        where: { parent: { slug: "chay" }, isActive: true },
+        select: { name: true, slug: true },
+        orderBy: { sortOrder: "asc" },
+      }),
+    ])
+    return {
+      origins: origins.map((o) => o.origin!).filter(Boolean),
+      roastLevels: [],
+      brewingMethods: [],
+      teaTypes: teaCategories,
+      productForms: ["листовой", "пакетики"],
+    }
+  }
+
+  if (productType === "instant") {
+    const productForms = await prisma.product.findMany({
+      where: { ...baseWhere, productForm: { not: null } },
+      select: { productForm: true },
+      distinct: ["productForm"],
+    })
+    return {
+      origins: [],
+      roastLevels: [],
+      brewingMethods: [],
+      teaTypes: [],
+      productForms: productForms.map((p) => p.productForm!).filter(Boolean),
+    }
+  }
+
+  // Default: coffee
   const [origins, roastLevels] = await Promise.all([
     prisma.product.findMany({
-      where: { isActive: true, origin: { not: null } },
+      where: { ...baseWhere, origin: { not: null } },
       select: { origin: true },
       distinct: ["origin"],
     }),
     prisma.product.findMany({
-      where: { isActive: true, roastLevel: { not: null } },
+      where: { ...baseWhere, roastLevel: { not: null } },
       select: { roastLevel: true },
       distinct: ["roastLevel"],
     }),
@@ -279,5 +340,7 @@ export async function getFilterOptions() {
     origins: origins.map((o) => o.origin!).filter(Boolean),
     roastLevels: roastLevels.map((r) => r.roastLevel!).filter(Boolean),
     brewingMethods: ["espresso", "filter", "french-press", "turka"],
+    teaTypes: [],
+    productForms: [],
   }
 }

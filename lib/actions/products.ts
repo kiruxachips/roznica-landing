@@ -12,6 +12,8 @@ export async function createProduct(data: {
   isActive?: boolean
   isFeatured?: boolean
   badge?: string
+  productType?: string
+  productForm?: string
   origin?: string
   region?: string
   farm?: string
@@ -40,6 +42,8 @@ export async function createProduct(data: {
       isActive: productData.isActive ?? true,
       isFeatured: productData.isFeatured ?? false,
       badge: productData.badge || null,
+      productType: productData.productType ?? "coffee",
+      productForm: productData.productForm || null,
       origin: productData.origin || null,
       region: productData.region || null,
       farm: productData.farm || null,
@@ -89,6 +93,8 @@ export async function updateProduct(
     isFeatured?: boolean
     badge?: string
     sortOrder?: number
+    productType?: string
+    productForm?: string
     origin?: string
     region?: string
     farm?: string

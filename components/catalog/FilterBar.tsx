@@ -4,18 +4,32 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useState } from "react"
 import { SlidersHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { ProductType } from "@/lib/types"
+
+interface FilterOptions {
+  origins: string[]
+  roastLevels: string[]
+  brewingMethods: string[]
+  teaTypes: { name: string; slug: string }[]
+  productForms: string[]
+}
 
 interface FilterBarProps {
-  filterOptions: {
-    origins: string[]
-    roastLevels: string[]
-    brewingMethods: string[]
-  }
+  filterOptions: FilterOptions
+  activeType?: ProductType
   activeRoast?: string
   activeOrigin?: string
   activeBrewing?: string
+  activeTeaType?: string
+  activeForm?: string
   activeSort?: string
 }
+
+const TYPE_TABS: { value: ProductType | ""; label: string }[] = [
+  { value: "coffee", label: "Кофе" },
+  { value: "tea", label: "Чай" },
+  { value: "instant", label: "Растворимая" },
+]
 
 const brewingLabels: Record<string, string> = {
   espresso: "Эспрессо",
@@ -33,7 +47,16 @@ const sortOptions = [
   { value: "newest", label: "Новинки" },
 ]
 
-export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrewing, activeSort }: FilterBarProps) {
+export function FilterBar({
+  filterOptions,
+  activeType,
+  activeRoast,
+  activeOrigin,
+  activeBrewing,
+  activeTeaType,
+  activeForm,
+  activeSort,
+}: FilterBarProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -51,19 +74,49 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
     [router, searchParams]
   )
 
-  const hasActiveFilters = activeRoast || activeOrigin || activeBrewing
+  const switchType = useCallback(
+    (type: ProductType) => {
+      // When switching tabs, drop all sub-filters, keep only sort
+      const params = new URLSearchParams()
+      params.set("type", type)
+      if (activeSort) params.set("sort", activeSort)
+      router.push(`/catalog?${params.toString()}`)
+    },
+    [router, activeSort]
+  )
 
-  const clearAll = useCallback(() => {
+  const hasSubFilters = !!(activeRoast || activeOrigin || activeBrewing || activeTeaType || activeForm)
+
+  const clearSubFilters = useCallback(() => {
     const params = new URLSearchParams()
+    if (activeType) params.set("type", activeType)
     if (activeSort) params.set("sort", activeSort)
     router.push(`/catalog?${params.toString()}`)
-  }, [router, activeSort])
+  }, [router, activeType, activeSort])
 
-  const [filtersOpen, setFiltersOpen] = useState(!!hasActiveFilters)
+  const [filtersOpen, setFiltersOpen] = useState(!!hasSubFilters)
 
   return (
     <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-border -mx-4 px-4 sm:-mx-6 sm:px-6 mb-6 pb-3 pt-3">
-      {/* Header */}
+      {/* Product-type tabs */}
+      <div className="flex items-center gap-1 mb-3">
+        {TYPE_TABS.map((tab) => (
+          <button
+            key={tab.value}
+            onClick={() => switchType(tab.value as ProductType)}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+              activeType === tab.value || (!activeType && tab.value === "coffee")
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sort + sub-filters toggle */}
       <div className="flex items-center justify-between">
         <button
           onClick={() => setFiltersOpen(!filtersOpen)}
@@ -74,13 +127,11 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
           title="Фильтры"
         >
           <SlidersHorizontal className="w-4 h-4" />
-          {hasActiveFilters && (
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-          )}
+          {hasSubFilters && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
         </button>
         <div className="flex items-center gap-3">
-          {hasActiveFilters && (
-            <button onClick={clearAll} className="text-xs text-muted-foreground hover:text-primary transition-colors">
+          {hasSubFilters && (
+            <button onClick={clearSubFilters} className="text-xs text-muted-foreground hover:text-primary transition-colors">
               Сбросить
             </button>
           )}
@@ -96,48 +147,94 @@ export function FilterBar({ filterOptions, activeRoast, activeOrigin, activeBrew
         </div>
       </div>
 
-      {/* Filter rows — collapsible */}
-      {filtersOpen && <div className="space-y-3 mt-3">
-        {/* Roast levels */}
-        <FilterRow label="Обжарка">
-          <FilterPill active={!activeRoast} onClick={() => updateParams("roast", undefined)}>
-            Все
-          </FilterPill>
-          {filterOptions.roastLevels.map((level) => (
-            <FilterPill key={level} active={activeRoast === level} onClick={() => updateParams("roast", activeRoast === level ? undefined : level)}>
-              {level}
-            </FilterPill>
-          ))}
-        </FilterRow>
+      {/* Sub-filters — collapsible, content varies by tab */}
+      {filtersOpen && (
+        <div className="space-y-3 mt-3">
+          {/* COFFEE sub-filters */}
+          {(!activeType || activeType === "coffee") && (
+            <>
+              {filterOptions.roastLevels.length > 0 && (
+                <FilterRow label="Обжарка">
+                  <FilterPill active={!activeRoast} onClick={() => updateParams("roast", undefined)}>Все</FilterPill>
+                  {filterOptions.roastLevels.map((level) => (
+                    <FilterPill key={level} active={activeRoast === level} onClick={() => updateParams("roast", activeRoast === level ? undefined : level)}>
+                      {level}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+              {filterOptions.origins.length > 1 && (
+                <FilterRow label="Страна">
+                  <FilterPill active={!activeOrigin} onClick={() => updateParams("origin", undefined)}>Все</FilterPill>
+                  {filterOptions.origins.map((origin) => (
+                    <FilterPill key={origin} active={activeOrigin === origin} onClick={() => updateParams("origin", activeOrigin === origin ? undefined : origin)}>
+                      {origin}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+              {filterOptions.brewingMethods.length > 0 && (
+                <FilterRow label="Заваривание">
+                  <FilterPill active={!activeBrewing} onClick={() => updateParams("brewing", undefined)}>Все</FilterPill>
+                  {filterOptions.brewingMethods.map((method) => (
+                    <FilterPill key={method} active={activeBrewing === method} onClick={() => updateParams("brewing", activeBrewing === method ? undefined : method)}>
+                      {brewingLabels[method] ?? method}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+            </>
+          )}
 
-        {/* Origins */}
-        {filterOptions.origins.length > 1 && (
-          <FilterRow label="Страна">
-            <FilterPill active={!activeOrigin} onClick={() => updateParams("origin", undefined)}>
-              Все
-            </FilterPill>
-            {filterOptions.origins.map((origin) => (
-              <FilterPill key={origin} active={activeOrigin === origin} onClick={() => updateParams("origin", activeOrigin === origin ? undefined : origin)}>
-                {origin}
-              </FilterPill>
-            ))}
-          </FilterRow>
-        )}
+          {/* TEA sub-filters */}
+          {activeType === "tea" && (
+            <>
+              {filterOptions.teaTypes.length > 0 && (
+                <FilterRow label="Вид чая">
+                  <FilterPill active={!activeTeaType} onClick={() => updateParams("teaType", undefined)}>Все</FilterPill>
+                  {filterOptions.teaTypes.map((t) => (
+                    <FilterPill key={t.slug} active={activeTeaType === t.slug} onClick={() => updateParams("teaType", activeTeaType === t.slug ? undefined : t.slug)}>
+                      {t.name}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+              {filterOptions.origins.length > 1 && (
+                <FilterRow label="Страна">
+                  <FilterPill active={!activeOrigin} onClick={() => updateParams("origin", undefined)}>Все</FilterPill>
+                  {filterOptions.origins.map((origin) => (
+                    <FilterPill key={origin} active={activeOrigin === origin} onClick={() => updateParams("origin", activeOrigin === origin ? undefined : origin)}>
+                      {origin}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+              {filterOptions.productForms.length > 0 && (
+                <FilterRow label="Форма">
+                  <FilterPill active={!activeForm} onClick={() => updateParams("form", undefined)}>Все</FilterPill>
+                  {filterOptions.productForms.map((form) => (
+                    <FilterPill key={form} active={activeForm === form} onClick={() => updateParams("form", activeForm === form ? undefined : form)}>
+                      {form}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
+            </>
+          )}
 
-        {/* Brewing methods */}
-        {filterOptions.brewingMethods.length > 0 && (
-          <FilterRow label="Заваривание">
-            <FilterPill active={!activeBrewing} onClick={() => updateParams("brewing", undefined)}>
-              Все
-            </FilterPill>
-            {filterOptions.brewingMethods.map((method) => (
-              <FilterPill key={method} active={activeBrewing === method} onClick={() => updateParams("brewing", activeBrewing === method ? undefined : method)}>
-                {brewingLabels[method] ?? method}
-              </FilterPill>
-            ))}
-          </FilterRow>
-        )}
-      </div>}
+          {/* INSTANT sub-filters */}
+          {activeType === "instant" && filterOptions.productForms.length > 0 && (
+            <FilterRow label="Вид">
+              <FilterPill active={!activeForm} onClick={() => updateParams("form", undefined)}>Все</FilterPill>
+              {filterOptions.productForms.map((form) => (
+                <FilterPill key={form} active={activeForm === form} onClick={() => updateParams("form", activeForm === form ? undefined : form)}>
+                  {form}
+                </FilterPill>
+              ))}
+            </FilterRow>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -146,9 +243,7 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs font-medium text-muted-foreground w-20 shrink-0">{label}</span>
-      <div className="flex flex-wrap gap-1.5">
-        {children}
-      </div>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   )
 }

@@ -35,6 +35,8 @@ model Product {
   isFeatured      Boolean          @default(false)
   badge           String?
   sortOrder       Int              @default(0)
+  productType     String           @default("coffee") // "coffee" | "tea" | "instant"
+  productForm     String?          // tea: "листовой" | "пакетики" | instant: "гранулы" | "порошок" | "капсулы"
 
   // Coffee attributes (nullable for non-coffee products)
   origin          String?

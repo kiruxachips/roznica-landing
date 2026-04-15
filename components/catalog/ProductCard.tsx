@@ -48,7 +48,21 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
     setSelectedIdx(idx)
   }
 
-  const metaLine = [product.origin, product.roastLevel].filter(Boolean).join(" · ")
+  // Build meta line and chips based on product type
+  let metaLine = ""
+  let chips: string[] = []
+
+  if (product.productType === "tea") {
+    metaLine = [product.roastLevel, product.origin].filter(Boolean).join(" · ")
+    chips = product.flavorNotes
+  } else if (product.productType === "instant") {
+    metaLine = product.productForm ?? ""
+    chips = []
+  } else {
+    // coffee (default)
+    metaLine = [product.origin, product.roastLevel].filter(Boolean).join(" · ")
+    chips = product.flavorNotes
+  }
 
   return (
     <Link href={`/catalog/${product.slug}`} className="group block h-full">
@@ -121,9 +135,9 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
             {metaLine || "\u00A0"}
           </p>
 
-          {/* Flavor notes — fixed single row, max 2 chips */}
+          {/* Flavor notes / product form chips */}
           <div className="flex flex-wrap gap-1 min-h-[20px]">
-            {product.flavorNotes.slice(0, 2).map((note) => (
+            {chips.slice(0, 2).map((note) => (
               <span
                 key={note}
                 className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-full"
@@ -131,9 +145,9 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                 {note}
               </span>
             ))}
-            {product.flavorNotes.length > 2 && (
+            {chips.length > 2 && (
               <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground">
-                +{product.flavorNotes.length - 2}
+                +{chips.length - 2}
               </span>
             )}
           </div>

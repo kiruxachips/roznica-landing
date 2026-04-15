@@ -61,6 +61,8 @@ interface ProductFormProps {
     isActive: boolean
     isFeatured: boolean
     badge: string | null
+    productType: string
+    productForm: string | null
     origin: string | null
     region: string | null
     farm: string | null
@@ -96,6 +98,8 @@ export function ProductForm({ product, categories, collections = [], productColl
   const [isFeatured, setIsFeatured] = useState(product?.isFeatured ?? false)
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>(productCollectionIds)
   const [badge, setBadge] = useState(product?.badge ?? "")
+  const [productType, setProductType] = useState(product?.productType ?? "coffee")
+  const [productForm, setProductForm] = useState(product?.productForm ?? "")
   const [origin, setOrigin] = useState(product?.origin ?? "")
   const [region, setRegion] = useState(product?.region ?? "")
   const [farm, setFarm] = useState(product?.farm ?? "")
@@ -240,6 +244,8 @@ export function ProductForm({ product, categories, collections = [], productColl
         isActive,
         isFeatured,
         badge: badge || undefined,
+        productType,
+        productForm: productForm || undefined,
         metaTitle: metaTitle || undefined,
         metaDescription: metaDescription || undefined,
       }
@@ -371,6 +377,25 @@ export function ProductForm({ product, categories, collections = [], productColl
               className={inputClass}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Тип продукта</label>
+            <select value={productType} onChange={(e) => setProductType(e.target.value)} className={selectClass}>
+              <option value="coffee">Кофе</option>
+              <option value="tea">Чай</option>
+              <option value="instant">Растворимая продукция</option>
+            </select>
+          </div>
+          {(productType === "tea" || productType === "instant") && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Форма продукта</label>
+              <input
+                value={productForm}
+                onChange={(e) => setProductForm(e.target.value)}
+                placeholder={productType === "tea" ? "листовой, пакетики..." : "гранулы, порошок, капсулы..."}
+                className={inputClass}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="rounded" />

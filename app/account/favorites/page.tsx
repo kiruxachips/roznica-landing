@@ -18,6 +18,8 @@ function toProductCard(product: {
   name: string
   slug: string
   description: string
+  productType: string
+  productForm: string | null
   origin: string | null
   roastLevel: string | null
   badge: string | null
@@ -35,6 +37,8 @@ function toProductCard(product: {
     name: product.name,
     slug: product.slug,
     description: product.description,
+    productType: product.productType as ProductCardType["productType"],
+    productForm: product.productForm,
     origin: product.origin,
     roastLevel: product.roastLevel,
     badge: product.badge,

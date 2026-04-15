@@ -10,19 +10,27 @@ import { FilterBar } from "@/components/catalog/FilterBar"
 import { ProductGrid } from "@/components/catalog/ProductGrid"
 import { EmptyState } from "@/components/catalog/EmptyState"
 import { CollectionSection } from "@/components/catalog/CollectionSection"
+import type { ProductType } from "@/lib/types"
+
+const TYPE_TITLES: Record<string, string> = {
+  coffee: "Кофе",
+  tea: "Чай",
+  instant: "Растворимая продукция",
+}
 
 export async function generateMetadata({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>
+  searchParams: Promise<{ page?: string; type?: string }>
 }): Promise<Metadata> {
   const params = await searchParams
   const page = Number(params.page) || 1
+  const typeLabel = params.type ? (TYPE_TITLES[params.type] ?? "Каталог") : "Кофе"
   const canonical = page > 1 ? `/catalog?page=${page}` : "/catalog"
 
   return {
-    title: "Каталог свежеобжаренного кофе | Millor Coffee",
-    description: "Выберите свежеобжаренный кофе в зёрнах для дома. Арабика из Бразилии, Перу, Эфиопии. Доставка по России.",
+    title: `${typeLabel} — каталог | Millor Coffee`,
+    description: "Свежеобжаренный кофе, чай и растворимые напитки. Доставка по России.",
     alternates: { canonical },
   }
 }
@@ -30,36 +38,48 @@ export async function generateMetadata({
 export default async function CatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ roast?: string; origin?: string; brewing?: string; sort?: string; page?: string; collection?: string }>
+  searchParams: Promise<{ type?: string; roast?: string; origin?: string; brewing?: string; teaType?: string; form?: string; sort?: string; page?: string; collection?: string }>
 }) {
   const params = await searchParams
+  const rawType = params.type
+  const productType = (rawType === "coffee" || rawType === "tea" || rawType === "instant")
+    ? (rawType as ProductType)
+    : undefined
+
   const filters = {
+    productType,
     roastLevel: params.roast,
     origin: params.origin,
     brewingMethod: params.brewing,
+    teaType: params.teaType,
+    productForm: params.form,
     collectionSlug: params.collection,
     sort: params.sort as "price-asc" | "price-desc" | "newest" | "popular" | undefined,
     page: Number(params.page) || 1,
     limit: 12,
   }
 
-  const hasActiveFilters = !!(params.roast || params.origin || params.brewing || params.collection || params.sort)
+  const hasActiveFilters = !!(params.roast || params.origin || params.brewing || params.teaType || params.form || params.collection || params.sort)
+  const showCollections = !hasActiveFilters && (!productType || productType === "coffee")
 
   const session = await auth()
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
   const [{ products, total }, filterOptions, favIds, collections] = await Promise.all([
     getProducts(filters),
-    getFilterOptions(),
+    getFilterOptions(productType),
     isCustomer && session?.user?.id
       ? getFavoriteProductIds(session.user.id)
       : Promise.resolve([]),
-    !hasActiveFilters ? getCollectionsWithProducts() : Promise.resolve([]),
+    showCollections ? getCollectionsWithProducts() : Promise.resolve([]),
   ])
 
   const favoriteIds = isCustomer ? favIds : undefined
   const favoriteSet = favoriteIds ? new Set(favoriteIds) : undefined
   const totalPages = Math.ceil(total / 12)
+
+  const heading = productType ? (TYPE_TITLES[productType] ?? "Каталог") : "Каталог"
+  const countLabel = total === 1 ? "1 товар" : total < 5 ? `${total} товара` : `${total} товаров`
 
   return (
     <>
@@ -68,12 +88,12 @@ export default async function CatalogPage({
         <section className="py-6 sm:py-10">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-5 sm:mb-6">
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold">Каталог кофе</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">{total} сортов в наличии</p>
+              <h1 className="font-serif text-2xl sm:text-3xl font-bold">{heading}</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">{countLabel} в наличии</p>
             </div>
 
-            {/* Collection showcase sections — only when no filters active */}
-            {!hasActiveFilters && collections.length > 0 && (
+            {/* Collection showcase sections — only for coffee tab when no filters active */}
+            {showCollections && collections.length > 0 && (
               <div className="mb-10">
                 {collections.map((c) => (
                   <CollectionSection
@@ -95,15 +115,18 @@ export default async function CatalogPage({
                 <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
                   {params.collection}
                 </span>
-                <Link href="/catalog" className="text-xs text-muted-foreground hover:text-foreground">Сбросить</Link>
+                <Link href={productType ? `/catalog?type=${productType}` : "/catalog"} className="text-xs text-muted-foreground hover:text-foreground">Сбросить</Link>
               </div>
             )}
 
             <FilterBar
               filterOptions={filterOptions}
+              activeType={productType}
               activeRoast={params.roast}
               activeOrigin={params.origin}
               activeBrewing={params.brewing}
+              activeTeaType={params.teaType}
+              activeForm={params.form}
               activeSort={params.sort}
             />
 
