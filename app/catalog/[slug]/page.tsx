@@ -4,7 +4,7 @@ import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
-import { getProductBySlug, getProductSlugs } from "@/lib/dal/products"
+import { getProductBySlug, getProductSlugs, getRelatedProducts } from "@/lib/dal/products"
 import { isProductFavorited } from "@/lib/dal/favorites"
 import { auth } from "@/lib/auth"
 import { FavoriteButton } from "@/components/account/FavoriteButton"
@@ -15,7 +15,9 @@ import { FlavorProfileBars } from "@/components/product/FlavorProfileBars"
 import { FlavorNotes } from "@/components/product/FlavorNotes"
 import { ProductClientSection } from "@/components/product/ProductClientSection"
 import { ProductTabs } from "@/components/product/ProductTabs"
+import { ProductCard } from "@/components/catalog/ProductCard"
 import { Star } from "lucide-react"
+import type { ProductType } from "@/lib/types"
 
 export async function generateStaticParams() {
   try {
@@ -31,8 +33,13 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const product = await getProductBySlug(slug)
   if (!product) return { title: "Товар не найден" }
 
+  const typeSuffix =
+    product.productType === "tea" ? "купить чай" :
+    product.productType === "instant" ? "растворимые напитки" :
+    "купить кофе"
+
   return {
-    title: product.metaTitle || `${product.name} — купить кофе | Millor Coffee`,
+    title: product.metaTitle || `${product.name} — ${typeSuffix} | Millor Coffee`,
     description: product.metaDescription || product.description,
     alternates: { canonical: `/catalog/${slug}` },
     openGraph: {
@@ -56,9 +63,13 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   const session = await auth()
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
-  const favorited = isCustomer && session?.user?.id
-    ? await isProductFavorited(session.user.id, product.id)
-    : false
+
+  const [favorited, relatedProducts] = await Promise.all([
+    isCustomer && session?.user?.id
+      ? isProductFavorited(session.user.id, product.id)
+      : Promise.resolve(false),
+    getRelatedProducts(product.id, product.productType as ProductType, product.categoryId, 4),
+  ])
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -106,13 +117,25 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         {/* Breadcrumbs */}
         <div className="bg-secondary/30">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
-              <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
-              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <Link href="/catalog" className="hover:text-primary transition-colors">Каталог</Link>
-              <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="text-foreground font-medium truncate">{product.name}</span>
-            </nav>
+            {(() => {
+              const typeLabel =
+                product.productType === "tea" ? "Чай" :
+                product.productType === "instant" ? "Растворимая продукция" :
+                "Кофе"
+              const typeHref =
+                product.productType === "tea" ? "/catalog?type=tea" :
+                product.productType === "instant" ? "/catalog?type=instant" :
+                "/catalog?type=coffee"
+              return (
+                <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
+                  <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <Link href={typeHref} className="hover:text-primary transition-colors">{typeLabel}</Link>
+                  <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                  <span className="text-foreground font-medium truncate">{product.name}</span>
+                </nav>
+              )
+            })()}
           </div>
         </div>
 
@@ -170,8 +193,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 {/* Flavor notes */}
                 {product.flavorNotes.length > 0 && <FlavorNotes notes={product.flavorNotes} />}
 
-                {/* Flavor profile */}
-                {(product.acidity !== null || product.sweetness !== null) && (
+                {/* Flavor profile — coffee only */}
+                {product.productType === "coffee" && (product.acidity !== null || product.sweetness !== null) && (
                   <FlavorProfileBars
                     acidity={product.acidity}
                     sweetness={product.sweetness}
@@ -195,6 +218,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
             {/* Tabs: Description / Meta / Reviews */}
             <ProductTabs
+              productType={product.productType}
+              productForm={product.productForm}
               fullDescription={product.fullDescription}
               origin={product.origin}
               region={product.region}
@@ -205,6 +230,18 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               brewingMethods={product.brewingMethods}
               reviews={product.reviews}
             />
+
+            {/* Related products */}
+            {relatedProducts.length > 0 && (
+              <div className="mt-14 sm:mt-20">
+                <h2 className="font-serif text-xl sm:text-2xl font-bold mb-6">С этим также покупают</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {relatedProducts.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </section>
       </main>

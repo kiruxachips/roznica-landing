@@ -44,6 +44,7 @@ export interface ProductDetail {
   badge: string | null
   metaTitle: string | null
   metaDescription: string | null
+  categoryId: string
   category: {
     name: string
     slug: string

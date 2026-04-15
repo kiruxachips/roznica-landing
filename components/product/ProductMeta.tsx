@@ -1,6 +1,8 @@
-import { MapPin, Mountain, Sprout, Factory, Flame, Home } from "lucide-react"
+import { MapPin, Mountain, Sprout, Factory, Flame, Home, Package } from "lucide-react"
 
 interface ProductMetaProps {
+  productType?: string
+  productForm?: string | null
   origin: string | null
   region: string | null
   altitude: string | null
@@ -10,13 +12,28 @@ interface ProductMetaProps {
   compact?: boolean
 }
 
-export function ProductMeta({ origin, region, altitude, roastLevel, processingMethod, farm, compact }: ProductMetaProps) {
+export function ProductMeta({
+  productType = "coffee",
+  productForm,
+  origin,
+  region,
+  altitude,
+  roastLevel,
+  processingMethod,
+  farm,
+  compact,
+}: ProductMetaProps) {
+  // Label for roastLevel varies by product type
+  const roastLabel =
+    productType === "tea" ? "Степень окисления" : "Обжарка"
+
   const items = [
     { label: "Страна", value: origin, icon: MapPin },
     { label: "Регион", value: region, icon: MapPin },
     { label: "Высота", value: altitude, icon: Mountain },
-    { label: "Обжарка", value: roastLevel, icon: Flame },
+    { label: roastLabel, value: roastLevel, icon: Flame },
     { label: "Обработка", value: processingMethod, icon: Factory },
+    { label: "Форма", value: productForm ?? null, icon: Package },
     { label: "Ферма", value: farm, icon: Home },
   ].filter((item) => item.value)
 

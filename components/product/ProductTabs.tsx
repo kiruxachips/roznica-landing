@@ -17,6 +17,8 @@ interface Review {
 }
 
 interface ProductTabsProps {
+  productType?: string
+  productForm?: string | null
   fullDescription: string | null
   origin: string | null
   region: string | null
@@ -31,6 +33,8 @@ interface ProductTabsProps {
 type Tab = "description" | "meta" | "reviews"
 
 export function ProductTabs({
+  productType = "coffee",
+  productForm,
   fullDescription,
   origin,
   region,
@@ -114,6 +118,8 @@ export function ProductTabs({
         {active === "meta" && (
           <div className="space-y-8 max-w-2xl">
             <ProductMeta
+              productType={productType}
+              productForm={productForm}
               origin={origin}
               region={region}
               altitude={altitude}
@@ -121,7 +127,9 @@ export function ProductTabs({
               processingMethod={processingMethod}
               farm={farm}
             />
-            {brewingMethods.length > 0 && <BrewingMethods methods={brewingMethods} />}
+            {brewingMethods.length > 0 && productType !== "instant" && (
+              <BrewingMethods methods={brewingMethods} />
+            )}
           </div>
         )}
 

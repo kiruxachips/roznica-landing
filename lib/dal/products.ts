@@ -203,6 +203,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     badge: product.badge,
     metaTitle: product.metaTitle,
     metaDescription: product.metaDescription,
+    categoryId: product.categoryId,
     category: product.category,
     images: product.images.map((img) => ({
       id: img.id,
@@ -269,6 +270,49 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
           : null,
     }
   })
+}
+
+export async function getRelatedProducts(
+  productId: string,
+  productType: ProductType,
+  categoryId: string,
+  limit = 4
+): Promise<ProductCard[]> {
+  // Prefer same category first, fallback to same productType
+  const items = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      id: { not: productId },
+      OR: [{ categoryId }, { productType }],
+    },
+    orderBy: [{ categoryId: "asc" }, { sortOrder: "asc" }],
+    take: limit,
+    select: productCardSelect,
+  })
+
+  return items.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    productType: p.productType as ProductType,
+    productForm: p.productForm,
+    origin: p.origin,
+    roastLevel: p.roastLevel,
+    badge: p.badge,
+    flavorNotes: p.flavorNotes,
+    primaryImage: p.images[0]?.url ?? null,
+    primaryImageAlt: p.images[0]?.alt ?? null,
+    minPrice: p.variants[0]?.price ?? null,
+    minOldPrice: p.variants[0]?.oldPrice ?? null,
+    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, oldPrice: p.variants[0].oldPrice, stock: p.variants[0].stock } : null,
+    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, oldPrice: v.oldPrice, stock: v.stock })),
+    reviewCount: p.reviews.length,
+    averageRating:
+      p.reviews.length > 0
+        ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
+        : null,
+  }))
 }
 
 export async function getProductSlugs(): Promise<string[]> {
