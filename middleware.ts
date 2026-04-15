@@ -10,11 +10,16 @@ export default auth((req) => {
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login"
 
-    if (isLoginPage && isAuthenticated && userType === "admin") {
-      return NextResponse.redirect(new URL("/admin", req.url))
+    // Logged-in admin on login page → redirect to dashboard.
+    // Anonymous on login page → let the page render (no auth() overhead beyond what's already done).
+    if (isLoginPage) {
+      if (isAuthenticated && userType === "admin") {
+        return NextResponse.redirect(new URL("/admin", req.url))
+      }
+      return NextResponse.next()
     }
 
-    if (!isLoginPage && (!isAuthenticated || userType !== "admin")) {
+    if (!isAuthenticated || userType !== "admin") {
       return NextResponse.redirect(new URL("/admin/login", req.url))
     }
   }

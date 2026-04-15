@@ -8,6 +8,19 @@ export function estimateReadingTime(html: string): number {
   return Math.max(1, Math.ceil(wordCount / 200))
 }
 
+// Listings need content only to compute readingTime; everything else stays out
+const articleCardSelect = {
+  id: true,
+  title: true,
+  slug: true,
+  excerpt: true,
+  coverImage: true,
+  tags: true,
+  publishedAt: true,
+  content: true,
+  category: { select: { name: true, slug: true } },
+} satisfies Prisma.ArticleSelect
+
 export async function getArticles(filters: ArticleFilters = {}): Promise<{
   articles: ArticleCard[]
   total: number
@@ -37,9 +50,7 @@ export async function getArticles(filters: ArticleFilters = {}): Promise<{
       orderBy: { publishedAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
-      include: {
-        category: { select: { name: true, slug: true } },
-      },
+      select: articleCardSelect,
     }),
     prisma.article.count({ where }),
   ])
@@ -62,7 +73,19 @@ export async function getArticles(filters: ArticleFilters = {}): Promise<{
 export async function getArticleBySlug(slug: string): Promise<ArticleDetail | null> {
   const article = await prisma.article.findUnique({
     where: { slug, isPublished: true },
-    include: {
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      content: true,
+      coverImage: true,
+      categoryId: true,
+      tags: true,
+      publishedAt: true,
+      viewCount: true,
+      metaTitle: true,
+      metaDescription: true,
       category: { select: { name: true, slug: true } },
     },
   })
@@ -108,9 +131,7 @@ export async function getRelatedArticles(articleId: string, categoryId: string |
     where,
     orderBy: { publishedAt: "desc" },
     take: limit,
-    include: {
-      category: { select: { name: true, slug: true } },
-    },
+    select: articleCardSelect,
   })
 
   return items.map((a) => ({

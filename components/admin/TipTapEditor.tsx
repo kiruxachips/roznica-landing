@@ -87,7 +87,7 @@ export function TipTapEditor({ content, onChange, articleId }: TipTapEditorProps
         const url = await uploadArticleContentImage(formData)
         editor.chain().focus().setImage({ src: url }).run()
       } catch (err) {
-        console.error("Failed to upload image:", err)
+        if (process.env.NODE_ENV !== "production") console.error("Failed to upload image:", err)
       }
 
       if (fileRef.current) fileRef.current.value = ""

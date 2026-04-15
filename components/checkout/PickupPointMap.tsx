@@ -113,7 +113,7 @@ export function PickupPointMap() {
       mapInstanceRef.current = map
       setMapError(false)
     } catch (err) {
-      console.error("Yandex Maps init error:", err)
+      if (process.env.NODE_ENV !== "production") console.error("Yandex Maps init error:", err)
       setMapError(true)
     }
   }, [scriptLoaded, pickupPoints, selectPickupPoint])
