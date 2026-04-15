@@ -2,9 +2,19 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
 import { createArticle, updateArticle } from "@/lib/actions/articles"
-import { TipTapEditor } from "./TipTapEditor"
 import { ArticleCoverUploader } from "./ArticleCoverUploader"
+
+const TipTapEditor = dynamic(
+  () => import("./TipTapEditor").then((m) => m.TipTapEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[400px] rounded-lg border bg-muted/20 animate-pulse" />
+    ),
+  }
+)
 
 interface Category {
   id: string

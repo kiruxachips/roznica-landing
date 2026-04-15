@@ -72,37 +72,45 @@ export function About() {
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden">
                 <Image
-                  src="/images/1.jpg"
+                  src="/images/about-1.webp"
                   alt="Кофейные зёрна"
-                  width={300}
-                  height={300}
+                  width={450}
+                  height={450}
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  quality={80}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>
               <div className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden">
                 <Image
-                  src="/images/2.jpg"
+                  src="/images/about-2.webp"
                   alt="Процесс обжарки"
-                  width={300}
-                  height={300}
+                  width={450}
+                  height={450}
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  quality={80}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>
               <div className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden">
                 <Image
-                  src="/images/3.jpg"
+                  src="/images/about-3.webp"
                   alt="Свежий кофе"
-                  width={300}
-                  height={300}
+                  width={450}
+                  height={450}
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  quality={80}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>
               <div className="aspect-square rounded-xl sm:rounded-2xl overflow-hidden">
                 <Image
-                  src="/images/4.jpg"
+                  src="/images/about-4.webp"
                   alt="Упаковка кофе"
-                  width={300}
-                  height={300}
+                  width={450}
+                  height={450}
+                  sizes="(max-width: 1024px) 50vw, 25vw"
+                  quality={80}
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>

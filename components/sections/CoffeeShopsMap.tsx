@@ -67,19 +67,23 @@ export function CoffeeShopsMap() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState("")
   const [scriptLoaded, setScriptLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<YMapInstance | null>(null)
-  const markersRef = useRef<Map<string, HTMLDivElement>>(new Map())
+  const markersRef = useRef<Map<string, { el: HTMLDivElement; marker: unknown }>>(new Map())
   const listRef = useRef<HTMLDivElement>(null)
 
   // Fetch API key
   useEffect(() => {
-    if (!open) return
+    if (!open || apiKey) return
     fetch("/api/delivery/settings")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => data?.yandexMapsApiKey && setApiKey(data.yandexMapsApiKey))
-      .catch(() => {})
-  }, [open])
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("settings fetch failed"))))
+      .then((data) => {
+        if (data?.yandexMapsApiKey) setApiKey(data.yandexMapsApiKey)
+        else setLoadError("Карта временно недоступна")
+      })
+      .catch(() => setLoadError("Не удалось загрузить карту. Обновите страницу."))
+  }, [open, apiKey])
 
   // Load script
   useEffect(() => {
@@ -91,7 +95,9 @@ export function CoffeeShopsMap() {
     const script = document.createElement("script")
     script.src = `https://api-maps.yandex.ru/v3/?apikey=${apiKey}&lang=ru_RU`
     script.async = true
+    script.defer = true
     script.onload = () => setScriptLoaded(true)
+    script.onerror = () => setLoadError("Не удалось загрузить Яндекс.Карты")
     document.head.appendChild(script)
   }, [apiKey, scriptLoaded])
 
@@ -102,78 +108,95 @@ export function CoffeeShopsMap() {
 
   const selectedShop = selectedKey ? cityShops.find((s) => shopKey(s) === selectedKey) ?? null : null
 
-  const initMap = useCallback(async () => {
-    if (!scriptLoaded || !mapRef.current || !window.ymaps3) return
+  // Create map once when script + container are ready
+  const ensureMap = useCallback(async () => {
+    if (!scriptLoaded || !mapRef.current || !window.ymaps3) return null
+    if (mapInstanceRef.current) return mapInstanceRef.current
 
     try {
       await window.ymaps3.ready
-
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.destroy()
-        mapInstanceRef.current = null
-      }
-      markersRef.current.clear()
-
+      if (!mapRef.current) return null
       const cityCenter = CITY_CENTERS[selectedCity] || { lat: 54.72, lng: 20.51, zoom: 12 }
       const map = new window.ymaps3.YMap(mapRef.current, {
         location: { center: [cityCenter.lng, cityCenter.lat], zoom: cityCenter.zoom },
       })
-
       map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
       map.addChild(new window.ymaps3.YMapDefaultFeaturesLayer())
+      mapInstanceRef.current = map
+      return map
+    } catch (err) {
+      if (process.env.NODE_ENV !== "production") console.error("Map init error:", err)
+      setLoadError("Ошибка инициализации карты")
+      return null
+    }
+  // We intentionally exclude selectedCity — we only want first creation here
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scriptLoaded])
 
-      const shops = SHOPS.filter((s) => {
-        if (selectedCity === "Калининград") return belongsToKaliningrad(s.city)
-        return s.city === selectedCity
+  // Sync markers + center when city changes (or after first map creation)
+  const syncCity = useCallback(async () => {
+    const map = await ensureMap()
+    if (!map) return
+
+    const cityCenter = CITY_CENTERS[selectedCity] || { lat: 54.72, lng: 20.51, zoom: 12 }
+    map.update({ location: { center: [cityCenter.lng, cityCenter.lat], zoom: cityCenter.zoom } })
+
+    const shops = SHOPS.filter((s) =>
+      selectedCity === "Калининград" ? belongsToKaliningrad(s.city) : s.city === selectedCity
+    )
+    const wantKeys = new Set(shops.map(shopKey))
+
+    // Remove markers no longer needed
+    for (const [key, entry] of markersRef.current) {
+      if (!wantKeys.has(key)) {
+        try { map.removeChild(entry.marker as never) } catch {}
+        markersRef.current.delete(key)
+      }
+    }
+
+    // Add new markers
+    for (const shop of shops) {
+      const key = shopKey(shop)
+      if (markersRef.current.has(key)) continue
+
+      const el = document.createElement("div")
+      el.style.cssText = [
+        "width:30px",
+        "height:30px",
+        "background:#2d6b4a",
+        "border-radius:50%",
+        "border:3px solid white",
+        "box-shadow:0 2px 10px rgba(0,0,0,0.35)",
+        "cursor:pointer",
+        "position:relative",
+        "transition:transform 200ms ease, background 200ms ease",
+      ].join(";")
+      el.title = `${shop.city !== selectedCity && selectedCity === "Калининград" ? shop.city + ", " : ""}${shop.address}`
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        setSelectedKey(key)
       })
 
-      for (const shop of shops) {
-        const key = shopKey(shop)
-        const el = document.createElement("div")
-        el.style.cssText = [
-          "width:30px",
-          "height:30px",
-          "background:#2d6b4a",
-          "border-radius:50%",
-          "border:3px solid white",
-          "box-shadow:0 2px 10px rgba(0,0,0,0.35)",
-          "cursor:pointer",
-          "position:relative",
-          "transition:transform 200ms ease, background 200ms ease",
-        ].join(";")
-        el.title = `${shop.city !== selectedCity && selectedCity === "Калининград" ? shop.city + ", " : ""}${shop.address}`
-        el.addEventListener("click", (e) => {
-          e.stopPropagation()
-          setSelectedKey(key)
-        })
-
-        const marker = new window.ymaps3.YMapMarker({ coordinates: [shop.lng, shop.lat] })
-        marker.element.appendChild(el)
-        map.addChild(marker)
-        markersRef.current.set(key, el)
-      }
-
-      mapInstanceRef.current = map
-    } catch (err) {
-      console.error("Map init error:", err)
+      const marker = new window.ymaps3!.YMapMarker({ coordinates: [shop.lng, shop.lat] })
+      marker.element.appendChild(el)
+      map.addChild(marker)
+      markersRef.current.set(key, { el, marker })
     }
-  }, [scriptLoaded, selectedCity])
+  }, [ensureMap, selectedCity])
 
   useEffect(() => {
-    if (open) initMap()
-  }, [open, initMap])
+    if (open) syncCity()
+  }, [open, syncCity])
 
-  // Re-init map on city change + clear selection
   useEffect(() => {
     if (!open) return
     setSelectedKey(null)
-    initMap()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCity])
+    // syncCity is already wired via the effect above through dependency on selectedCity → syncCity ref
+  }, [selectedCity, open])
 
   // Visually highlight the selected marker + pan map
   useEffect(() => {
-    for (const [key, el] of markersRef.current) {
+    for (const [key, { el }] of markersRef.current) {
       const active = key === selectedKey
       el.style.background = active ? "#1a4d33" : "#2d6b4a"
       el.style.transform = active ? "scale(1.35)" : "scale(1)"
@@ -271,7 +294,17 @@ export function CoffeeShopsMap() {
             <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
               {/* Map */}
               <div className="relative flex-1 min-h-[240px] sm:min-h-0">
-                {apiKey ? (
+                {loadError ? (
+                  <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-center px-6">
+                    <p className="text-sm text-muted-foreground">{loadError}</p>
+                    <button
+                      onClick={() => { setLoadError(null); setApiKey(""); setScriptLoaded(false) }}
+                      className="h-9 px-4 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 transition-colors"
+                    >
+                      Попробовать снова
+                    </button>
+                  </div>
+                ) : apiKey ? (
                   <div ref={mapRef} className="w-full h-full" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm">
