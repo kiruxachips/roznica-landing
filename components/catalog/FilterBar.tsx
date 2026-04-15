@@ -120,9 +120,7 @@ export function FilterBar({
     [router, activeSort, searchValue]
   )
 
-  // Only filters hidden in the collapsible panel count as "sub-filters" for the indicator.
-  // teaType (tea) and form (instant) are now visible primary sub-tabs, not hidden filters.
-  const hasSubFilters = !!(activeRoast || activeOrigin || activeBrewing || (activeType === "tea" && activeForm))
+  const hasSubFilters = !!(activeRoast || activeOrigin || activeBrewing || activeTeaType || activeForm)
 
   const clearSubFilters = useCallback(() => {
     const params = new URLSearchParams()
@@ -157,67 +155,6 @@ export function FilterBar({
         })}
       </div>
 
-      {/* Tea sub-category tabs — shown when on Tea tab */}
-      {activeType === "tea" && filterOptions.teaTypes.length > 0 && (
-        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-          <button
-            onClick={() => updateParams("teaType", undefined)}
-            className={cn(
-              "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border",
-              !activeTeaType
-                ? "bg-foreground text-background border-foreground"
-                : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-            )}
-          >
-            Все
-          </button>
-          {filterOptions.teaTypes.map((t) => (
-            <button
-              key={t.slug}
-              onClick={() => updateParams("teaType", activeTeaType === t.slug ? undefined : t.slug)}
-              className={cn(
-                "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border whitespace-nowrap",
-                activeTeaType === t.slug
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-              )}
-            >
-              {t.name}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Instant sub-category tabs — shown when on Instant tab */}
-      {activeType === "instant" && filterOptions.productForms.length > 1 && (
-        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-          <button
-            onClick={() => updateParams("form", undefined)}
-            className={cn(
-              "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border",
-              !activeForm
-                ? "bg-foreground text-background border-foreground"
-                : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-            )}
-          >
-            Все
-          </button>
-          {filterOptions.productForms.map((form) => (
-            <button
-              key={form}
-              onClick={() => updateParams("form", activeForm === form ? undefined : form)}
-              className={cn(
-                "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all border whitespace-nowrap capitalize",
-                activeForm === form
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-white text-muted-foreground border-border hover:text-foreground hover:border-foreground/40"
-              )}
-            >
-              {form}
-            </button>
-          ))}
-        </div>
-      )}
 
       {/* Search input */}
       <div className="relative mb-3">
@@ -309,9 +246,19 @@ export function FilterBar({
             </>
           )}
 
-          {/* TEA sub-filters — teaType is now primary sub-tab; only show form filter */}
+          {/* TEA sub-filters */}
           {activeType === "tea" && (
             <>
+              {filterOptions.teaTypes.length > 0 && (
+                <FilterRow label="Вид чая">
+                  <FilterPill active={!activeTeaType} onClick={() => updateParams("teaType", undefined)}>Все</FilterPill>
+                  {filterOptions.teaTypes.map((t) => (
+                    <FilterPill key={t.slug} active={activeTeaType === t.slug} onClick={() => updateParams("teaType", activeTeaType === t.slug ? undefined : t.slug)}>
+                      {t.name}
+                    </FilterPill>
+                  ))}
+                </FilterRow>
+              )}
               {filterOptions.origins.length > 1 && (
                 <FilterRow label="Страна">
                   <FilterPill active={!activeOrigin} onClick={() => updateParams("origin", undefined)}>Все</FilterPill>
@@ -334,7 +281,18 @@ export function FilterBar({
               )}
             </>
           )}
-          {/* INSTANT sub-filters — productForm is now primary sub-tab, nothing extra here */}
+
+          {/* INSTANT sub-filters */}
+          {activeType === "instant" && filterOptions.productForms.length > 0 && (
+            <FilterRow label="Вид">
+              <FilterPill active={!activeForm} onClick={() => updateParams("form", undefined)}>Все</FilterPill>
+              {filterOptions.productForms.map((form) => (
+                <FilterPill key={form} active={activeForm === form} onClick={() => updateParams("form", activeForm === form ? undefined : form)}>
+                  {form}
+                </FilterPill>
+              ))}
+            </FilterRow>
+          )}
         </div>
       )}
     </div>
