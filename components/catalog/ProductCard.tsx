@@ -83,7 +83,7 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
             </div>
           )}
           {product.badge && (
-            <Badge className="absolute top-2 left-2 z-10 bg-white text-foreground border-0 shadow-sm text-[10px] sm:text-[11px] font-semibold px-2 py-0.5">
+            <Badge className="absolute top-2 left-2 z-10 bg-primary text-white border-0 shadow-sm text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 uppercase tracking-wide">
               {product.badge}
             </Badge>
           )}
