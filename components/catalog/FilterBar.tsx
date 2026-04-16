@@ -133,72 +133,67 @@ export function FilterBar({
   const [filtersOpen, setFiltersOpen] = useState(!!hasSubFilters)
 
   return (
-    <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-border -mx-4 px-4 sm:-mx-6 sm:px-6 mb-6 pb-3 pt-3">
-      {/* Product-type tabs — primary navigation */}
-      <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
-        {TYPE_TABS.map((tab) => {
-          const isActive = activeType === tab.value || (!activeType && tab.value === "coffee")
-          return (
-            <button
-              key={tab.value}
-              onClick={() => switchType(tab.value as ProductType)}
-              className={cn(
-                "shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold transition-all",
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
-              {tab.label}
-            </button>
-          )
-        })}
-      </div>
+    <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-border -mx-4 px-4 sm:-mx-6 sm:px-6 mb-4 py-2">
+      <div className="flex flex-col md:flex-row md:items-center gap-2">
+        {/* Product-type tabs */}
+        <div className="flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-hide">
+          {TYPE_TABS.map((tab) => {
+            const isActive = activeType === tab.value || (!activeType && tab.value === "coffee")
+            return (
+              <button
+                key={tab.value}
+                onClick={() => switchType(tab.value as ProductType)}
+                className={cn(
+                  "shrink-0 px-4 h-9 rounded-full text-sm font-semibold transition-all",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                )}
+              >
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
 
+        {/* Search + filter toggle + sort — shares a row with tabs on md+ */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="search"
+              value={searchValue}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Поиск…"
+              className="w-full h-9 pl-9 pr-8 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            {searchValue && (
+              <button
+                onClick={() => handleSearchChange("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-      {/* Search input */}
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-        <input
-          type="search"
-          value={searchValue}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          placeholder="Поиск по каталогу…"
-          className="w-full h-9 pl-9 pr-8 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        />
-        {searchValue && (
           <button
-            onClick={() => handleSearchChange("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            onClick={() => setFiltersOpen(!filtersOpen)}
+            className={cn(
+              "relative shrink-0 h-9 w-9 rounded-lg border border-input flex items-center justify-center transition-colors",
+              filtersOpen ? "bg-primary/10 text-primary border-primary/30" : "bg-background text-muted-foreground hover:text-foreground"
+            )}
+            title="Фильтры"
+            aria-label="Фильтры"
           >
-            <X className="w-3.5 h-3.5" />
+            <SlidersHorizontal className="w-4 h-4" />
+            {hasSubFilters && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />}
           </button>
-        )}
-      </div>
 
-      {/* Sort + sub-filters toggle */}
-      <div className="flex items-center justify-between">
-        <button
-          onClick={() => setFiltersOpen(!filtersOpen)}
-          className={cn(
-            "flex items-center gap-1.5 p-2 rounded-lg transition-colors",
-            filtersOpen ? "text-primary" : "text-muted-foreground hover:text-foreground"
-          )}
-          title="Фильтры"
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-          {hasSubFilters && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
-        </button>
-        <div className="flex items-center gap-3">
-          {hasSubFilters && (
-            <button onClick={clearSubFilters} className="text-xs text-muted-foreground hover:text-primary transition-colors">
-              Сбросить
-            </button>
-          )}
           <select
             value={activeSort ?? ""}
             onChange={(e) => updateParams("sort", e.target.value || undefined)}
-            className="h-10 sm:h-8 px-3 sm:px-2.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="shrink-0 h-9 px-2.5 rounded-lg border border-input bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             {sortOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>

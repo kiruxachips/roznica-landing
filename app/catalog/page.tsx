@@ -91,11 +91,11 @@ export default async function CatalogPage({
     <>
       <Header />
       <main className="pt-16">
-        <section className="py-6 sm:py-10">
+        <section className="py-4 sm:py-6">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-5 sm:mb-6">
-              <h1 className="font-serif text-2xl sm:text-3xl font-bold">{heading}</h1>
-              <p className="text-sm sm:text-base text-muted-foreground mt-1">{countLabel} в наличии</p>
+            <div className="mb-3 sm:mb-4 flex items-baseline gap-3">
+              <h1 className="font-serif text-xl sm:text-2xl font-bold">{heading}</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">{countLabel}</p>
             </div>
 
             {/* Collection showcase sections — only for coffee tab when no filters active */}
