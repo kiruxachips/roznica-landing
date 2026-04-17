@@ -96,11 +96,12 @@ export function ProductGrid({
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-        {items.map((product) => (
+        {items.map((product, i) => (
           <ProductCard
             key={product.id}
             product={product}
             favorited={favoriteSet ? favoriteSet.has(product.id) : undefined}
+            priority={i < 4}
           />
         ))}
       </div>

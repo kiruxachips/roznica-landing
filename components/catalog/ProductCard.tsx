@@ -13,9 +13,12 @@ import type { ProductCard as ProductCardType } from "@/lib/types"
 interface ProductCardProps {
   product: ProductCardType
   favorited?: boolean
+  // Prioritise the first few cards' images so above-fold LCP isn't blocked
+  // by lazy-loading. Passed from ProductGrid based on card index.
+  priority?: boolean
 }
 
-export function ProductCard({ product, favorited }: ProductCardProps) {
+export function ProductCard({ product, favorited, priority }: ProductCardProps) {
   const addItem = useCartStore((s) => s.addItem)
   const openDrawer = useCartUIStore((s) => s.openDrawer)
 
@@ -76,6 +79,8 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
               fill
               className="object-cover object-top group-hover:scale-105 transition-transform duration-500"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+              priority={priority}
+              loading={priority ? undefined : "lazy"}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">

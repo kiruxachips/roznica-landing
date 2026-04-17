@@ -60,6 +60,10 @@ interface ImportProduct {
   body?: number | null
   badge?: string | null
   isFeatured?: boolean
+  // Explicit sortOrder override. When omitted, position in the JSON array is
+  // used. Useful for pinning an item to the bottom of the catalog (e.g. drip
+  // packets, which are a side-format and should appear after whole-bean coffee).
+  sortOrder?: number
   variants: ImportVariant[]
   reviews: ImportReview[]
   images?: ImportImage[]
@@ -103,7 +107,7 @@ async function main() {
       isActive: true,
       isFeatured: p.isFeatured ?? false,
       badge: p.badge ?? null,
-      sortOrder: index,
+      sortOrder: p.sortOrder ?? index,
       origin: p.origin ?? null,
       region: p.region ?? null,
       farm: p.farm ?? null,

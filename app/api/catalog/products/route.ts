@@ -15,10 +15,11 @@ export async function GET(request: Request) {
   const page = Math.max(1, Number(url.searchParams.get("page")) || 1)
   const PAGE_SIZE = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_PAGE_SIZE))
 
+  // Default to coffee when no ?type param — matches the catalog page default
+  // so infinite-scroll load-more doesn't start pulling in tea/instant products.
   const rawType = url.searchParams.get("type")
-  const productType = (rawType === "coffee" || rawType === "tea" || rawType === "instant")
-    ? (rawType as ProductType)
-    : undefined
+  const productType: ProductType =
+    rawType === "tea" || rawType === "instant" ? rawType : "coffee"
 
   const filters = {
     productType,

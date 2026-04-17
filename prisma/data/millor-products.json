@@ -351,6 +351,8 @@
     "origin": "Ассорти",
     "flavorNotes": ["ассорти", "8 стран"],
     "brewingMethods": ["filter"],
+    "badge": "Альтернативный формат",
+    "sortOrder": 999,
     "variants": [{"weight": "88г", "price": 550}],
     "reviews": [
       {"name": "Михаил", "text": "Очень удобно и вкусно", "rating": 5, "date": "19 декабря 2024"}

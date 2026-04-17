@@ -25,7 +25,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const params = await searchParams
   const page = Number(params.page) || 1
-  const typeLabel = params.type ? (TYPE_TITLES[params.type] ?? "Каталог") : "Кофе"
+  // Default tab is coffee when no ?type param is present — matches the UI.
+  const typeLabel = TYPE_TITLES[params.type ?? "coffee"] ?? "Каталог"
   const title = params.q
     ? `Поиск: «${params.q}» | Millor Coffee`
     : `${typeLabel} — каталог | Millor Coffee`
@@ -45,9 +46,11 @@ export default async function CatalogPage({
 }) {
   const params = await searchParams
   const rawType = params.type
-  const productType = (rawType === "coffee" || rawType === "tea" || rawType === "instant")
-    ? (rawType as ProductType)
-    : undefined
+  // Catalog defaults to the coffee tab — the UI highlights "Кофе" when no
+  // ?type param is set, so the DAL query must agree to avoid tea/instant
+  // products leaking into the default coffee view.
+  const productType: ProductType =
+    rawType === "tea" || rawType === "instant" ? rawType : "coffee"
 
   const filters = {
     productType,
@@ -64,7 +67,7 @@ export default async function CatalogPage({
   }
 
   const hasActiveFilters = !!(params.roast || params.origin || params.brewing || params.teaType || params.form || params.collection || params.sort || params.q)
-  const showCollections = !hasActiveFilters && (!productType || productType === "coffee")
+  const showCollections = !hasActiveFilters && productType === "coffee"
 
   const session = await auth()
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
