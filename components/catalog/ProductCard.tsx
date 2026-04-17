@@ -135,18 +135,18 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
             {metaLine || "\u00A0"}
           </p>
 
-          {/* Flavor notes / product form chips */}
-          <div className="flex flex-wrap gap-1 min-h-[20px]">
+          {/* Flavor notes / product form chips — single row, no wrap to keep cards equal height */}
+          <div className="flex gap-1 min-h-[20px] overflow-hidden">
             {chips.slice(0, 2).map((note) => (
               <span
                 key={note}
-                className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-full"
+                className="shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground truncate max-w-[45%]"
               >
                 {note}
               </span>
             ))}
             {chips.length > 2 && (
-              <span className="px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground">
+              <span className="shrink-0 px-1.5 sm:px-2 py-0.5 rounded-full bg-secondary text-[10px] sm:text-[11px] text-muted-foreground">
                 +{chips.length - 2}
               </span>
             )}
@@ -172,15 +172,15 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
               </div>
             )}
 
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-baseline gap-1 min-w-0">
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-baseline gap-1 min-w-0 overflow-hidden">
                 {selected && (
-                  <span className="text-base sm:text-lg font-bold text-primary leading-none">
+                  <span className="text-sm sm:text-base font-bold text-primary leading-none whitespace-nowrap">
                     {selected.price}₽
                   </span>
                 )}
                 {selected?.oldPrice && selected.oldPrice > selected.price && (
-                  <span className="text-[11px] sm:text-xs text-muted-foreground line-through truncate">
+                  <span className="text-[10px] sm:text-[11px] text-muted-foreground line-through whitespace-nowrap">
                     {selected.oldPrice}₽
                   </span>
                 )}
@@ -189,9 +189,9 @@ export function ProductCard({ product, favorited }: ProductCardProps) {
                 <button
                   onClick={handleQuickAdd}
                   aria-label="В корзину"
-                  className="shrink-0 h-9 w-9 sm:h-10 sm:w-auto sm:px-4 bg-primary text-white rounded-lg text-sm font-medium flex items-center justify-center sm:gap-1.5 hover:bg-primary/90 transition-colors"
+                  className="shrink-0 h-8 w-8 sm:h-9 sm:w-auto sm:px-3 bg-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center sm:gap-1.5 hover:bg-primary/90 transition-colors"
                 >
-                  <ShoppingCart className="w-4 h-4" />
+                  <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">В корзину</span>
                 </button>
               )}
