@@ -29,6 +29,10 @@ RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+# scripts/ ships with the image so maintenance scripts (e.g. product import,
+# review sync) can be run via `docker exec <container> npx tsx scripts/<name>.ts`
+# without the caller having to docker cp them in each time.
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
