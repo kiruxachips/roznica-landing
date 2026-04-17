@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { ArrowLeft, ArrowRight, Coffee, Loader2, Sparkles } from "lucide-react"
+import { ArrowLeft, ArrowRight, Coffee, Loader2, Sparkles, X } from "lucide-react"
 import { questions, type Answers } from "./quiz/questions"
 import { QuizStep } from "./quiz/QuizStep"
 import { QuizResult } from "./quiz/QuizResult"
@@ -36,6 +36,13 @@ export function TasteQuiz() {
     if (phase !== "questions") return
     stepBodyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [step, phase])
+
+  // Lock body scroll when result modal is open
+  useEffect(() => {
+    if (phase !== "result") return
+    document.body.style.overflow = "hidden"
+    return () => { document.body.style.overflow = "" }
+  }, [phase])
 
   function handleStart() {
     setPhase("questions")
@@ -181,11 +188,40 @@ export function TasteQuiz() {
             )}
 
             {phase === "result" && (
-              <QuizResult products={products} matches={matches} onRestart={handleRestart} />
+              <div className="text-center py-6">
+                <Sparkles className="w-8 h-8 text-primary mx-auto mb-3" strokeWidth={1.75} />
+                <p className="text-base sm:text-lg font-medium text-foreground">Подборка готова!</p>
+                <p className="text-sm text-muted-foreground mt-1">Результаты показаны во всплывающем окне.</p>
+                <button
+                  onClick={handleRestart}
+                  className="mt-4 text-sm text-primary hover:underline font-medium"
+                >
+                  Пройти ещё раз
+                </button>
+              </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Result modal overlay */}
+      {phase === "result" && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm">
+          <div
+            className="relative w-full max-w-5xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl m-4 sm:m-6 lg:my-10 p-5 sm:p-8 lg:p-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={handleRestart}
+              className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-secondary/80 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Закрыть"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <QuizResult products={products} matches={matches} onRestart={handleRestart} />
+          </div>
+        </div>
+      )}
     </section>
   )
 }
