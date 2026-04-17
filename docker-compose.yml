@@ -9,6 +9,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:?required}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - internal
     # No port mapping — DB accessible only within docker network (app → db:5432)
     # For local dev, uncomment: ports: ["5433:5432"]
 
@@ -43,16 +45,50 @@ services:
       - AUTH_TRUST_HOST=${AUTH_TRUST_HOST:-true}
       - GOOGLE_SITE_VERIFICATION=${GOOGLE_SITE_VERIFICATION:-}
       - YANDEX_VERIFICATION=${YANDEX_VERIFICATION:-}
+      - MILLORBOT_ENABLED=${MILLORBOT_ENABLED:-false}
+      - MILLORBOT_URL=${MILLORBOT_URL:-}
+      - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
     depends_on:
       - db
     volumes:
       - uploads:/app/public/uploads
+    networks:
+      - internal
+      - millor-backbone
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: roznica-outbox-worker
+    restart: unless-stopped
+    command: ["node", "scripts/outbox-worker.js"]
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://roznica:${DB_PASSWORD:?required}@db:5432/roznica
+      - MILLORBOT_ENABLED=${MILLORBOT_ENABLED:-false}
+      - MILLORBOT_URL=${MILLORBOT_URL:-}
+      - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
+      - OUTBOX_POLL_INTERVAL_MS=${OUTBOX_POLL_INTERVAL_MS:-5000}
+      - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
+    depends_on:
+      - db
+    networks:
+      - internal
+      - millor-backbone
+
+networks:
+  internal:
+    driver: bridge
+  millor-backbone:
+    external: true
+    name: millor-backbone
 
 volumes:
   pgdata:

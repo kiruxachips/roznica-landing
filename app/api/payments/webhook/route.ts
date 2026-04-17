@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, type OrderEmailData } from "@/lib/email"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { getPayment } from "@/lib/yookassa"
+import { enqueueOutbox } from "@/lib/dal/outbox"
+import { buildOrderPaidPayload } from "@/lib/integrations/millorbot/payload"
 
 // YooKassa IP ranges (first line of defense)
 const YOOKASSA_IPS = [
@@ -138,6 +140,30 @@ export async function POST(request: NextRequest) {
       await createShipmentForOrder(order.id)
     } catch (e) {
       console.error("Failed to create shipment for order:", order.id, e)
+    }
+
+    // Enqueue order.paid event for millorbot (worker delivers asynchronously with retries).
+    // eventId is deterministic per order so the OutboxEvent UNIQUE constraint makes this idempotent
+    // across repeated YooKassa webhook retries.
+    try {
+      const freshOrder = await prisma.order.findUnique({
+        where: { id: order.id },
+        include: { items: true },
+      })
+      if (freshOrder) {
+        const eventId = `paid_${freshOrder.id}`
+        const payload = buildOrderPaidPayload(freshOrder, { eventId })
+        try {
+          await enqueueOutbox("order.paid", payload as unknown as Parameters<typeof enqueueOutbox>[1], { eventId })
+        } catch (err) {
+          const e = err as { code?: string }
+          if (e?.code !== "P2002") {
+            console.error("Failed to enqueue order.paid outbox event:", err)
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to prepare order.paid event:", e)
     }
   } else if (verifiedStatus === "canceled") {
     // Idempotency: skip if already cancelled

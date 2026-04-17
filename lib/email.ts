@@ -336,6 +336,95 @@ export async function sendAdminNewOrderEmail(data: OrderEmailData) {
   })
 }
 
+// ── Customer: Order Shipped (передан в доставку) ──
+
+function trackingUrl(carrier: string | undefined, trackingNumber: string | undefined): string | null {
+  if (!trackingNumber) return null
+  const t = encodeURIComponent(trackingNumber)
+  switch (carrier) {
+    case "cdek":
+      return `https://www.cdek.ru/ru/tracking?order_id=${t}`
+    case "pochta":
+      return `https://www.pochta.ru/tracking?barcode=${t}`
+    default:
+      return null
+  }
+}
+
+export interface ShippedEmailData extends OrderEmailData {
+  trackingNumber?: string
+}
+
+export async function sendOrderShippedEmail(data: ShippedEmailData) {
+  if (!data.customerEmail) return
+
+  const track = data.trackingNumber
+  const url = trackingUrl(data.deliveryMethod, track)
+  const carrierLabel = data.deliveryMethod ? deliveryMethodLabels[data.deliveryMethod] || data.deliveryMethod : ""
+
+  const trackBlock = track
+    ? `
+      <div style="background: #f5f0eb; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
+        <p style="margin: 0 0 6px; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Трек-номер</p>
+        <p style="margin: 0 0 12px; color: #7c4a1e; font-size: 22px; font-weight: bold; letter-spacing: 2px;">${track}</p>
+        ${url ? `<a href="${url}" style="display: inline-block; background: #7c4a1e; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Отследить посылку</a>` : ""}
+      </div>
+    `
+    : ""
+
+  const html = wrapEmail(`
+    <h2 style="color: #7c4a1e; margin-bottom: 16px;">Заказ передан в доставку</h2>
+    <p style="color: #555; font-size: 16px; line-height: 1.5;">
+      ${data.customerName}, мы передали ваш заказ <strong>${data.orderNumber}</strong>${carrierLabel ? ` в службу ${carrierLabel}` : ""}.
+    </p>
+    ${trackBlock}
+    ${buildDeliveryHtml(data)}
+    <p style="color: #888; font-size: 14px; margin-top: 24px;">
+      Статус доставки обновится автоматически — следить можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from: `"Millor Coffee" <${fromEmail}>`,
+    to: data.customerEmail,
+    subject: `Заказ ${data.orderNumber} передан в доставку${track ? ` — трек ${track}` : ""}`,
+    html,
+  })
+}
+
+// ── Customer: Order Delivered ──
+
+export async function sendOrderDeliveredEmail(data: OrderEmailData) {
+  if (!data.customerEmail) return
+
+  const isPvz = data.deliveryType === "pvz"
+  const pickupLine = isPvz && data.pickupPointName
+    ? `Заберите его в пункте выдачи: <strong>${data.pickupPointName}</strong>.`
+    : "Посылка доставлена на указанный адрес."
+
+  const html = wrapEmail(`
+    <h2 style="color: #2d6b4a; margin-bottom: 16px;">Заказ доставлен</h2>
+    <p style="color: #555; font-size: 16px; line-height: 1.5;">
+      ${data.customerName}, ваш заказ <strong>${data.orderNumber}</strong> прибыл!
+      ${isPvz ? pickupLine : ""}
+    </p>
+    ${buildDeliveryHtml(data)}
+    <p style="color: #555; font-size: 14px; margin-top: 24px;">
+      Спасибо, что выбрали Millor Coffee. Будем рады видеть вас снова!
+    </p>
+    <p style="color: #888; font-size: 14px;">
+      Оставить отзыв или повторить заказ можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from: `"Millor Coffee" <${fromEmail}>`,
+    to: data.customerEmail,
+    subject: `Заказ ${data.orderNumber} доставлен — Millor Coffee`,
+    html,
+  })
+}
+
 // ── Admin: Payment Success Notification ──
 
 export async function sendAdminPaymentSuccessEmail(data: OrderEmailData) {
