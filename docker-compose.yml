@@ -68,7 +68,7 @@ services:
       dockerfile: Dockerfile
     container_name: roznica-outbox-worker
     restart: unless-stopped
-    command: ["node", "scripts/outbox-worker.js"]
+    command: ["node", "scripts/outbox-worker.mjs"]
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://roznica:${DB_PASSWORD:?required}@db:5432/roznica
