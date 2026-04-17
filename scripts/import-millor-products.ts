@@ -2,11 +2,14 @@
  * Import script for Millor coffee products scraped from millor-shop.ru.
  *
  * Reads prisma/data/millor-products.json and upserts each product with its
- * variants + reviews. Does NOT touch ProductImage — images are uploaded via
- * admin panel separately.
+ * variants, reviews, and (optionally) images. When a product entry includes
+ * an "images" field, the script replaces ProductImage rows for that product
+ * to match the JSON. Products without an "images" field keep whatever image
+ * state is already in the DB (useful when images are managed via the admin
+ * panel).
  *
- * Idempotent: re-running replaces variants and reviews (cascade delete + insert)
- * so re-import stays fresh if JSON changes.
+ * Idempotent: re-running replaces variants, reviews, and (when present in
+ * JSON) images — cascade delete + insert — so re-import stays fresh.
  *
  * Usage (inside docker container):
  *   docker exec roznica-landing npx tsx scripts/import-millor-products.ts
@@ -31,6 +34,13 @@ interface ImportReview {
   date: string
 }
 
+interface ImportImage {
+  url: string
+  alt?: string
+  isPrimary?: boolean
+  sortOrder?: number
+}
+
 interface ImportProduct {
   slug: string
   name: string
@@ -52,6 +62,7 @@ interface ImportProduct {
   isFeatured?: boolean
   variants: ImportVariant[]
   reviews: ImportReview[]
+  images?: ImportImage[]
 }
 
 const COFFEE_CATEGORY_SLUG = "zernovoy-kofe"
@@ -148,8 +159,25 @@ async function main() {
       })
     }
 
+    // Replace images only when the JSON entry specifies them; otherwise leave
+    // the DB rows alone so admin-uploaded images are preserved.
+    let imageCount = 0
+    if (p.images && p.images.length > 0) {
+      await prisma.productImage.deleteMany({ where: { productId: product.id } })
+      await prisma.productImage.createMany({
+        data: p.images.map((img, i) => ({
+          productId: product.id,
+          url: img.url,
+          alt: img.alt ?? p.name,
+          isPrimary: img.isPrimary ?? i === 0,
+          sortOrder: img.sortOrder ?? i,
+        })),
+      })
+      imageCount = p.images.length
+    }
+
     console.log(
-      `${existing ? "↺" : "+"} ${p.name} (${p.slug}) — ${p.variants.length} variants, ${p.reviews.length} reviews`
+      `${existing ? "↺" : "+"} ${p.name} (${p.slug}) — ${p.variants.length} variants, ${p.reviews.length} reviews, ${imageCount} images`
     )
   }
 
