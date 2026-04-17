@@ -21,7 +21,42 @@
 
 Генерируется один раз: `openssl rand -hex 32`.
 
-**Общая Docker-сеть** `millor-backbone` (external). Нужно создать на сервере: `docker network create millor-backbone`, затем подключить к ней контейнер бота (см. раздел 5).
+**Общая Docker-сеть** `millor-backbone` (external) — **уже создана на сервере**, контейнер сайта `roznica-landing` и worker `roznica-outbox-worker` в неё включены. Боту нужно только присоединиться (см. раздел 5).
+
+---
+
+## 0.1 Текущее состояние на сервере (на 2026-04-17)
+
+Сайт задеплоен, готов принимать и отправлять события. Текущая конфигурация:
+
+| Что | Где | Значение |
+|---|---|---|
+| Docker-сеть | сервер beget | `millor-backbone` создана |
+| Контейнер сайта | `roznica-landing` | в сети `millor-backbone`, DNS: `roznica-landing`, порт внутри `3000` |
+| Outbox worker | `roznica-outbox-worker` | в сети `millor-backbone`, сейчас `MILLORBOT_ENABLED=false` |
+| Inbound endpoint | готов | `POST http://roznica-landing:3000/api/webhooks/millorbot/tracking` |
+| Админка | `https://millor-coffee.ru/admin/integrations` | мониторинг outbox + журнал |
+
+**Shared secret** (HMAC-ключ на обе стороны) — 64-символьный hex. Запросить у пользователя **Кирилла** или взять из `.env` файла сайта на сервере:
+```bash
+ssh beget 'grep MILLORBOT_SHARED_SECRET ~/roznica-landing/.env'
+```
+**Ровно это значение** нужно положить в `.env` бота как `WEBSITE_SHARED_SECRET`. Без совпадения секретов обе стороны будут возвращать 401.
+
+**Ожидаемые значения в `.env` бота после всех работ:**
+```
+WEBSITE_API_URL=http://roznica-landing:3000/api/webhooks/millorbot/tracking
+WEBSITE_SHARED_SECRET=<hex 64, тот же что на сайте>
+HTTP_SERVER_ENABLED=true
+HTTP_SERVER_PORT=8000
+IMAP_ENABLED=true   # оставить true на переходный период; позже false
+```
+
+**После запуска бота Кирилл на сервере включит outbox-воркер:**
+```bash
+ssh beget 'cd ~/roznica-landing && sed -i "s/MILLORBOT_ENABLED=false/MILLORBOT_ENABLED=true/" .env && docker compose restart outbox-worker'
+```
+До этого момента все `order.paid` копятся в БД сайта со `status=pending` — ничего не теряется.
 
 ---
 
@@ -713,57 +748,77 @@ asyncio.run(main())
 
 ## 5. План деплоя (через GitHub)
 
-### 5.1 На сервере заранее:
+> **Сторона сайта уже задеплоена на сервер** (см. раздел 0.1). На сервере готово:
+> - сеть `millor-backbone`
+> - контейнеры `roznica-landing`, `roznica-outbox-worker` в ней
+> - миграция Prisma применена (`OutboxEvent`, `IntegrationLog`, `ProcessedInboundEvent`)
+> - `MILLORBOT_SHARED_SECRET` в `~/roznica-landing/.env` на сервере
+> - флаг `MILLORBOT_ENABLED=false` — worker готов, но пока не стучится
+>
+> **Остаётся только сторона бота.**
+
+### 5.1 Взять shared secret
 
 ```bash
-# 1. Создать общую docker-сеть (идемпотентно)
-docker network create millor-backbone 2>/dev/null || true
+ssh beget 'grep MILLORBOT_SHARED_SECRET ~/roznica-landing/.env'
+```
+Полученный hex (64 символа) — это будет `WEBSITE_SHARED_SECRET` в `.env` бота.
 
-# 2. Сгенерить shared secret
-openssl rand -hex 32  # скопировать, положить в оба .env одинаковым значением
+### 5.2 Деплой бота
+
+```bash
+# Локально — завершить работу по плану (шаги 1–9 из раздела 3), потом:
+git push origin main
+
+# На сервере:
+ssh beget
+cd ~/millorbot-delivery
+git pull
+# Отредактировать .env — добавить/изменить:
+#   WEBSITE_API_URL=http://roznica-landing:3000/api/webhooks/millorbot/tracking
+#   WEBSITE_SHARED_SECRET=<hex из 5.1>
+#   HTTP_SERVER_ENABLED=true
+#   HTTP_SERVER_PORT=8000
+#   IMAP_ENABLED=true    # оставляем true на переходный период
+# Удалить из .env: WEBSITE_AUTH_TOKEN (заменён)
+docker compose down
+docker compose up -d --build
 ```
 
-### 5.2 Первый деплой — двусторонний:
+### 5.3 Проверки после запуска бота
 
-1. **Сайт:**
-   ```
-   cd ~/roznica-landing
-   git pull
-   # заполнить в .env:
-   #   MILLORBOT_ENABLED=true
-   #   MILLORBOT_URL=http://millor-telegram-router:8000
-   #   MILLORBOT_SHARED_SECRET=<hex>
-   docker compose down
-   docker compose up -d --build  # запустит и app, и новый outbox-worker
-   docker compose exec app npx prisma migrate deploy
-   ```
+```bash
+# 1. Бот живёт и сеть подключена
+docker logs millor-telegram-router --tail 30
+docker network inspect millor-backbone --format '{{range .Containers}}{{.Name}} {{end}}'
+# Ожидаемо: millor-telegram-router roznica-landing roznica-outbox-worker
 
-2. **Бот:**
-   ```
-   cd ~/millorbot-delivery
-   git pull
-   # заполнить в .env:
-   #   WEBSITE_API_URL=http://roznica-landing:3000/api/webhooks/millorbot/tracking
-   #   WEBSITE_SHARED_SECRET=<ТОТ ЖЕ hex>
-   #   HTTP_SERVER_ENABLED=true
-   #   IMAP_ENABLED=true  # на переходный период
-   docker compose down
-   docker compose up -d --build
-   ```
+# 2. HTTP-сервер бота отвечает внутри сети
+docker exec roznica-landing wget -qO- http://millor-telegram-router:8000/health
+# Ожидаемо: {"ok":true}
 
-3. **Проверка:**
-   ```
-   docker logs roznica-outbox-worker --tail 20
-   docker logs millor-telegram-router --tail 20
-   curl http://roznica-landing:3000/api/webhooks/millorbot/tracking -v  # должно ругнуться 401 (no signature)
-   docker exec millor-telegram-router curl http://localhost:8000/health  # {"ok":true}
-   ```
+# 3. HMAC-подпись корректно отвергает невалидный запрос
+docker exec roznica-landing wget -qO- --post-data='{}' \
+  --header='Content-Type: application/json' \
+  http://millor-telegram-router:8000/api/orders/paid 2>&1 || echo "OK — 401 expected"
+```
 
-### 5.3 Переключение с IMAP на HTTP
+### 5.4 Включение outbox-воркера (это делает Кирилл на сайте)
 
-1. Провести 2–3 тестовых заказа, убедиться что всё работает через HTTP-канал.
-2. Поставить `IMAP_ENABLED=false` в `.env` бота, `docker compose restart`.
-3. Старый `millor-shop.ru` отключить / перенаправить DNS на новый сайт.
+Когда бот поднят и проверен:
+```bash
+ssh beget 'cd ~/roznica-landing && sed -i "s/MILLORBOT_ENABLED=false/MILLORBOT_ENABLED=true/" .env && docker compose restart outbox-worker && sleep 3 && docker logs roznica-outbox-worker --tail 5'
+```
+В логе ожидается `"enabled":true`. После этого накопленные `OutboxEvent` начнут доставляться в бота.
+
+Мониторинг: `https://millor-coffee.ru/admin/integrations`.
+
+### 5.5 Переключение с IMAP на HTTP (после стабилизации)
+
+1. Провести 2–3 реальных тестовых заказа, убедиться что путь работает сквозь HTTP.
+2. Проверить `/admin/integrations` — нет failed/dead событий.
+3. В `.env` бота: `IMAP_ENABLED=false`, `docker compose restart`.
+4. Позже — переключить DNS `millor-shop.ru` на новый сайт, отключить старый WordPress.
 
 ---
 
