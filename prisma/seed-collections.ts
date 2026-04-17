@@ -28,7 +28,11 @@ interface CollectionSeed {
 
 // Curated flavour-based groupings. A product may appear in more than one
 // collection when the profile fits both (e.g. Blend Espresso → эспрессо AND
-// хорош с молоком). Order within each list controls display order.
+// с молоком). Order within each list controls display order.
+//
+// Invariant: every active coffee product MUST belong to ≥1 collection. The
+// catalog defaults to showing collection sections only (no flat grid below),
+// so an unclassified coffee would be invisible on the default view.
 const COLLECTIONS: CollectionSeed[] = [
   {
     slug: "s-molokom",
@@ -37,27 +41,30 @@ const COLLECTIONS: CollectionSeed[] = [
     description: "Низкая кислотность, шоколадно-ореховые и карамельные ноты — раскрываются в латте, капучино и флэт-уайт.",
     sortOrder: 1,
     productSlugs: [
-      "brazil-santos",
       "brazil-yellow-bourbon",
+      "brazil-santos",
       "honduras",
       "peru-gr1",
-      "uganda-bigusi-aa",
       "blend-espresso",
       "blend-crema",
       "blend-gurme",
       "blend-dlya-neyo",
       "oro-rosso",
-      "salvador",
       "dominicana-barohona-aa",
       "kenigsbergskij-kofe",
-      "indonesia",
+      "salvador",
+      "uganda-bigusi-aa",
+      "nicaragua-shg",
+      "vietnam-arabica-scr-18",
+      "papua-new-guinea",
+      "panama-arabica-shb-bouquete",
     ],
   },
   {
     slug: "klassika",
-    name: "Классика",
+    name: "Классика на каждый день",
     emoji: "☕",
-    description: "Сбалансированные сорта на каждый день: без резкой кислинки, с тёплым шоколадно-ореховым профилем.",
+    description: "Сбалансированные универсальные сорта без резких нот — подойдут к любому способу заваривания.",
     sortOrder: 2,
     productSlugs: [
       "brazil-santos",
@@ -66,27 +73,49 @@ const COLLECTIONS: CollectionSeed[] = [
       "honduras",
       "peru-gr1",
       "guatemala",
-      "vietnam-arabica-scr-18",
       "nicaragua-shg",
+      "vietnam-arabica-scr-18",
+      "brazilia-decaf",
+      "salvador",
+    ],
+  },
+  {
+    slug: "shokoladno-orehovyy",
+    name: "Шоколадно-ореховый профиль",
+    emoji: "🍫",
+    description: "Плотные сорта с нотами какао, тёмного шоколада, жареных орехов и карамели — для любителей «уютного» вкуса.",
+    sortOrder: 3,
+    productSlugs: [
+      "indonesia",
+      "uganda-bigusi-aa",
+      "dominicana-barohona-aa",
+      "kenigsbergskij-kofe",
+      "tanzania-aa",
+      "guatemala",
+      "peru-gr1",
       "brazil-yellow-bourbon",
+      "vietnam-arabica-scr-18",
+      "oro-nero",
     ],
   },
   {
     slug: "s-kislinkoy",
-    name: "С кислинкой и фруктами",
+    name: "Яркие и фруктовые",
     emoji: "🍋",
-    description: "Яркие, ягодные и цитрусовые профили — для тех, кто любит фильтр-кофе и чистую чашку без молока.",
-    sortOrder: 3,
+    description: "Выразительная кислотность, ягоды, цитрусы, цветы — чистая чашка без молока, фильтр, аэропресс.",
+    sortOrder: 4,
     productSlugs: [
-      "ethiopia-yirgacheffe-gr-1",
       "kenya-aaab",
+      "ethiopia-yirgacheffe-gr-1",
       "tanzania-aa",
-      "rwanda",
-      "costa-rica",
-      "burundi",
       "panama-arabica-shb-bouquete",
+      "costa-rica",
+      "rwanda",
+      "burundi",
       "papua-new-guinea",
       "oro-grano",
+      "mexico",
+      "colombia-supremo",
     ],
   },
   {
@@ -94,7 +123,7 @@ const COLLECTIONS: CollectionSeed[] = [
     name: "Для эспрессо",
     emoji: "⚡",
     description: "Бленды и моносорта с плотным телом и устойчивой крема — созданы для эспрессо-машины и мокки.",
-    sortOrder: 4,
+    sortOrder: 5,
     productSlugs: [
       "blend-espresso",
       "blend-crema",
@@ -107,12 +136,36 @@ const COLLECTIONS: CollectionSeed[] = [
     ],
   },
   {
+    slug: "dlya-znatokov",
+    name: "Для знатоков",
+    emoji: "✨",
+    description: "Сложные многогранные профили, редкие регионы и необычные ноты — кофе для тех, кто уже определился со вкусом.",
+    sortOrder: 6,
+    productSlugs: [
+      "ethiopia-yirgacheffe-gr-1",
+      "kenya-aaab",
+      "rwanda",
+      "burundi",
+      "costa-rica",
+      "indonesia",
+      "robusta-india-cherry-aa",
+    ],
+  },
+  {
     slug: "bez-kofeina",
     name: "Без кофеина",
     emoji: "🌙",
     description: "Кофе с извлечённым кофеином — вкус и аромат сохранены, можно пить вечером.",
-    sortOrder: 5,
+    sortOrder: 7,
     productSlugs: ["brazilia-decaf"],
+  },
+  {
+    slug: "alt-formaty",
+    name: "Альтернативные форматы",
+    emoji: "📦",
+    description: "Готовый кофе в удобных форматах — для офиса, путешествий и тех случаев, когда нет кофеварки.",
+    sortOrder: 8,
+    productSlugs: ["drip-pakety-v-assortimente"],
   },
 ]
 
@@ -169,6 +222,23 @@ async function main() {
     }
 
     console.log(`  ✓ ${c.emoji} ${c.name} — ${products.length} products`)
+  }
+
+  // Sanity check: every active coffee must be in ≥1 collection. The catalog's
+  // default view hides the flat grid, so unclassified coffees become invisible.
+  const orphans = await prisma.product.findMany({
+    where: {
+      isActive: true,
+      productType: "coffee",
+      collections: { none: {} },
+    },
+    select: { slug: true, name: true },
+  })
+  if (orphans.length > 0) {
+    console.warn(
+      `\n⚠ ${orphans.length} coffee product(s) not assigned to any collection — they will not appear on /catalog:`
+    )
+    for (const o of orphans) console.warn(`    - ${o.name} (${o.slug})`)
   }
 
   console.log("Done.")

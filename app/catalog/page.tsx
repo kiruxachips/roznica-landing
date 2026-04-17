@@ -72,14 +72,20 @@ export default async function CatalogPage({
   const session = await auth()
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
-  const [{ products, total }, filterOptions, favIds, collections] = await Promise.all([
-    getProducts(filters),
+  // When showing collections we render the curated sections only — skip the
+  // flat product grid fetch entirely so the default coffee view doesn't
+  // double-render every product.
+  const [gridResult, filterOptions, favIds, collections] = await Promise.all([
+    showCollections
+      ? Promise.resolve({ products: [], total: 0 })
+      : getProducts(filters),
     getFilterOptions(productType),
     isCustomer && session?.user?.id
       ? getFavoriteProductIds(session.user.id)
       : Promise.resolve([]),
     showCollections ? getCollectionsWithProducts() : Promise.resolve([]),
   ])
+  const { products, total } = gridResult
 
   const favoriteIds = isCustomer ? favIds : undefined
   const favoriteSet = favoriteIds ? new Set(favoriteIds) : undefined
@@ -88,7 +94,11 @@ export default async function CatalogPage({
   const heading = params.q
     ? `Результаты поиска: «${params.q}»`
     : productType ? (TYPE_TITLES[productType] ?? "Каталог") : "Каталог"
-  const countLabel = total === 1 ? "1 товар" : total < 5 ? `${total} товара` : `${total} товаров`
+  // Count label makes sense only when the flat grid is on screen — when
+  // collections are showcased instead, each section has its own count.
+  const countLabel = showCollections
+    ? null
+    : total === 1 ? "1 товар" : total < 5 ? `${total} товара` : `${total} товаров`
 
   return (
     <>
@@ -98,35 +108,10 @@ export default async function CatalogPage({
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-3 sm:mb-4 flex items-baseline gap-3">
               <h1 className="font-serif text-xl sm:text-2xl font-bold">{heading}</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground">{countLabel}</p>
+              {countLabel && (
+                <p className="text-xs sm:text-sm text-muted-foreground">{countLabel}</p>
+              )}
             </div>
-
-            {/* Collection showcase sections — only for coffee tab when no filters active */}
-            {showCollections && collections.length > 0 && (
-              <div className="mb-10">
-                {collections.map((c) => (
-                  <CollectionSection
-                    key={c.id}
-                    name={c.name}
-                    slug={c.slug}
-                    emoji={c.emoji}
-                    products={c.products}
-                    favoritedIds={favoriteSet}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Active collection filter label */}
-            {params.collection && (
-              <div className="mb-4 flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Подборка:</span>
-                <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                  {params.collection}
-                </span>
-                <Link href={productType ? `/catalog?type=${productType}` : "/catalog"} className="text-xs text-muted-foreground hover:text-foreground">Сбросить</Link>
-              </div>
-            )}
 
             <FilterBar
               filterOptions={filterOptions}
@@ -140,7 +125,37 @@ export default async function CatalogPage({
               activeSearch={params.q}
             />
 
-            {products.length > 0 ? (
+            {/* Active collection filter label */}
+            {params.collection && (
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Подборка:</span>
+                <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium">
+                  {params.collection}
+                </span>
+                <Link href={productType ? `/catalog?type=${productType}` : "/catalog"} className="text-xs text-muted-foreground hover:text-foreground">Сбросить</Link>
+              </div>
+            )}
+
+            {showCollections ? (
+              // Default coffee view: curated collection carousels only, no
+              // flat grid below (would duplicate every product).
+              collections.length > 0 ? (
+                <div className="mt-2">
+                  {collections.map((c) => (
+                    <CollectionSection
+                      key={c.id}
+                      name={c.name}
+                      slug={c.slug}
+                      emoji={c.emoji}
+                      products={c.products}
+                      favoritedIds={favoriteSet}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState />
+              )
+            ) : products.length > 0 ? (
               <ProductGrid
                 key={`${productType ?? "all"}|${params.q ?? ""}|${params.roast ?? ""}|${params.origin ?? ""}|${params.brewing ?? ""}|${params.teaType ?? ""}|${params.form ?? ""}|${params.collection ?? ""}|${params.sort ?? ""}`}
                 products={products}

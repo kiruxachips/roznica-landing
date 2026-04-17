@@ -47,7 +47,7 @@ export async function getCollectionsWithProducts(): Promise<
       emoji: true,
       products: {
         orderBy: { sortOrder: "asc" },
-        take: 10,
+        take: 20,
         select: {
           product: {
             select: {
