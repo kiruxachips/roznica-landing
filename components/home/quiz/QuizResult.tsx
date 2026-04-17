@@ -7,8 +7,8 @@ import type { ProductCard as ProductCardType } from "@/lib/types"
 
 interface Match {
   productId: string
-  score: number
   percent: number
+  reasons: string[]
 }
 
 interface QuizResultProps {
@@ -73,9 +73,9 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6 mb-8">
         {products.map((product, idx) => {
           const m = matchMap.get(product.id)
-          const percent = m?.percent ?? 0
           const tier = TIERS[Math.min(idx, TIERS.length - 1)]
           const Icon = tier.icon
+          const reasons = m?.reasons ?? []
           return (
             <div key={product.id} className="relative">
               {/* Tier pill above the card */}
@@ -84,8 +84,12 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
               >
                 <Icon className="w-3.5 h-3.5" strokeWidth={2} />
                 {tier.label}
-                <span className="opacity-70 ml-1">· {percent}%</span>
               </div>
+              {reasons.length > 0 && (
+                <p className="mb-2 text-[11px] sm:text-xs text-muted-foreground leading-snug">
+                  Почему: {reasons.join(" · ")}
+                </p>
+              )}
               <div className={`rounded-xl ${tier.ring} transition-shadow`}>
                 <ProductCard product={product} />
               </div>

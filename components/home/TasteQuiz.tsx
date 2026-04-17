@@ -13,8 +13,8 @@ type QuizPhase = "intro" | "questions" | "loading" | "result"
 
 interface Match {
   productId: string
-  score: number
   percent: number
+  reasons: string[]
 }
 
 export function TasteQuiz() {

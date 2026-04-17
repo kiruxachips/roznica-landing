@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import {
   scoreProducts,
   pickTopMatches,
+  reasonsForMatch,
   type ScorableProduct,
 } from "@/components/home/quiz/scoring"
 import type { Answers } from "@/components/home/quiz/questions"
@@ -12,11 +13,11 @@ export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 const ALLOWED_ANSWERS: Record<keyof Answers, Set<string>> = {
-  brewing: new Set(["espresso", "filter", "turka", "french-press", "moka", "aeropress", "any"]),
-  flavor: new Set(["sweet", "fruity", "nutty", "any"]),
-  strength: new Set(["light", "medium", "strong"]),
+  milk: new Set(["milk", "black", "both"]),
+  flavor: new Set(["chocolate", "balanced", "fruity", "any"]),
   acidity: new Set(["low", "mid", "high"]),
-  budget: new Set(["low", "mid", "high", "any"]),
+  brewing: new Set(["espresso", "turka", "filter", "french-press", "any"]),
+  experience: new Set(["beginner", "regular", "enthusiast"]),
 }
 
 function sanitizeAnswers(raw: unknown): Answers {
@@ -42,11 +43,12 @@ export async function POST(request: Request) {
   const body = sanitizeAnswers(raw)
 
   const products = await prisma.product.findMany({
-    where: { isActive: true },
+    where: { isActive: true, productType: "coffee" },
     include: {
       images: { where: { isPrimary: true }, take: 1 },
       variants: { where: { isActive: true }, orderBy: { price: "asc" } },
       reviews: { where: { isVisible: true }, select: { rating: true } },
+      collections: { select: { collection: { select: { slug: true } } } },
     },
   })
 
@@ -54,18 +56,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ products: [], matches: [] })
   }
 
-  const scorable: ScorableProduct[] = products.map((p) => ({
-    id: p.id,
-    flavorNotes: p.flavorNotes,
-    acidity: p.acidity,
-    sweetness: p.sweetness,
-    bitterness: p.bitterness,
-    body: p.body,
-    roastLevel: p.roastLevel,
-    brewingMethods: p.brewingMethods,
-    minPrice: p.variants[0]?.price ?? null,
-    variants: p.variants.map((v) => ({ weight: v.weight, price: v.price })),
-  }))
+  const scorable: ScorableProduct[] = products.map((p) => {
+    const reviewCount = p.reviews.length
+    const averageRating =
+      reviewCount > 0
+        ? Math.round((p.reviews.reduce((s, r) => s + r.rating, 0) / reviewCount) * 10) / 10
+        : null
+    return {
+      id: p.id,
+      collectionSlugs: p.collections.map((ci) => ci.collection.slug),
+      brewingMethods: p.brewingMethods,
+      reviewCount,
+      averageRating,
+    }
+  })
 
   const scored = scoreProducts(scorable, body)
   const picks = pickTopMatches(scored, 3)
@@ -118,8 +122,8 @@ export async function POST(request: Request) {
     const s = matchMap.get(p.id)
     return {
       productId: p.id,
-      score: s?.raw ?? 0,
       percent: s?.percent ?? 50,
+      reasons: s ? reasonsForMatch(s.matchedCollections) : [],
     }
   })
 

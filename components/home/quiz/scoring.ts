@@ -1,197 +1,229 @@
 import type { Answers } from "./questions"
 
-export interface ScorableVariant {
-  weight: string
-  price: number
-}
-
 export interface ScorableProduct {
   id: string
-  flavorNotes: string[]
-  acidity: number | null
-  sweetness: number | null
-  bitterness: number | null
-  body: number | null
-  roastLevel: string | null
+  // Slugs of ProductCollection rows this product belongs to. This is the
+  // primary scoring signal — curated collections are a much cleaner grouping
+  // than ad-hoc flavour-keyword matching.
+  collectionSlugs: string[]
   brewingMethods: string[]
-  minPrice: number | null
-  variants: ScorableVariant[]
+  reviewCount: number
+  averageRating: number | null
 }
 
-// Flavor keyword buckets (normalized lowercase, stem-ish)
-const FLAVOR_KEYWORDS: Record<string, string[]> = {
-  sweet: ["шокол", "карам", "ванил", "мёд", "мед", "ирис", "тоффи", "пралине"],
-  fruity: [
-    "ягод", "смород", "клубни", "малин", "вишн", "слив", "черносл",
-    "цитрус", "лимон", "апельс", "грейпф",
-    "яблок", "абрик", "персик", "манго", "тропич", "цвет", "жасмин", "бергамот", "чай",
-  ],
-  nutty: ["орех", "фундук", "миндал", "арахис", "какао", "хлеб", "солод", "сухофрукт", "изюм", "табак"],
-}
+// Collection slugs used by the scorer. Mirrors prisma/seed-collections.ts.
+// Kept as literal types so a typo here would fail typecheck.
+type Slug =
+  | "s-molokom"
+  | "klassika"
+  | "shokoladno-orehovyy"
+  | "s-kislinkoy"
+  | "dlya-espresso"
+  | "dlya-znatokov"
+  | "bez-kofeina"
+  | "alt-formaty"
 
-function findFlavorHits(target: string, notes: string[]): number {
-  const keywords = FLAVOR_KEYWORDS[target] ?? []
-  const normalized = notes.map((n) => n.toLowerCase())
-  let hits = 0
-  for (const note of normalized) {
-    if (keywords.some((kw) => note.includes(kw))) hits++
+type CollectionWeights = Partial<Record<Slug, number>>
+
+// Mapping from quiz answer to a per-collection weight delta. Positive numbers
+// pull a product toward the match, negatives push it away. All axes compose
+// additively, so overlaps (e.g. "С молоком" + "Шоколадный вкус") naturally
+// amplify collections that satisfy both (shokoladno-orehovyy here).
+function collectionWeights(answers: Answers): CollectionWeights {
+  const w: CollectionWeights = {}
+  const add = (slug: Slug, n: number) => {
+    w[slug] = (w[slug] ?? 0) + n
   }
-  return hits
-}
 
-// Convert any variant to price per 250g to normalize across different pack sizes.
-function pricePer250g(variants: ScorableVariant[]): number | null {
-  if (variants.length === 0) return null
-  const best = variants
-    .map((v) => {
-      const m = v.weight.match(/(\d+)\s*(г|гр|g|кг|kg)?/i)
-      if (!m) return null
-      let grams = Number(m[1])
-      const unit = (m[2] || "").toLowerCase()
-      if (unit.startsWith("к")) grams *= 1000
-      if (grams === 0) return null
-      return (v.price / grams) * 250
-    })
-    .filter((x): x is number => x !== null)
-  if (best.length === 0) return null
-  return Math.round(Math.min(...best))
-}
-
-interface AxisResult {
-  got: number
-  max: number
-}
-
-function brewingAxis(target: string | undefined, methods: string[]): AxisResult {
-  if (!target || target === "any") return { got: 0, max: 0 }
-  if (methods.includes(target)) return { got: 30, max: 30 }
-  if (methods.length === 0) return { got: 15, max: 30 } // universal fallback
-  return { got: 0, max: 30 }
-}
-
-function flavorAxis(target: string | undefined, notes: string[]): AxisResult {
-  if (!target || target === "any") return { got: 0, max: 0 }
-  const hits = findFlavorHits(target, notes)
-  if (hits >= 2) return { got: 25, max: 25 }
-  if (hits === 1) return { got: 17, max: 25 }
-  return { got: 3, max: 25 }
-}
-
-function strengthAxis(
-  target: string | undefined,
-  roast: string | null,
-  body: number | null
-): AxisResult {
-  if (!target) return { got: 0, max: 0 }
-  const r = (roast ?? "").toLowerCase()
-  const b = body ?? 50
-
-  if (target === "light") {
-    if (r.includes("светл")) return { got: 15, max: 15 }
-    if (r.includes("сред") && !r.includes("тёмн") && !r.includes("темн")) return { got: 8, max: 15 }
-    if (r.includes("тёмн") || r.includes("темн")) return { got: 0, max: 15 }
-    return { got: 7, max: 15 }
+  // Q1: milk preference — the highest-weight signal because it drives the
+  // biggest split in coffee choice (milk kills bright acidity; black reveals it).
+  if (answers.milk === "milk") {
+    add("s-molokom", 35)
+    add("dlya-espresso", 15)
+    add("shokoladno-orehovyy", 10)
+    add("s-kislinkoy", -25)
+  } else if (answers.milk === "black") {
+    add("s-kislinkoy", 15)
+    add("klassika", 10)
+    add("dlya-znatokov", 10)
+    add("shokoladno-orehovyy", 5)
+    add("s-molokom", -10)
   }
-  if (target === "medium") {
-    if (r === "средняя" || (r.includes("сред") && !r.includes("тёмн") && !r.includes("темн"))) {
-      return { got: 15, max: 15 }
-    }
-    if (r.includes("тёмн") || r.includes("темн")) return { got: 8, max: 15 }
-    if (r.includes("светл")) return { got: 9, max: 15 }
-    return { got: 10, max: 15 }
+  // "both" → no bias, let the other axes decide
+
+  // Q2: flavour profile
+  if (answers.flavor === "chocolate") {
+    add("shokoladno-orehovyy", 30)
+    add("klassika", 10)
+    add("s-kislinkoy", -15)
+  } else if (answers.flavor === "balanced") {
+    add("klassika", 30)
+    add("shokoladno-orehovyy", 10)
+    add("s-molokom", 10)
+  } else if (answers.flavor === "fruity") {
+    add("s-kislinkoy", 30)
+    add("dlya-znatokov", 15)
+    add("s-molokom", -10)
+    add("shokoladno-orehovyy", -10)
   }
-  // strong
-  if (r.includes("тёмн") || r.includes("темн")) return { got: 15, max: 15 }
-  if (r.includes("сред") && b >= 55) return { got: 10, max: 15 }
-  if (r.includes("светл")) return { got: 0, max: 15 }
-  return { got: 7, max: 15 }
+  // "any" → no bias
+
+  // Q3: acidity — refines flavour choice
+  if (answers.acidity === "low") {
+    add("s-molokom", 10)
+    add("shokoladno-orehovyy", 10)
+    add("klassika", 5)
+    add("s-kislinkoy", -25)
+    add("dlya-znatokov", -10)
+  } else if (answers.acidity === "high") {
+    add("s-kislinkoy", 25)
+    add("dlya-znatokov", 15)
+    add("s-molokom", -15)
+    add("shokoladno-orehovyy", -10)
+  } else if (answers.acidity === "mid") {
+    add("klassika", 15)
+    add("s-molokom", 5)
+    add("shokoladno-orehovyy", 5)
+  }
+
+  // Q4: brewing method — nudges toward expected collections. The actual
+  // method-array match gets a secondary boost below; this is the collection
+  // correlation signal only.
+  if (answers.brewing === "espresso") {
+    add("dlya-espresso", 25)
+    add("s-molokom", 5)
+    add("shokoladno-orehovyy", 5)
+  } else if (answers.brewing === "filter") {
+    // Filter/pour-over tends to reward clean, acidic cups.
+    add("s-kislinkoy", 15)
+    add("dlya-znatokov", 10)
+    add("klassika", 5)
+  }
+  // turka, french-press, any → all coffees are fine, no collection bias
+
+  // Q5: experience level
+  if (answers.experience === "beginner") {
+    add("klassika", 20)
+    add("s-molokom", 10)
+    add("shokoladno-orehovyy", 10)
+    add("dlya-znatokov", -15) // steer away from complex profiles
+  } else if (answers.experience === "enthusiast") {
+    add("dlya-znatokov", 25)
+    add("s-kislinkoy", 10)
+    add("klassika", -5) // too vanilla for this user
+  }
+  // "regular" → no bias
+
+  return w
 }
 
-function acidityAxis(target: string | undefined, acidity: number | null, notes: string[]): AxisResult {
-  if (!target) return { got: 0, max: 0 }
-
-  // Proxy: if no numeric acidity metadata, infer from flavor notes.
-  const hasFruity = findFlavorHits("fruity", notes) > 0
-  const hasSweet = findFlavorHits("sweet", notes) > 0
-  const inferred = acidity ?? (hasFruity ? 70 : hasSweet ? 35 : 50)
-
-  if (target === "low") {
-    if (inferred <= 35) return { got: 15, max: 15 }
-    if (inferred <= 55) return { got: 9, max: 15 }
-    return { got: 0, max: 15 }
+// Brewing-method exact match, with soft neighbours for similar methods.
+// E.g. a filter-loving user is also happy with aeropress.
+function brewingBoost(userMethod: string | undefined, productMethods: string[]): number {
+  if (!userMethod || userMethod === "any") return 0
+  if (productMethods.includes(userMethod)) return 15
+  const neighbours: Record<string, string[]> = {
+    filter: ["aeropress"],
+    aeropress: ["filter"],
+    "french-press": ["moka"],
+    moka: ["french-press"],
+    espresso: ["moka"],
   }
-  if (target === "mid") {
-    if (inferred >= 35 && inferred <= 65) return { got: 15, max: 15 }
-    return { got: 8, max: 15 }
-  }
-  // high
-  if (inferred >= 65) return { got: 15, max: 15 }
-  if (inferred >= 50) return { got: 9, max: 15 }
-  return { got: 0, max: 15 }
-}
-
-function priceAxis(target: string | undefined, per250g: number | null): AxisResult {
-  if (!target || target === "any") return { got: 0, max: 0 }
-  if (per250g === null) return { got: 7, max: 15 }
-
-  if (target === "low") {
-    if (per250g <= 500) return { got: 15, max: 15 }
-    if (per250g <= 600) return { got: 8, max: 15 }
-    return { got: 0, max: 15 }
-  }
-  if (target === "mid") {
-    if (per250g >= 500 && per250g <= 650) return { got: 15, max: 15 }
-    if (per250g <= 750) return { got: 9, max: 15 }
-    return { got: 3, max: 15 }
-  }
-  // high
-  if (per250g >= 650) return { got: 15, max: 15 }
-  if (per250g >= 580) return { got: 9, max: 15 }
-  return { got: 3, max: 15 }
+  const alt = neighbours[userMethod] ?? []
+  if (alt.some((m) => productMethods.includes(m))) return 8
+  return 0
 }
 
 export interface ScoredProduct {
   productId: string
-  percent: number  // 0-100, relative to user's selected criteria
-  raw: number
-  maxPossible: number
+  score: number
+  percent: number // 0-100 confidence, bounded by answer weights
+  matchedCollections: string[] // collection slugs that positively contributed
 }
 
 export function scoreProducts(
   products: ScorableProduct[],
   answers: Answers
 ): ScoredProduct[] {
+  const weights = collectionWeights(answers)
+  // The theoretical maximum score for this answer set — used to normalise
+  // a "confidence" percent that users see. Only positive weights count.
+  const maxPositive = Object.values(weights).reduce<number>(
+    (s, v) => s + (v && v > 0 ? v : 0),
+    0
+  )
+  const maxBrewing = answers.brewing && answers.brewing !== "any" ? 15 : 0
+  const maxSocial = 15 // reviewCount/rating ceiling below
+  const maxPossible = Math.max(1, maxPositive + maxBrewing + maxSocial)
+
   return products
     .map((p) => {
-      const axes = [
-        brewingAxis(answers.brewing, p.brewingMethods),
-        flavorAxis(answers.flavor, p.flavorNotes),
-        strengthAxis(answers.strength, p.roastLevel, p.body),
-        acidityAxis(answers.acidity, p.acidity, p.flavorNotes),
-        priceAxis(answers.budget, pricePer250g(p.variants)),
-      ]
-      const raw = axes.reduce((s, a) => s + a.got, 0)
-      const maxPossible = axes.reduce((s, a) => s + a.max, 0)
-      const percent =
-        maxPossible > 0 ? Math.round((raw / maxPossible) * 100) : 50
-      return { productId: p.id, percent, raw, maxPossible }
+      // Hard excludes: decaf and alternative formats (drip packets) aren't
+      // what users come here to be "matched" with — they pick those on purpose.
+      if (p.collectionSlugs.includes("bez-kofeina")) {
+        return { productId: p.id, score: -Infinity, percent: 0, matchedCollections: [] }
+      }
+      if (p.collectionSlugs.includes("alt-formaty")) {
+        return { productId: p.id, score: -Infinity, percent: 0, matchedCollections: [] }
+      }
+
+      let score = 0
+      const matched: string[] = []
+      for (const c of p.collectionSlugs) {
+        const delta = weights[c as Slug]
+        if (delta !== undefined) {
+          score += delta
+          if (delta > 0) matched.push(c)
+        }
+      }
+
+      // Secondary: brewing method actually works
+      score += brewingBoost(answers.brewing, p.brewingMethods)
+
+      // Tertiary: social proof — popular well-rated coffees tiebreak.
+      // Capped small so it can't flip a bad match into a "perfect" one.
+      const socialBoost =
+        Math.min(p.reviewCount, 20) * 0.4 +
+        (p.averageRating !== null ? Math.max(0, (p.averageRating - 4.2) * 6) : 0)
+      score += Math.min(socialBoost, 15)
+
+      const percent = Math.max(
+        0,
+        Math.min(100, Math.round((score / maxPossible) * 100))
+      )
+      return { productId: p.id, score, percent, matchedCollections: matched }
     })
-    .sort((a, b) => b.raw - a.raw)
+    .sort((a, b) => b.score - a.score)
 }
 
 /**
- * Returns top N products with a minimum percent threshold, backfilling with
- * highest-raw-score remainder if too few clear the bar.
+ * Picks top N matches. No hard percent threshold — even a mediocre fit is
+ * better than nothing, and we tier-label the UI by rank instead.
  */
-export function pickTopMatches(
-  scored: ScoredProduct[],
-  limit = 3,
-  minPercent = 45
-): ScoredProduct[] {
-  const primary = scored.filter((s) => s.percent >= minPercent).slice(0, limit)
-  if (primary.length >= limit) return primary
-  const extras = scored
-    .filter((s) => s.percent < minPercent)
-    .slice(0, limit - primary.length)
-  return [...primary, ...extras]
+export function pickTopMatches(scored: ScoredProduct[], limit = 3): ScoredProduct[] {
+  return scored.filter((s) => s.score > -Infinity).slice(0, limit)
+}
+
+// Human-readable reasons the scorer liked a product, based on which
+// collections matched. Shown in QuizResult so users understand the pick.
+const COLLECTION_REASON: Record<string, string> = {
+  "s-molokom": "раскроется в латте и капучино",
+  "klassika": "надёжная классика",
+  "shokoladno-orehovyy": "шоколадно-ореховый профиль",
+  "s-kislinkoy": "яркий фруктовый вкус",
+  "dlya-espresso": "создан для эспрессо",
+  "dlya-znatokov": "сложный многогранный профиль",
+}
+
+export function reasonsForMatch(matchedCollections: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const c of matchedCollections) {
+    const r = COLLECTION_REASON[c]
+    if (r && !seen.has(r)) {
+      seen.add(r)
+      out.push(r)
+    }
+  }
+  return out.slice(0, 2) // two reasons max — cards stay compact
 }
