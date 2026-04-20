@@ -95,17 +95,47 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Enrich with photo from legacy VK API
+  // Also call VK ID user_info endpoint as a second source (sometimes id_token is minimal)
+  try {
+    const uiRes = await fetch("https://id.vk.ru/oauth2/user_info", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        access_token: tokens.access_token,
+      }).toString(),
+    })
+    const uiData = await uiRes.json()
+    const u = uiData.user ?? {}
+    if (u.first_name && !userInfo.first_name) userInfo.first_name = u.first_name
+    if (u.last_name && !userInfo.last_name) userInfo.last_name = u.last_name
+    if (u.email && !userInfo.email) userInfo.email = u.email
+    if (u.phone && !userInfo.phone) userInfo.phone = u.phone
+    if (u.avatar && !userInfo.avatar) userInfo.avatar = u.avatar
+  } catch {
+    // Non-fatal
+  }
+
+  // Enrich with photo from legacy VK API as final fallback for photo_200
   try {
     const apiRes = await fetch(
       `https://api.vk.com/method/users.get?fields=photo_200&access_token=${encodeURIComponent(tokens.access_token)}&v=5.199`
     )
     const apiData = await apiRes.json()
     const apiUser = apiData.response?.[0]
-    if (apiUser?.photo_200) userInfo.avatar = apiUser.photo_200
+    if (apiUser?.photo_200 && !userInfo.avatar) userInfo.avatar = apiUser.photo_200
   } catch {
     // Non-fatal; continue without photo
   }
+
+  console.log("VK callback userInfo:", {
+    sub: userInfo.sub,
+    hasFirstName: Boolean(userInfo.first_name),
+    hasLastName: Boolean(userInfo.last_name),
+    hasEmail: Boolean(userInfo.email),
+    hasPhone: Boolean(userInfo.phone),
+    hasAvatar: Boolean(userInfo.avatar),
+  })
 
   const vkUserId = String(userInfo.sub ?? tokens.user_id ?? "")
   if (!vkUserId) return fail("no_user_id")
@@ -150,23 +180,25 @@ export async function GET(request: NextRequest) {
         },
       },
     })
-  } else if (!existingAccount) {
-    // Link VK account to existing user (matched by email)
-    await prisma.account.create({
-      data: {
-        userId: user.id,
-        provider: "vk",
-        providerAccountId: vkUserId,
-        type: "oauth",
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token ?? null,
-        expires_at: tokens.expires_in ? Math.floor(Date.now() / 1000) + tokens.expires_in : null,
-        token_type: tokens.token_type ?? null,
-        scope: tokens.scope ?? null,
-        id_token: tokens.id_token ?? null,
-      },
-    })
-    // Backfill missing fields from VK data (don't overwrite user-provided values)
+  } else {
+    // Link VK account if not already linked (user matched by email)
+    if (!existingAccount) {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          provider: "vk",
+          providerAccountId: vkUserId,
+          type: "oauth",
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token ?? null,
+          expires_at: tokens.expires_in ? Math.floor(Date.now() / 1000) + tokens.expires_in : null,
+          token_type: tokens.token_type ?? null,
+          scope: tokens.scope ?? null,
+          id_token: tokens.id_token ?? null,
+        },
+      })
+    }
+    // Backfill: always try to fill in missing profile fields from VK on every sign-in
     const updates: Record<string, string | Date> = {}
     if (!user.name && fullName) updates.name = fullName
     if (!user.phone && phoneFromVk) updates.phone = phoneFromVk
