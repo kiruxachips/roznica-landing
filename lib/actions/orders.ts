@@ -2,6 +2,7 @@
 
 import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
+import { updateTasteProfile } from "@/lib/dal/taste-profile"
 import type { OrderData } from "@/lib/types"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
@@ -56,6 +57,14 @@ export async function createOrder(data: OrderData) {
 
   const order = await createOrderDAL(data)
   revalidatePath("/admin/orders")
+
+  // Update user taste profile non-blocking — enriches future recommendations
+  if (data.userId) {
+    const productIds = data.items.map((i) => i.productId)
+    updateTasteProfile(data.userId, productIds, order.total).catch((e) =>
+      console.error("Failed to update taste profile:", e)
+    )
+  }
 
   // Build email data with full order details
   const emailData: OrderEmailData = {

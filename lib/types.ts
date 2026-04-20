@@ -191,3 +191,31 @@ export interface ArticleFilters {
   page?: number
   limit?: number
 }
+
+export interface TasteProfile {
+  flavorNotes: Record<string, number>   // e.g. "Шоколад": 5, "Карамель": 3
+  origins: Record<string, number>       // e.g. "Эфиопия": 2
+  roastLevels: Record<string, number>   // e.g. "Средняя": 4
+  productTypes: Record<string, number>  // e.g. "coffee": 6, "tea": 1
+  avgOrderValue: number
+  totalOrders: number
+  purchasedProductIds: string[]
+  updatedAt: string
+}
+
+export interface RecommendedProduct {
+  id: string
+  name: string
+  slug: string
+  primaryImage: string | null
+  primaryImageAlt: string | null
+  productType: ProductType
+  recommendedVariant: {
+    id: string
+    weight: string
+    price: number
+    stock: number
+  }
+  score: number
+  reason: "milestone" | "affinity" | "popular" | "cross-sell"
+}

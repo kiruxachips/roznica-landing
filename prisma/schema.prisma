@@ -130,6 +130,7 @@ model User {
   notifyPromotions   Boolean   @default(false)
   notifyNewProducts  Boolean   @default(false)
   bonusBalance       Int       @default(0)
+  tasteProfile       Json?             // aggregated taste profile, updated on each order
   accounts           Account[]
   orders             Order[]
   sessions           Session[]
