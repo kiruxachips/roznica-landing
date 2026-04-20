@@ -17,6 +17,10 @@ import { buildStockPayload } from "@/lib/integrations/millorbot/payload"
 export async function notifyStockChange(result: StockAdjustResult): Promise<void> {
   if (!result.becameDepleted && !result.crossedLowThreshold) return
 
+  // Kill-switch: пока бот не готов принимать stock-события, не пишем в outbox.
+  // Сам stock adjust + StockHistory работают независимо — просто не шлём наружу.
+  if (process.env.STOCK_ALERTS_ENABLED !== "true") return
+
   try {
     // Подтягиваем карточку варианта для payload (единожды, даже если оба события)
     const variant = await prisma.productVariant.findUnique({
