@@ -123,6 +123,8 @@ export async function GET(request: NextRequest) {
   }
 
   const fullName = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(" ").trim() || null
+  // VK ID may return phone as "+7XXXXXXXXXX" — normalize minimal (strip spaces)
+  const phoneFromVk = userInfo.phone ? userInfo.phone.replace(/\s/g, "") : null
 
   if (!user) {
     user = await prisma.user.create({
@@ -130,7 +132,9 @@ export async function GET(request: NextRequest) {
         email: emailLower ?? null,
         emailVerified: emailLower ? new Date() : null,
         name: fullName,
+        phone: phoneFromVk,
         avatarUrl: userInfo.avatar ?? null,
+        image: userInfo.avatar ?? null,
         accounts: {
           create: {
             provider: "vk",
@@ -162,8 +166,18 @@ export async function GET(request: NextRequest) {
         id_token: tokens.id_token ?? null,
       },
     })
-    if (!user.avatarUrl && userInfo.avatar) {
-      await prisma.user.update({ where: { id: user.id }, data: { avatarUrl: userInfo.avatar } })
+    // Backfill missing fields from VK data (don't overwrite user-provided values)
+    const updates: Record<string, string | Date> = {}
+    if (!user.name && fullName) updates.name = fullName
+    if (!user.phone && phoneFromVk) updates.phone = phoneFromVk
+    if (!user.avatarUrl && userInfo.avatar) updates.avatarUrl = userInfo.avatar
+    if (!user.image && userInfo.avatar) updates.image = userInfo.avatar
+    if (!user.email && emailLower) {
+      updates.email = emailLower
+      updates.emailVerified = new Date()
+    }
+    if (Object.keys(updates).length > 0) {
+      user = await prisma.user.update({ where: { id: user.id }, data: updates })
     }
   }
 

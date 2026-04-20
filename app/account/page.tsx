@@ -1,14 +1,14 @@
 import { Metadata } from "next"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ShoppingBag, User, Heart, MapPin, Gift, Bell } from "lucide-react"
+import { ShoppingBag, User, Heart, MapPin, Bell } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getUserById } from "@/lib/dal/users"
 import { getOrdersByUserId } from "@/lib/dal/orders"
 import { getFavoritesCount } from "@/lib/dal/favorites"
 import { getAddressCount } from "@/lib/dal/addresses"
-import { getBonusBalance } from "@/lib/dal/bonuses"
 import { OrderCard } from "@/components/account/OrderCard"
+import { ProfileCompletionBanner } from "@/components/account/ProfileCompletionBanner"
 
 export const dynamic = "force-dynamic"
 
@@ -20,12 +20,11 @@ export default async function AccountPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/auth/login")
 
-  const [user, ordersData, favCount, addressCount, bonusBalance] = await Promise.all([
+  const [user, ordersData, favCount, addressCount] = await Promise.all([
     getUserById(session.user.id),
     getOrdersByUserId(session.user.id, { limit: 3 }),
     getFavoritesCount(session.user.id),
     getAddressCount(session.user.id),
-    getBonusBalance(session.user.id),
   ])
 
   if (!user) redirect("/auth/login")
@@ -42,6 +41,12 @@ export default async function AccountPage() {
             : "Добро пожаловать в ваш аккаунт"}
         </p>
       </div>
+
+      <ProfileCompletionBanner
+        hasEmail={Boolean(user.email)}
+        hasPhone={Boolean(user.phone)}
+        hasName={Boolean(user.name)}
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <Link
@@ -90,18 +95,6 @@ export default async function AccountPage() {
           <div>
             <p className="font-medium text-sm">Адреса</p>
             <p className="text-xs text-muted-foreground">{addressCount} адресов</p>
-          </div>
-        </Link>
-        <Link
-          href="/account/bonuses"
-          className="bg-white rounded-2xl shadow-sm p-5 hover:shadow-md transition-shadow flex items-center gap-4"
-        >
-          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-            <Gift className="w-5 h-5 text-amber-500" />
-          </div>
-          <div>
-            <p className="font-medium text-sm">Бонусы</p>
-            <p className="text-xs text-muted-foreground">{bonusBalance}₽</p>
           </div>
         </Link>
         <Link

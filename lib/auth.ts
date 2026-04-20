@@ -117,7 +117,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     // /api/auth/vk/start и /api/auth/callback/vk (см. app/api/auth/vk/*).
   ],
   callbacks: {
-    async signIn() {
+    async signIn({ user, account }) {
+      // PrismaAdapter fills name/email/image on OAuth sign-in. Sync image → avatarUrl
+      // (our UI reads avatarUrl). Non-blocking: never fail sign-in if DB sync errors.
+      if (account?.type === "oauth" && user?.id && user?.image) {
+        try {
+          const existing = await prisma.user.findUnique({
+            where: { id: user.id },
+            select: { avatarUrl: true },
+          })
+          if (existing && !existing.avatarUrl) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { avatarUrl: user.image },
+            })
+          }
+        } catch (e) {
+          console.error("OAuth avatar sync failed:", e)
+        }
+      }
       return true
     },
     async jwt({ token, user, account }) {

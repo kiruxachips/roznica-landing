@@ -67,6 +67,29 @@ export async function createOrder(data: OrderData) {
     updateTasteProfile(data.userId, productIds, order.total).catch((e) =>
       console.error("Failed to update taste profile:", e)
     )
+
+    // Backfill profile: if user placed an order with phone/email/name and we don't have
+    // those in their profile yet, save them — speeds up future checkouts
+    try {
+      const existing = await prisma.user.findUnique({
+        where: { id: data.userId },
+        select: { name: true, phone: true, email: true },
+      })
+      if (existing) {
+        const updates: Record<string, string | Date> = {}
+        if (!existing.name && data.customerName) updates.name = data.customerName
+        if (!existing.phone && data.customerPhone) updates.phone = data.customerPhone
+        if (!existing.email && data.customerEmail) {
+          updates.email = data.customerEmail.toLowerCase()
+          updates.emailVerified = new Date()
+        }
+        if (Object.keys(updates).length > 0) {
+          await prisma.user.update({ where: { id: data.userId }, data: updates })
+        }
+      }
+    } catch (e) {
+      console.error("Failed to backfill user profile from order:", e)
+    }
   }
 
   // Build email data with full order details

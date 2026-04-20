@@ -8,7 +8,6 @@ import Link from "next/link"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { createOrder } from "@/lib/actions/orders"
-import { BonusSelector } from "./BonusSelector"
 import { CitySearch } from "./CitySearch"
 import { AddressInput } from "./AddressInput"
 import { DeliveryOptions } from "./DeliveryOptions"
@@ -54,7 +53,6 @@ export function CheckoutForm() {
   const [agreed, setAgreed] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
-  const [bonusAmount, setBonusAmount] = useState(0)
   const paymentMethod = "online" as const
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
@@ -81,9 +79,7 @@ export function CheckoutForm() {
   const total = totalPrice()
   const afterDiscount = total - promoDiscount
   const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
-  const maxBonusAmount = Math.floor(afterDiscount * 0.5)
-  const effectiveBonus = Math.min(bonusAmount, maxBonusAmount)
-  const finalTotal = afterDiscount - effectiveBonus + deliveryPrice
+  const finalTotal = afterDiscount + deliveryPrice
 
   if (items.length === 0) {
     return (
@@ -155,7 +151,6 @@ export function CheckoutForm() {
         paymentMethod,
         notes: (form.get("notes") as string) || undefined,
         promoCode: promoCode || undefined,
-        bonusAmount: effectiveBonus > 0 ? effectiveBonus : undefined,
         deliveryType: selectedRate?.deliveryType,
         deliveryPrice,
         pickupPointCode: selectedPickupPoint?.code,
@@ -288,13 +283,6 @@ export function CheckoutForm() {
             </div>
           </div>
 
-          {isCustomer && (
-            <BonusSelector
-              maxBonusAmount={maxBonusAmount}
-              onBonusChange={setBonusAmount}
-            />
-          )}
-
           {deliveryCity && !selectedRate && (
             <p className="text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3">
               Выберите способ доставки, чтобы продолжить оформление
@@ -365,12 +353,6 @@ export function CheckoutForm() {
               <div className="flex justify-between text-green-600">
                 <span>Скидка ({promoCode})</span>
                 <span>-{promoDiscount}₽</span>
-              </div>
-            )}
-            {effectiveBonus > 0 && (
-              <div className="flex justify-between text-amber-600">
-                <span>Бонусы</span>
-                <span>-{effectiveBonus}₽</span>
               </div>
             )}
             <div className="flex justify-between">

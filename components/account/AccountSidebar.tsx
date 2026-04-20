@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { User, ShoppingBag, Heart, MapPin, Gift, Bell, LogOut } from "lucide-react"
+import { User, ShoppingBag, Heart, MapPin, Bell, LogOut } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +11,6 @@ const navItems = [
   { name: "Мои заказы", href: "/account/orders", icon: ShoppingBag },
   { name: "Избранное", href: "/account/favorites", icon: Heart },
   { name: "Адреса", href: "/account/addresses", icon: MapPin },
-  { name: "Бонусы", href: "/account/bonuses", icon: Gift },
   { name: "Уведомления", href: "/account/notifications", icon: Bell },
 ]
 
