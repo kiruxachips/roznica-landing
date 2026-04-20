@@ -61,6 +61,7 @@ export async function getCollectionsWithProducts(): Promise<
               roastLevel: true,
               badge: true,
               flavorNotes: true,
+              smallImage: true,
               isActive: true,
               images: {
                 where: { isPrimary: true },
@@ -111,6 +112,7 @@ export async function getCollectionsWithProducts(): Promise<
             flavorNotes: p.flavorNotes,
             primaryImage: p.images[0]?.url ?? null,
             primaryImageAlt: p.images[0]?.alt ?? null,
+            smallImage: p.smallImage,
             minPrice: p.variants[0]?.price ?? null,
             minOldPrice: p.variants[0]?.oldPrice ?? null,
             firstVariant: p.variants[0]
