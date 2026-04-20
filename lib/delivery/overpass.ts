@@ -36,8 +36,19 @@ interface OverpassNode {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type PochtaOffice = Record<string, any>
+interface PochtaOffice {
+  "postal-code"?: string | number
+  postalCode?: string | number
+  "address-source"?: string
+  addressSource?: string
+  address?: string
+  latitude?: string | number
+  longitude?: string | number
+  "work-time"?: string
+  workTime?: string
+  "phone-list"?: string[]
+  phoneList?: string[]
+}
 
 function buildOsmAddress(tags: OverpassNode["tags"], city: string): string {
   if (!tags) return ""
@@ -137,10 +148,10 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
 
     // Address: prefer Pochta API (always has real address), fall back to OSM tags
     const pochtaAddr = pochtaData
-      ? (pochtaData["address-source"] || pochtaData.addressSource || "").trim()
+      ? (pochtaData["address-source"] || pochtaData.addressSource || "")
       : ""
     const osmAddr = buildOsmAddress(tags, city)
-    const address = pochtaAddr || osmAddr || city
+    const address = String(pochtaAddr || osmAddr || city)
 
     const nameRaw = (tags.name || "").trim()
     const name = ref
@@ -177,7 +188,7 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     if (!code || seen.has(code)) continue
     seen.add(code)
 
-    const address = (o["address-source"] || o.addressSource || o.address || city).trim()
+    const address = String(o["address-source"] || o.addressSource || o.address || city)
     points.push({
       code,
       name: `Почтовое отделение ${code}`,
