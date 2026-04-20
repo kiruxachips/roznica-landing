@@ -1,49 +1,42 @@
 "use client"
 
-import { Children, isValidElement, useState, type ReactElement, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 
-interface PanelProps {
+interface Tab {
   id: string
   label: string
-  children: ReactNode
-}
-
-function Panel(_: PanelProps): null {
-  return null
+  content: ReactNode
 }
 
 interface Props {
-  children: ReactNode
+  tabs: Tab[]
   defaultTab?: string
 }
 
-export function DeliveryPageTabs({ children, defaultTab }: Props) {
-  const panels = Children.toArray(children).filter(
-    (c): c is ReactElement<PanelProps> => isValidElement(c) && c.type === Panel
-  )
-  const [active, setActive] = useState(defaultTab || panels[0]?.props.id || "")
-  const current = panels.find((p) => p.props.id === active) || panels[0]
+export function DeliveryPageTabs({ tabs, defaultTab }: Props) {
+  const [active, setActive] = useState(defaultTab || tabs[0]?.id || "")
+  const current = tabs.find((t) => t.id === active) || tabs[0]
+
+  if (!current) return null
 
   return (
     <div className="space-y-6">
       <div className="flex gap-1 bg-muted p-1 rounded-xl w-fit">
-        {panels.map((p) => (
+        {tabs.map((t) => (
           <button
-            key={p.props.id}
-            onClick={() => setActive(p.props.id)}
+            key={t.id}
+            onClick={() => setActive(t.id)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              active === p.props.id
+              active === t.id
                 ? "bg-white text-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {p.props.label}
+            {t.label}
           </button>
         ))}
       </div>
-      <div>{current?.props.children}</div>
+      <div>{current.content}</div>
     </div>
   )
 }
-
-DeliveryPageTabs.Panel = Panel

@@ -29,30 +29,46 @@ export default async function AdminDeliveryPage() {
   return (
     <div className="max-w-5xl">
       <h1 className="text-2xl font-bold mb-6">Настройки доставки</h1>
-      <DeliveryPageTabs>
-        <DeliveryPageTabs.Panel id="settings" label="Настройки">
-          <DeliverySettingsForm settings={settings} rules={rules} />
-          <div className="mt-8">
-            <DeliveryRulesManager initialRules={deliveryRules} />
-          </div>
-        </DeliveryPageTabs.Panel>
-        <DeliveryPageTabs.Panel id="tester" label="Тестовый расчёт">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
-            <DeliveryCalculatorTester />
-          </div>
-        </DeliveryPageTabs.Panel>
-        <DeliveryPageTabs.Panel id="logs" label="Логи интеграций">
-          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
-            <IntegrationLogViewer
-              initialLogs={logs.map((l) => ({
-                ...l,
-                createdAt: l.createdAt.toISOString(),
-              }))}
-              sources={sources}
-            />
-          </div>
-        </DeliveryPageTabs.Panel>
-      </DeliveryPageTabs>
+      <DeliveryPageTabs
+        tabs={[
+          {
+            id: "settings",
+            label: "Настройки",
+            content: (
+              <>
+                <DeliverySettingsForm settings={settings} rules={rules} />
+                <div className="mt-8">
+                  <DeliveryRulesManager initialRules={deliveryRules} />
+                </div>
+              </>
+            ),
+          },
+          {
+            id: "tester",
+            label: "Тестовый расчёт",
+            content: (
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+                <DeliveryCalculatorTester />
+              </div>
+            ),
+          },
+          {
+            id: "logs",
+            label: "Логи интеграций",
+            content: (
+              <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+                <IntegrationLogViewer
+                  initialLogs={logs.map((l) => ({
+                    ...l,
+                    createdAt: l.createdAt.toISOString(),
+                  }))}
+                  sources={sources}
+                />
+              </div>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }
