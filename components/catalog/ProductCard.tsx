@@ -78,6 +78,7 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
         <div className="relative aspect-[4/5] bg-neutral-50 overflow-hidden">
           {displayImage ? (
             <Image
+              key={displayImage}
               src={displayImage}
               alt={product.primaryImageAlt ?? product.name}
               fill
