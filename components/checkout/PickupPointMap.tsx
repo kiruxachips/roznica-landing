@@ -68,12 +68,10 @@ export function PickupPointMap() {
   useEffect(() => {
     if (!cityCode || selectedRate?.deliveryType !== "pvz") return
 
+    setPickupPoints([])
     setPickupPointsLoading(true)
-    const params = new URLSearchParams({
-      city_code: cityCode,
-      carrier: selectedRate.carrier,
-      ...(city ? { city } : {}),
-    })
+    const params = new URLSearchParams({ city_code: cityCode, carrier: selectedRate.carrier })
+    if (city) params.set("city", city)
     fetch(`/api/delivery/pickup-points?${params}`)
       .then((r) => r.ok ? r.json() : [])
       .then((points) => {

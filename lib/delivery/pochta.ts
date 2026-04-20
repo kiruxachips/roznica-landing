@@ -30,6 +30,11 @@ export function createPochtaProvider(config: {
     carrier: "pochta",
 
     async calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]> {
+      if (!config.senderPostalCode) {
+        console.warn("Pochta: senderPostalCode not configured, skipping rate calculation")
+        return []
+      }
+
       let postalCode = req.toPostalCode
 
       // If no postal code provided, try to look up from city name.
@@ -142,51 +147,50 @@ export function createPochtaProvider(config: {
     async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
       if (!cityName) return []
 
-      // Public endpoint — no auth required for branch listings.
-      // Try open Pochta endpoint first; if tokens are present, also try authenticated Otpravka API.
-      const sources: Array<{
-        url: string
-        headers?: Record<string, string>
-      }> = []
-
-      sources.push({
-        url: `https://api.pochta.ru/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
-      })
-
-      if (config.accessToken && config.userAuth) {
-        sources.push({
-          url: `${OTPRAVKA_API}/1.0/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
-          headers: {
-            Authorization: `AccessToken ${config.accessToken}`,
-            "X-User-Authorization": `Basic ${config.userAuth}`,
-            Accept: "application/json;charset=UTF-8",
-          },
-        })
+      // Primary: OpenStreetMap via Overpass API (no auth, 6h in-memory cache).
+      // Much more complete than the legacy Pochta endpoint which only returns
+      // offices matching the exact address string.
+      try {
+        const { getPochtaOfficesByCity } = await import("./overpass")
+        const points = await getPochtaOfficesByCity(cityName)
+        if (points.length > 0) return points
+      } catch (e) {
+        console.error("Pochta getPickupPoints (Overpass) failed:", e)
       }
 
-      for (const source of sources) {
+      // Fallback: authenticated Otpravka API if tokens are configured.
+      if (config.accessToken && config.userAuth) {
         try {
-          const res = await fetchWithTimeout(source.url, { headers: source.headers }, 8000)
-          if (!res.ok) continue
-          const data = await res.json()
-          const offices: unknown[] = Array.isArray(data) ? data : []
-          const points = offices
-            .filter((o: any) => o.latitude && o.longitude)
-            .map((o: any) => ({
-              code: String(o["postal-code"] || o.postalCode || ""),
-              name: `Почтовое отделение ${o["postal-code"] || o.postalCode || ""}`,
-              address: o["address-source"] || o.addressSource || o.address || "",
-              lat: Number(o.latitude),
-              lng: Number(o.longitude),
-              workTime: o["work-time"] || o.workTime || undefined,
-              phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
-              carrier: "pochta" as const,
-            }))
-          if (points.length > 0) return points
-        } catch (e) {
-          if (process.env.NODE_ENV !== "production") {
-            console.error("Pochta getPickupPoints source failed:", e)
+          const res = await fetchWithTimeout(
+            `${OTPRAVKA_API}/1.0/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
+            {
+              headers: {
+                Authorization: `AccessToken ${config.accessToken}`,
+                "X-User-Authorization": `Basic ${config.userAuth}`,
+                Accept: "application/json;charset=UTF-8",
+              },
+            },
+            8000
+          )
+          if (res.ok) {
+            const data = await res.json()
+            const offices: unknown[] = Array.isArray(data) ? data : []
+            const points = offices
+              .filter((o: any) => o.latitude && o.longitude)
+              .map((o: any) => ({
+                code: String(o["postal-code"] || o.postalCode || ""),
+                name: `Почтовое отделение ${o["postal-code"] || o.postalCode || ""}`,
+                address: o["address-source"] || o.addressSource || o.address || "",
+                lat: Number(o.latitude),
+                lng: Number(o.longitude),
+                workTime: o["work-time"] || o.workTime || undefined,
+                phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
+                carrier: "pochta" as const,
+              }))
+            if (points.length > 0) return points
           }
+        } catch (e) {
+          console.error("Pochta getPickupPoints (Otpravka) failed:", e)
         }
       }
 

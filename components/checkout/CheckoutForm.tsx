@@ -264,9 +264,8 @@ export function CheckoutForm() {
           <h2 className="text-lg font-semibold pt-2">Доставка</h2>
 
           <CitySearch />
-          <AddressInput />
           <DeliveryOptions />
-
+          {selectedRate?.deliveryType !== "pvz" && <AddressInput />}
           {selectedRate?.deliveryType === "pvz" && <PickupPointMap />}
 
 

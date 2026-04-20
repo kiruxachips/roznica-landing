@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(points)
     }
 
-    if (carrier === "pochta" && settings.pochta_enabled === "true" && city) {
+    if (carrier === "pochta" && settings.pochta_enabled === "true" && city.trim()) {
       const provider = createPochtaProvider({
         accessToken: settings.pochta_access_token || undefined,
         userAuth: settings.pochta_user_auth || undefined,

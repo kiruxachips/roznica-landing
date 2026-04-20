@@ -13,6 +13,7 @@ interface Suggestion {
 
 export function AddressInput() {
   const city = useDeliveryStore((s) => s.city)
+  const selectedRate = useDeliveryStore((s) => s.selectedRate)
   const doorAddress = useDeliveryStore((s) => s.doorAddress)
   const setDoorAddress = useDeliveryStore((s) => s.setDoorAddress)
   const setPostalCode = useDeliveryStore((s) => s.setPostalCode)
@@ -75,7 +76,7 @@ export function AddressInput() {
     setSuggestions([])
   }
 
-  if (!city) return null
+  if (!city || selectedRate?.deliveryType === "pvz") return null
 
   return (
     <div ref={containerRef} className="relative">
