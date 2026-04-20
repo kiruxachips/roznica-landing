@@ -266,19 +266,20 @@ export async function updateOrderStatus(id: string, status: string) {
     payload: { from: previous?.status, to: status },
   })
 
-  // Send email notification + bonus logic
+  // Email + bonus + shipment. Email-блок обрабатывает и гостей и зарегистрированных;
+  // bonuses/createShipment живут под if (userId)/paymentMethod соответственно.
   try {
     const order = await getOrderById(id)
-    if (order?.userId) {
-      const user = await prisma.user.findUnique({
-        where: { id: order.userId },
-        select: { email: true, name: true, notifyOrderStatus: true },
-      })
+    if (order) {
+      const user = order.userId
+        ? await prisma.user.findUnique({
+            where: { id: order.userId },
+            select: { email: true, name: true, notifyOrderStatus: true },
+          })
+        : null
 
       // Send email only for customer-visible statuses — non-blocking via after().
-      // ВАЖНО: используем order.customerEmail, а не user.email. customer для гостей = null,
-      // но customerEmail хранится в Order. notifyOrderStatus применяем только если есть user
-      // (гости не могут выключить — получают все уведомления).
+      // Используем order.customerEmail (есть и у гостей), notifyOrderStatus — только если есть user.
       const customerVisibleStatuses = ["paid", "confirmed", "shipped", "delivered", "cancelled"]
       const recipient = order.customerEmail
       const mayNotify = user ? user.notifyOrderStatus : true
@@ -300,12 +301,12 @@ export async function updateOrderStatus(id: string, status: string) {
         })
       }
 
-      // Credit bonuses on delivery
-      if (status === "delivered") {
+      // Credit bonuses on delivery — только для зарегистрированных.
+      if (status === "delivered" && order.userId) {
         await creditBonusesForOrder(order.userId, order.id, order.total)
       }
 
-      // Auto-create shipment when order is confirmed (COD)
+      // Auto-create shipment when order is confirmed (COD) — не зависит от userId.
       if (status === "confirmed" && order.paymentMethod !== "online") {
         try {
           await createShipmentForOrder(order.id)

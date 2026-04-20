@@ -72,6 +72,23 @@ export async function sendRenderedEmail(email: {
 
 // ── Helpers ──
 
+/**
+ * Экранирование HTML-чувствительных символов в user-вводимых данных (имя, заметки,
+ * адрес доставки, промокод и т.д.). Защищает шаблоны писем от XSS: агрессивный
+ * customerName вида `<img src=x onerror=...>` стал бы активным HTML в письме.
+ */
+function escapeHtml(v: unknown): string {
+  if (v === null || v === undefined) return ""
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+}
+// Короткий alias — чтобы шаблоны читались проще.
+const e = escapeHtml
+
 const deliveryMethodLabels: Record<string, string> = {
   cdek: "СДЭК",
   pochta: "Почта России",
@@ -130,7 +147,7 @@ function buildItemsTableHtml(items: OrderItem[]): string {
   const rows = items.map((item) => `
     <tr>
       <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #333; font-size: 14px;">
-        ${item.name} (${item.weight})
+        ${e(item.name)} (${e(item.weight)})
       </td>
       <td style="padding: 8px 0; border-bottom: 1px solid #eee; color: #555; font-size: 14px; text-align: center;">
         ${item.quantity} шт.
@@ -161,7 +178,7 @@ function buildTotalsHtml(data: Pick<OrderEmailData, "subtotal" | "discount" | "d
   lines.push(`<tr><td style="padding: 4px 0; color: #555; font-size: 14px;">Товары:</td><td style="padding: 4px 0; text-align: right; color: #333; font-size: 14px;">${formatPrice(data.subtotal)}₽</td></tr>`)
 
   if (data.discount > 0) {
-    lines.push(`<tr><td style="padding: 4px 0; color: #555; font-size: 14px;">Скидка${data.promoCode ? ` (${data.promoCode})` : ""}:</td><td style="padding: 4px 0; text-align: right; color: #d33; font-size: 14px;">−${formatPrice(data.discount)}₽</td></tr>`)
+    lines.push(`<tr><td style="padding: 4px 0; color: #555; font-size: 14px;">Скидка${data.promoCode ? ` (${e(data.promoCode)})` : ""}:</td><td style="padding: 4px 0; text-align: right; color: #d33; font-size: 14px;">−${formatPrice(data.discount)}₽</td></tr>`)
   }
 
   if (data.bonusUsed && data.bonusUsed > 0) {
@@ -185,16 +202,16 @@ function buildDeliveryHtml(data: Pick<OrderEmailData, "deliveryMethod" | "delive
     parts.push(`<strong>Способ:</strong> ${deliveryTypeLabels[data.deliveryType] || data.deliveryType}`)
   }
   if (data.destinationCity) {
-    parts.push(`<strong>Город:</strong> ${data.destinationCity}`)
+    parts.push(`<strong>Город:</strong> ${e(data.destinationCity)}`)
   }
   if (data.pickupPointName) {
-    parts.push(`<strong>Пункт выдачи:</strong> ${data.pickupPointName}`)
+    parts.push(`<strong>Пункт выдачи:</strong> ${e(data.pickupPointName)}`)
   }
   if (data.deliveryAddress) {
-    parts.push(`<strong>Адрес:</strong> ${data.deliveryAddress}`)
+    parts.push(`<strong>Адрес:</strong> ${e(data.deliveryAddress)}`)
   }
   if (data.estimatedDelivery) {
-    parts.push(`<strong>Срок:</strong> ${data.estimatedDelivery}`)
+    parts.push(`<strong>Срок:</strong> ${e(data.estimatedDelivery)}`)
   }
 
   if (parts.length === 0) return ""
@@ -280,10 +297,10 @@ export function renderOrderStatusEmail({
     html: wrapEmail(`
       <h2 style="color: #7c4a1e; margin-bottom: 16px;">Статус заказа обновлён</h2>
       <p style="color: #555; font-size: 16px; line-height: 1.5;">
-        ${customerName}, ваш заказ <strong>${orderNumber}</strong> получил новый статус:
+        ${e(customerName)}, ваш заказ <strong>${e(orderNumber)}</strong> получил новый статус:
       </p>
       <div style="background: #f5f0eb; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
-        <span style="font-size: 20px; font-weight: bold; color: #7c4a1e;">${statusText}</span>
+        <span style="font-size: 20px; font-weight: bold; color: #7c4a1e;">${e(statusText)}</span>
       </div>
       <p style="color: #888; font-size: 14px;">
         Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
@@ -313,7 +330,7 @@ export function renderOrderConfirmationEmail(data: OrderEmailData): { subject: s
   const html = wrapEmail(`
     <h2 style="color: #7c4a1e; margin-bottom: 16px;">Заказ оформлен</h2>
     <p style="color: #555; font-size: 16px; line-height: 1.5;">
-      ${data.customerName}, спасибо за заказ <strong>${data.orderNumber}</strong>!
+      ${e(data.customerName)}, спасибо за заказ <strong>${e(data.orderNumber)}</strong>!
     </p>
 
     ${buildItemsTableHtml(data.items)}
@@ -344,7 +361,7 @@ export function renderPaymentSuccessEmail(data: OrderEmailData): { subject: stri
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата прошла успешно</h2>
     <p style="color: #555; font-size: 16px; line-height: 1.5;">
-      ${data.customerName}, оплата заказа <strong>${data.orderNumber}</strong> подтверждена!
+      ${e(data.customerName)}, оплата заказа <strong>${e(data.orderNumber)}</strong> подтверждена!
     </p>
 
     ${buildItemsTableHtml(data.items)}
@@ -375,14 +392,14 @@ export async function sendPaymentSuccessEmail(data: OrderEmailData): Promise<Sen
 export function renderAdminNewOrderEmail(data: OrderEmailData): { subject: string; html: string } {
   const paymentLabel = data.paymentMethod === "online" ? "Онлайн (YooKassa)" : "При получении"
   const html = wrapEmail(`
-    <h2 style="color: #7c4a1e; margin-bottom: 16px;">Новый заказ ${data.orderNumber}</h2>
+    <h2 style="color: #7c4a1e; margin-bottom: 16px;">Новый заказ ${e(data.orderNumber)}</h2>
 
     <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
       <p style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #333;">Покупатель</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Имя:</strong> ${data.customerName}</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Телефон:</strong> ${data.customerPhone}</p>
-      ${data.customerEmail ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Email:</strong> ${data.customerEmail}</p>` : ""}
-      ${data.notes ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Комментарий:</strong> ${data.notes}</p>` : ""}
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Имя:</strong> ${e(data.customerName)}</p>
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Телефон:</strong> ${e(data.customerPhone)}</p>
+      ${data.customerEmail ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Email:</strong> ${e(data.customerEmail)}</p>` : ""}
+      ${data.notes ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Комментарий:</strong> ${e(data.notes)}</p>` : ""}
     </div>
 
     ${buildItemsTableHtml(data.items)}
@@ -436,7 +453,7 @@ export function renderOrderShippedEmail(data: ShippedEmailData): { subject: stri
     ? `
       <div style="background: #f5f0eb; border-radius: 12px; padding: 20px; margin: 24px 0; text-align: center;">
         <p style="margin: 0 0 6px; color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 1px;">Трек-номер</p>
-        <p style="margin: 0 0 12px; color: #7c4a1e; font-size: 22px; font-weight: bold; letter-spacing: 2px;">${track}</p>
+        <p style="margin: 0 0 12px; color: #7c4a1e; font-size: 22px; font-weight: bold; letter-spacing: 2px;">${e(track)}</p>
         ${url ? `<a href="${url}" style="display: inline-block; background: #7c4a1e; color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Отследить посылку</a>` : ""}
       </div>
     `
@@ -445,7 +462,7 @@ export function renderOrderShippedEmail(data: ShippedEmailData): { subject: stri
   const html = wrapEmail(`
     <h2 style="color: #7c4a1e; margin-bottom: 16px;">Заказ передан в доставку</h2>
     <p style="color: #555; font-size: 16px; line-height: 1.5;">
-      ${data.customerName}, мы передали ваш заказ <strong>${data.orderNumber}</strong>${carrierLabel ? ` в службу ${carrierLabel}` : ""}.
+      ${e(data.customerName)}, мы передали ваш заказ <strong>${e(data.orderNumber)}</strong>${carrierLabel ? ` в службу ${e(carrierLabel)}` : ""}.
     </p>
     ${trackBlock}
     ${buildDeliveryHtml(data)}
@@ -470,13 +487,13 @@ export async function sendOrderShippedEmail(data: ShippedEmailData): Promise<Sen
 export function renderOrderDeliveredEmail(data: OrderEmailData): { subject: string; html: string } {
   const isPvz = data.deliveryType === "pvz"
   const pickupLine = isPvz && data.pickupPointName
-    ? `Заберите его в пункте выдачи: <strong>${data.pickupPointName}</strong>.`
+    ? `Заберите его в пункте выдачи: <strong>${e(data.pickupPointName)}</strong>.`
     : "Посылка доставлена на указанный адрес."
 
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Заказ доставлен</h2>
     <p style="color: #555; font-size: 16px; line-height: 1.5;">
-      ${data.customerName}, ваш заказ <strong>${data.orderNumber}</strong> прибыл!
+      ${e(data.customerName)}, ваш заказ <strong>${e(data.orderNumber)}</strong> прибыл!
       ${isPvz ? pickupLine : ""}
     </p>
     ${buildDeliveryHtml(data)}
@@ -503,7 +520,7 @@ export async function sendOrderDeliveredEmail(data: OrderEmailData): Promise<Sen
 
 export function renderAdminPaymentSuccessEmail(data: OrderEmailData): { subject: string; html: string } {
   const html = wrapEmail(`
-    <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата получена: ${data.orderNumber}</h2>
+    <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата получена: ${e(data.orderNumber)}</h2>
 
     <div style="background: #e8f5e9; border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
       <span style="font-size: 24px; font-weight: bold; color: #2d6b4a;">${formatPrice(data.total)}₽</span>
@@ -511,9 +528,9 @@ export function renderAdminPaymentSuccessEmail(data: OrderEmailData): { subject:
 
     <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
       <p style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #333;">Покупатель</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Имя:</strong> ${data.customerName}</p>
-      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Телефон:</strong> ${data.customerPhone}</p>
-      ${data.customerEmail ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Email:</strong> ${data.customerEmail}</p>` : ""}
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Имя:</strong> ${e(data.customerName)}</p>
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Телефон:</strong> ${e(data.customerPhone)}</p>
+      ${data.customerEmail ? `<p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Email:</strong> ${e(data.customerEmail)}</p>` : ""}
     </div>
 
     ${buildItemsTableHtml(data.items)}

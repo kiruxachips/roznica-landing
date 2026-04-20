@@ -177,12 +177,23 @@ async function tick() {
 // EmailDispatch записи (pending|failed) и отправляет их через SMTP.
 // Вся логика ретрая и backoff на стороне endpoint'а — воркер только тригерит.
 let lastEmailTickAt = 0
+let warnedNoCronSecret = false
 async function emailTick() {
   const now = Date.now()
   if (now - lastEmailTickAt < EMAIL_TICK_EVERY_MS) return
   lastEmailTickAt = now
 
-  if (!CRON_SECRET) return // без секрета endpoint защищён, тихо не дёргаем
+  if (!CRON_SECRET) {
+    // Без секрета endpoint /api/cron/retry-emails отдаёт 401. Предупреждаем один раз,
+    // чтобы в логах было видно, что воркер отключён от email-ретрая.
+    if (!warnedNoCronSecret) {
+      log("error", "email_retry_disabled", {
+        reason: "CRON_SECRET not set; falling back to app-side send only (no durable retry)",
+      })
+      warnedNoCronSecret = true
+    }
+    return
+  }
 
   const url = `${APP_INTERNAL_URL.replace(/\/$/, "")}/api/cron/retry-emails`
   const controller = new AbortController()
