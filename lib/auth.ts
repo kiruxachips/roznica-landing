@@ -127,6 +127,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
           token: "https://id.vk.ru/oauth2/auth",
           userinfo: {
+            url: "https://api.vk.com/method/users.get",
             request: async ({ tokens }: { tokens: { access_token: string; id_token?: string } }) => {
               // VK ID embeds user info (incl. email) in id_token JWT — decode it directly
               if (tokens.id_token) {
