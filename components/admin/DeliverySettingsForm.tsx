@@ -15,6 +15,7 @@ const tabs = [
   { id: "cdek", label: "СДЭК" },
   { id: "pochta", label: "Почта РФ" },
   { id: "courier", label: "Курьер" },
+  { id: "addresses", label: "Адреса / Карты" },
   { id: "markups", label: "Наценки" },
 ]
 
@@ -367,14 +368,62 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               </div>
             </div>
 
+          </>
+        )}
+
+        {activeTab === "addresses" && (
+          <>
+            <h2 className="text-lg font-semibold">Адреса и карты</h2>
+            <p className="text-sm text-muted-foreground">
+              Подсказки адреса при оформлении, индексы для Почты России, карта
+              пунктов выдачи.
+            </p>
+
             <div>
-              <label className={labelClass}>API ключ Яндекс.Карт</label>
+              <label className={labelClass}>API-ключ DaData (подсказки адресов)</label>
+              <input
+                className={inputClass}
+                type="password"
+                value={localSettings.dadata_api_key || ""}
+                onChange={(e) => set("dadata_api_key", e.target.value)}
+                placeholder="Token ..."
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Подсказки по российским адресам (улицы и дома) в поле «Адрес».
+                Бесплатный лимит — 10 000 запросов/день. Получить ключ:{" "}
+                <a
+                  href="https://dadata.ru/api/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  dadata.ru/api
+                </a>
+                .
+              </p>
+            </div>
+
+            <div>
+              <label className={labelClass}>API-ключ Яндекс.Карт</label>
               <input
                 className={inputClass}
                 value={localSettings.yandex_maps_api_key || ""}
                 onChange={(e) => set("yandex_maps_api_key", e.target.value)}
-                placeholder="Для карты ПВЗ"
+                placeholder="Для карты ПВЗ и запасных подсказок"
               />
+              <p className="text-xs text-muted-foreground mt-1">
+                Используется для отображения карты пунктов выдачи и как
+                запасной геокодер, если DaData не настроен. Получить ключ:{" "}
+                <a
+                  href="https://developer.tech.yandex.ru/services/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  developer.tech.yandex.ru
+                </a>
+                .
+              </p>
             </div>
           </>
         )}

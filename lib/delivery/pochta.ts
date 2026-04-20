@@ -1,4 +1,5 @@
 import { fetchWithTimeout } from "./utils"
+import { getPostalCodeForCity } from "./dadata"
 import type {
   DeliveryProvider,
   DeliveryRateRequest,
@@ -23,6 +24,7 @@ export function createPochtaProvider(config: {
   trackingPassword?: string
   objectType: number // 47030 = посылка нестандартная
   senderPostalCode: string
+  dadataApiKey?: string
 }): DeliveryProvider {
   return {
     carrier: "pochta",
@@ -30,22 +32,33 @@ export function createPochtaProvider(config: {
     async calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]> {
       let postalCode = req.toPostalCode
 
-      // If no postal code provided, try to look up from city name
+      // If no postal code provided, try to look up from city name.
+      // Prefer DaData (reliable, structured) over Pochta's legacy by-address endpoint.
       if (!postalCode && req.toCity) {
-        try {
-          const lookupRes = await fetchWithTimeout(
-            `https://api.pochta.ru/postoffice/1.0/by-address?${new URLSearchParams({ address: req.toCity })}`,
-            {},
-            5000
-          )
-          if (lookupRes.ok) {
-            const offices = await lookupRes.json()
-            if (Array.isArray(offices) && offices.length > 0) {
-              postalCode = String(offices[0]?.["postal-code"] || offices[0]?.postalCode || "")
-            }
+        if (config.dadataApiKey) {
+          try {
+            postalCode = await getPostalCodeForCity(config.dadataApiKey, req.toCity)
+          } catch {
+            // continue to fallback
           }
-        } catch {
-          // Lookup failed — can't calculate without postal code
+        }
+
+        if (!postalCode) {
+          try {
+            const lookupRes = await fetchWithTimeout(
+              `https://api.pochta.ru/postoffice/1.0/by-address?${new URLSearchParams({ address: req.toCity })}`,
+              {},
+              5000
+            )
+            if (lookupRes.ok) {
+              const offices = await lookupRes.json()
+              if (Array.isArray(offices) && offices.length > 0) {
+                postalCode = String(offices[0]?.["postal-code"] || offices[0]?.postalCode || "")
+              }
+            }
+          } catch {
+            // Still no postal code — return empty below
+          }
         }
       }
 
@@ -127,41 +140,57 @@ export function createPochtaProvider(config: {
     },
 
     async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
-      if (!config.accessToken || !config.userAuth || !cityName) return []
+      if (!cityName) return []
 
-      try {
-        const res = await fetchWithTimeout(
-          `${OTPRAVKA_API}/1.0/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
-          {
-            headers: {
-              Authorization: `AccessToken ${config.accessToken}`,
-              "X-User-Authorization": `Basic ${config.userAuth}`,
-              Accept: "application/json;charset=UTF-8",
-            },
-          }
-        )
+      // Public endpoint — no auth required for branch listings.
+      // Try open Pochta endpoint first; if tokens are present, also try authenticated Otpravka API.
+      const sources: Array<{
+        url: string
+        headers?: Record<string, string>
+      }> = []
 
-        if (!res.ok) return []
+      sources.push({
+        url: `https://api.pochta.ru/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
+      })
 
-        const data = await res.json()
-        const offices: unknown[] = Array.isArray(data) ? data : []
-
-        return offices
-          .filter((o: any) => o.latitude && o.longitude)
-          .map((o: any) => ({
-            code: String(o["postal-code"] || o.postalCode || ""),
-            name: `Почтовое отделение ${o["postal-code"] || o.postalCode || ""}`,
-            address: o["address-source"] || o.addressSource || "",
-            lat: o.latitude,
-            lng: o.longitude,
-            workTime: o["work-time"] || o.workTime || undefined,
-            phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
-            carrier: "pochta" as const,
-          }))
-      } catch (e) {
-        console.error("Pochta getPickupPoints error:", e)
-        return []
+      if (config.accessToken && config.userAuth) {
+        sources.push({
+          url: `${OTPRAVKA_API}/1.0/postoffice/1.0/by-address?${new URLSearchParams({ address: cityName })}`,
+          headers: {
+            Authorization: `AccessToken ${config.accessToken}`,
+            "X-User-Authorization": `Basic ${config.userAuth}`,
+            Accept: "application/json;charset=UTF-8",
+          },
+        })
       }
+
+      for (const source of sources) {
+        try {
+          const res = await fetchWithTimeout(source.url, { headers: source.headers }, 8000)
+          if (!res.ok) continue
+          const data = await res.json()
+          const offices: unknown[] = Array.isArray(data) ? data : []
+          const points = offices
+            .filter((o: any) => o.latitude && o.longitude)
+            .map((o: any) => ({
+              code: String(o["postal-code"] || o.postalCode || ""),
+              name: `Почтовое отделение ${o["postal-code"] || o.postalCode || ""}`,
+              address: o["address-source"] || o.addressSource || o.address || "",
+              lat: Number(o.latitude),
+              lng: Number(o.longitude),
+              workTime: o["work-time"] || o.workTime || undefined,
+              phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
+              carrier: "pochta" as const,
+            }))
+          if (points.length > 0) return points
+        } catch (e) {
+          if (process.env.NODE_ENV !== "production") {
+            console.error("Pochta getPickupPoints source failed:", e)
+          }
+        }
+      }
+
+      return []
     },
 
     async createShipment(req: CreateShipmentRequest): Promise<CreateShipmentResult> {

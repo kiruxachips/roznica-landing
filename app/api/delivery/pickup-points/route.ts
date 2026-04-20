@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
         userAuth: settings.pochta_user_auth || undefined,
         objectType: parseInt(settings.pochta_object_type) || 47030,
         senderPostalCode: sender.postalCode,
+        dadataApiKey: settings.dadata_api_key || undefined,
       })
 
       const points = await provider.getPickupPoints(city)

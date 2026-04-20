@@ -30,6 +30,7 @@ export function CitySearch() {
   const setRatesLoading = useDeliveryStore((s) => s.setRatesLoading)
   const setRatesError = useDeliveryStore((s) => s.setRatesError)
   const selectRate = useDeliveryStore((s) => s.selectRate)
+  const selectedRate = useDeliveryStore((s) => s.selectedRate)
 
   const cartTotal = useCartStore((s) => s.totalPrice)()
   const cartWeight = useCartStore((s) => s.totalWeight)()
@@ -55,10 +56,17 @@ export function CitySearch() {
       .then((rates) => {
         setRates(rates)
         setRatesLoading(false)
-        // Auto-select cheapest if available
-        if (rates.length > 0) {
-          selectRate(rates[0])
-        }
+        if (rates.length === 0) return
+        // Preserve current selection if same carrier+tariff is still offered,
+        // otherwise auto-select the cheapest option.
+        const current = selectedRate
+        const match =
+          current &&
+          rates.find(
+            (r: { carrier: string; tariffCode: number }) =>
+              r.carrier === current.carrier && r.tariffCode === current.tariffCode
+          )
+        selectRate(match || rates[0])
       })
       .catch(() => {
         setRatesError("Не удалось рассчитать стоимость доставки")

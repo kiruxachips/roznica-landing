@@ -271,8 +271,8 @@ async function main() {
     cdek_client_secret: "",
     cdek_test_mode: "true",
     cdek_tariffs: JSON.stringify([136, 137]),
-    // Pochta RF
-    pochta_enabled: "false",
+    // Pochta RF — enabled by default (tariff API works without tokens)
+    pochta_enabled: "true",
     pochta_access_token: "",
     pochta_user_auth: "",
     pochta_object_type: "47030",
@@ -281,8 +281,10 @@ async function main() {
     courier_price: "300",
     courier_city: "Калининград",
     courier_free_threshold: "3000",
-    // Yandex Maps
+    // Yandex Maps (for ПВЗ map visualization)
     yandex_maps_api_key: "",
+    // DaData — primary address autocomplete + geocoding (free tier: 10k/day)
+    dadata_api_key: "",
     // Cart upsell / gift threshold
     gift_threshold: "5000",
     gift_description: "Подарок от нас",
