@@ -1,7 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { User as UserIcon } from "lucide-react"
 import { updateProfile, changePassword } from "@/lib/actions/profile"
 import { PhoneInput } from "@/components/ui/phone-input"
 
@@ -11,6 +13,7 @@ interface ProfileFormProps {
     email: string | null
     phone: string | null
     defaultAddress: string | null
+    avatarUrl: string | null
     passwordHash: boolean // has password
     accounts: { provider: string }[]
   }
@@ -36,6 +39,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
       name: form.get("name") as string,
       phone: form.get("phone") as string,
       defaultAddress: form.get("defaultAddress") as string,
+      email: user.email ? undefined : (form.get("email") as string),
     })
 
     setLoadingProfile(false)
@@ -95,7 +99,28 @@ export function ProfileForm({ user }: ProfileFormProps) {
     <div className="space-y-5 sm:space-y-6">
       {/* Profile info */}
       <form onSubmit={handleProfileSubmit} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
-        <h2 className="text-lg font-semibold">Личные данные</h2>
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
+            {user.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt={user.name || "Аватар"}
+                width={64}
+                height={64}
+                className="w-16 h-16 object-cover"
+                unoptimized
+              />
+            ) : (
+              <UserIcon className="w-7 h-7 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-semibold">Личные данные</h2>
+            <p className="text-xs text-muted-foreground">
+              {user.name || "Имя не указано"}
+            </p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -118,11 +143,25 @@ export function ProfileForm({ user }: ProfileFormProps) {
 
         <div>
           <label className="block text-sm font-medium mb-1">Email</label>
-          <input
-            value={user.email || ""}
-            readOnly
-            className="w-full h-11 px-4 rounded-xl border border-input text-sm bg-muted/50 text-muted-foreground"
-          />
+          {user.email ? (
+            <input
+              value={user.email}
+              readOnly
+              className="w-full h-11 px-4 rounded-xl border border-input text-sm bg-muted/50 text-muted-foreground"
+            />
+          ) : (
+            <>
+              <input
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Укажите email — он нужен для отправки уведомлений о статусе заказа
+              </p>
+            </>
+          )}
         </div>
 
         <div>

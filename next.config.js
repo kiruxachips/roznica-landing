@@ -44,7 +44,7 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://mc.yandex.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net https://*.yastatic.net https://telegram.org",
               "style-src 'self' 'unsafe-inline' https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net https://*.yastatic.net",
-              "img-src 'self' data: blob: https://mc.yandex.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net https://yastatic.net https://*.yastatic.net https://millor-shop.ru",
+              "img-src 'self' data: blob: https://mc.yandex.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net https://yastatic.net https://*.yastatic.net https://millor-shop.ru https://*.userapi.com https://*.vkuserphoto.ru https://*.googleusercontent.com https://avatars.yandex.net",
               "font-src 'self' data:",
               "connect-src 'self' https://mc.yandex.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net https://geocode-maps.yandex.ru https://yastatic.net https://*.yastatic.net",
               "frame-src https://yoomoney.ru https://telegram.org",

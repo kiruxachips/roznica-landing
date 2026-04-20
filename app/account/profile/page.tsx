@@ -26,6 +26,7 @@ export default async function ProfilePage() {
           email: user.email,
           phone: user.phone,
           defaultAddress: user.defaultAddress,
+          avatarUrl: user.avatarUrl ?? user.image ?? null,
           passwordHash: !!user.passwordHash,
           accounts: user.accounts,
         }}
