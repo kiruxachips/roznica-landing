@@ -1,17 +1,34 @@
-import { getStockSnapshot, getStockMetrics } from "@/lib/dal/stock"
+import { getStockSnapshot, getStockMetrics, getStockFacets } from "@/lib/dal/stock"
 import { WarehouseDashboard } from "@/components/admin/WarehouseDashboard"
 
 export default async function WarehousePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>
+  searchParams: Promise<{
+    status?: string
+    q?: string
+    category?: string
+    type?: string
+    weight?: string
+    inactive?: string
+  }>
 }) {
   const params = await searchParams
   const statusFilter = (params.status as "all" | "in_stock" | "low" | "out") || "all"
+  const weightGrams = params.weight ? parseInt(params.weight) : undefined
+  const includeInactive = params.inactive === "1"
 
-  const [snapshot, metrics] = await Promise.all([
-    getStockSnapshot({ status: statusFilter, search: params.q }),
+  const [snapshot, metrics, facets] = await Promise.all([
+    getStockSnapshot({
+      status: statusFilter,
+      search: params.q,
+      categoryId: params.category || undefined,
+      productType: params.type || undefined,
+      weightGrams: weightGrams && weightGrams > 0 ? weightGrams : undefined,
+      includeInactive,
+    }),
     getStockMetrics(),
+    getStockFacets(),
   ])
 
   return (
@@ -25,8 +42,15 @@ export default async function WarehousePage({
       <WarehouseDashboard
         snapshot={snapshot}
         metrics={metrics}
-        initialFilter={statusFilter}
-        initialSearch={params.q || ""}
+        facets={facets}
+        initialFilters={{
+          status: statusFilter,
+          search: params.q || "",
+          categoryId: params.category || "",
+          productType: params.type || "",
+          weightGrams: weightGrams && weightGrams > 0 ? weightGrams : 0,
+          includeInactive,
+        }}
       />
     </div>
   )

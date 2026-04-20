@@ -134,6 +134,8 @@ export async function adjustStockBatch(
 
 /**
  * Снимок склада для дашборда: список вариантов с текущим остатком и статусом.
+ * Вес варианта нормализуется в граммы для единообразной фильтрации/сортировки
+ * (например, "250г" → 250, "1кг" → 1000).
  */
 export interface StockSnapshotRow {
   variantId: string
@@ -141,7 +143,11 @@ export interface StockSnapshotRow {
   productName: string
   productSlug: string
   productIsActive: boolean
-  variantWeight: string
+  productType: string         // "coffee" | "tea" | "instant"
+  categoryId: string
+  categoryName: string
+  variantWeight: string       // исходная строка "250г", "1кг"
+  variantWeightGrams: number  // нормализованный вес в граммах для фильтров
   variantSku: string | null
   variantIsActive: boolean
   stock: number
@@ -154,6 +160,19 @@ export interface StockSnapshotFilters {
   status?: "in_stock" | "low" | "out" | "all"
   search?: string
   categoryId?: string
+  productType?: string              // coffee / tea / instant
+  weightGrams?: number              // точное значение: 250, 500, 1000
+  includeInactive?: boolean         // по умолчанию скрываем скрытые товары
+}
+
+function parseWeightToGrams(w: string): number {
+  const lower = w.toLowerCase().trim()
+  const match = lower.match(/^([\d.,]+)\s*(кг|г|kg|g)?$/)
+  if (!match) return 0
+  const n = parseFloat(match[1].replace(",", "."))
+  if (isNaN(n)) return 0
+  const unit = match[2] || "г"
+  return unit === "кг" || unit === "kg" ? Math.round(n * 1000) : Math.round(n)
 }
 
 export async function getStockSnapshot(
@@ -166,8 +185,12 @@ export async function getStockSnapshot(
       { sku: { contains: filters.search, mode: "insensitive" } },
     ]
   }
-  if (filters.categoryId) {
-    where.product = { ...(where.product as object), categoryId: filters.categoryId }
+  const productWhere: Prisma.ProductWhereInput = {}
+  if (filters.categoryId) productWhere.categoryId = filters.categoryId
+  if (filters.productType) productWhere.productType = filters.productType
+  if (!filters.includeInactive) productWhere.isActive = true
+  if (Object.keys(productWhere).length > 0) {
+    where.product = productWhere
   }
 
   const variants = await prisma.productVariant.findMany({
@@ -180,7 +203,15 @@ export async function getStockSnapshot(
       lowStockThreshold: true,
       isActive: true,
       product: {
-        select: { id: true, name: true, slug: true, isActive: true },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          isActive: true,
+          productType: true,
+          categoryId: true,
+          category: { select: { name: true } },
+        },
       },
       stockHistory: {
         orderBy: { createdAt: "desc" },
@@ -191,7 +222,7 @@ export async function getStockSnapshot(
     orderBy: [{ product: { name: "asc" } }, { sortOrder: "asc" }],
   })
 
-  const mapped: StockSnapshotRow[] = variants.map((v) => {
+  let mapped: StockSnapshotRow[] = variants.map((v) => {
     let status: "in_stock" | "low" | "out" = "in_stock"
     if (v.stock <= 0) status = "out"
     else if (v.lowStockThreshold !== null && v.stock <= v.lowStockThreshold) status = "low"
@@ -202,7 +233,11 @@ export async function getStockSnapshot(
       productName: v.product.name,
       productSlug: v.product.slug,
       productIsActive: v.product.isActive,
+      productType: v.product.productType,
+      categoryId: v.product.categoryId,
+      categoryName: v.product.category.name,
       variantWeight: v.weight,
+      variantWeightGrams: parseWeightToGrams(v.weight),
       variantSku: v.sku,
       variantIsActive: v.isActive,
       stock: v.stock,
@@ -213,9 +248,58 @@ export async function getStockSnapshot(
   })
 
   if (filters.status && filters.status !== "all") {
-    return mapped.filter((r) => r.status === filters.status)
+    mapped = mapped.filter((r) => r.status === filters.status)
+  }
+  if (filters.weightGrams && filters.weightGrams > 0) {
+    mapped = mapped.filter((r) => r.variantWeightGrams === filters.weightGrams)
   }
   return mapped
+}
+
+/**
+ * Набор доступных фасетов для фильтров (чтобы UI не хардкодил значения).
+ * Считает только по активным продуктам.
+ */
+export async function getStockFacets() {
+  const [categories, weightsRaw, types] = await Promise.all([
+    prisma.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.productVariant.findMany({
+      where: { product: { isActive: true } },
+      select: { weight: true },
+    }),
+    prisma.product.findMany({
+      where: { isActive: true },
+      distinct: ["productType"],
+      select: { productType: true },
+    }),
+  ])
+
+  // Уникальные нормализованные веса (в граммах), отсортированные по возрастанию
+  const weightSet = new Set<number>()
+  const weightsByGrams = new Map<number, string>()
+  for (const v of weightsRaw) {
+    const g = parseWeightToGrams(v.weight)
+    if (g > 0) {
+      weightSet.add(g)
+      // Предпочитаем короткую форму ("1кг" лучше "1000г")
+      if (!weightsByGrams.has(g) || v.weight.length < (weightsByGrams.get(g) ?? "").length) {
+        weightsByGrams.set(g, v.weight)
+      }
+    }
+  }
+  const weights = Array.from(weightSet)
+    .sort((a, b) => a - b)
+    .map((grams) => ({ grams, label: weightsByGrams.get(grams) ?? `${grams}г` }))
+
+  return {
+    categories,
+    weights,
+    productTypes: types.map((t) => t.productType),
+  }
 }
 
 /**
