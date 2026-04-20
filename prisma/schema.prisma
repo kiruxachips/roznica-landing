@@ -235,7 +235,8 @@ model Order {
   destinationCityCode String?
   carrierStatus       String?   // последний статус от перевозчика
   estimatedDelivery   String?   // "3-5 дней"
-  packageWeight       Int?      // граммы
+  packageWeight       Int?      // суммарный брутто-вес всех коробок, граммы
+  packagePlan         Json?     // физический план упаковки: массив коробок (length/width/height/weight/presetCode)
   tariffCode          Int?      // код тарифа перевозчика
   postalCode          String?   // почтовый индекс получателя
   adminNotes          String?   @db.Text

@@ -33,7 +33,13 @@ export function CitySearch() {
   const selectedRate = useDeliveryStore((s) => s.selectedRate)
 
   const cartTotal = useCartStore((s) => s.totalPrice)()
-  const cartWeight = useCartStore((s) => s.totalWeight)()
+  const cartItems = useCartStore((s) => s.items)
+  const itemsForPacking = useCartStore((s) => s.itemsForPacking)()
+  // Стабильная строка для зависимости useEffect — массив каждый рендер новый,
+  // поэтому хэшируем содержимое (вес + количество), чтобы избежать лишних пересчётов.
+  const itemsKey = cartItems
+    .map((i) => `${i.variantId}:${i.quantity}:${i.weight}`)
+    .join("|")
 
   // Fetch rates when city changes
   useEffect(() => {
@@ -49,7 +55,7 @@ export function CitySearch() {
         city: city || undefined,
         region: region || undefined,
         cartTotal,
-        weight: cartWeight || undefined,
+        items: itemsForPacking,
       }),
     })
       .then((r) => r.ok ? r.json() : Promise.reject())
@@ -73,9 +79,10 @@ export function CitySearch() {
         setRatesLoading(false)
       })
     // city is intentionally excluded — cityCode is the unique identifier;
-    // city name is sent in the body but shouldn't trigger re-fetch
+    // city name is sent in the body but shouldn't trigger re-fetch.
+    // itemsForPacking опущен — используем itemsKey как стабильный маркер содержимого корзины.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityCode, postalCode, cartTotal, cartWeight])
+  }, [cityCode, postalCode, cartTotal, itemsKey])
 
   // Debounced city search
   useEffect(() => {

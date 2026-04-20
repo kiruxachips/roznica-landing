@@ -4,6 +4,7 @@ import type {
   DeliveryProvider,
   DeliveryRateRequest,
   DeliveryRate,
+  Package,
   PickupPoint,
   CreateShipmentRequest,
   CreateShipmentResult,
@@ -16,6 +17,69 @@ const DELIVERY_API = "https://delivery.pochta.ru/delivery/v1/calculate"
 const OTPRAVKA_API = "https://otpravka-api.pochta.ru"
 const TRACKING_API = "https://tracking.pochta.ru/rtm34"
 const POCHTA_PVZ_TARIFF_OFFSET = 100000
+
+/**
+ * Считает цену Почты РФ для одной физической коробки. Возвращает null при ошибке.
+ * Также возвращает сроки (минимум/максимум в днях), если удалось получить.
+ */
+async function calculateSinglePackagePrice(params: {
+  objectType: number
+  senderPostalCode: string
+  toPostalCode: string
+  pkg: Package
+  date: string
+}): Promise<{ price: number; minDays: number; maxDays: number } | null> {
+  const { objectType, senderPostalCode, toPostalCode, pkg, date } = params
+  const qs = new URLSearchParams({
+    object: objectType.toString(),
+    from: senderPostalCode,
+    to: toPostalCode,
+    weight: pkg.weight.toString(),
+    group: "0",
+    closed: "1",
+    date,
+  })
+
+  const dimension = Math.max(pkg.length, pkg.width, pkg.height)
+  qs.set("dimension", `${pkg.length}x${pkg.width}x${pkg.height}`)
+  qs.set("dimensiontype", dimension > 60 ? "0" : "1")
+
+  try {
+    const [tariffRes, deliveryRes] = await Promise.allSettled([
+      fetchWithTimeout(`${TARIFF_API}?${qs}`),
+      fetchWithTimeout(
+        `${DELIVERY_API}?${new URLSearchParams({
+          object: objectType.toString(),
+          from: senderPostalCode,
+          to: toPostalCode,
+        })}`
+      ),
+    ])
+
+    if (tariffRes.status !== "fulfilled" || !tariffRes.value.ok) {
+      const reason = tariffRes.status === "rejected" ? tariffRes.reason : `HTTP ${tariffRes.value.status}`
+      console.error("Pochta tariff API failed:", reason)
+      return null
+    }
+
+    const tariffData = await tariffRes.value.json()
+    // Pochta returns price in kopecks
+    const priceRub = Math.ceil((tariffData.ground?.val || tariffData.paynds || 0) / 100)
+
+    let minDays = 5
+    let maxDays = 14
+    if (deliveryRes.status === "fulfilled" && deliveryRes.value.ok) {
+      const data = await deliveryRes.value.json()
+      minDays = data.delivery?.min || 5
+      maxDays = data.delivery?.max || 14
+    }
+
+    return { price: priceRub, minDays, maxDays }
+  } catch (e) {
+    console.error("Pochta calculateSinglePackagePrice error:", e)
+    return null
+  }
+}
 
 export function createPochtaProvider(config: {
   accessToken?: string
@@ -34,6 +98,8 @@ export function createPochtaProvider(config: {
         console.warn("Pochta: senderPostalCode not configured, skipping rate calculation")
         return []
       }
+
+      if (!req.packages || req.packages.length === 0) return []
 
       let postalCode = req.toPostalCode
 
@@ -69,79 +135,54 @@ export function createPochtaProvider(config: {
 
       if (!postalCode) return []
 
-      const params = new URLSearchParams({
-        "object": config.objectType.toString(),
-        "from": config.senderPostalCode,
-        "to": postalCode,
-        "weight": req.weight.toString(),
-        "group": "0",
-        "closed": "1",
-        "date": new Date().toISOString().slice(0, 8) + "01",
-      })
+      // Считаем цену для КАЖДОЙ коробки и суммируем. Сроки берём как max по коробкам
+      // (заказ доедет не раньше, чем доедет самая «медленная» посылка).
+      const date = new Date().toISOString().slice(0, 8) + "01"
+      const results = await Promise.all(
+        req.packages.map((pkg) =>
+          calculateSinglePackagePrice({
+            objectType: config.objectType,
+            senderPostalCode: config.senderPostalCode,
+            toPostalCode: postalCode as string,
+            pkg,
+            date,
+          })
+        )
+      )
 
-      if (req.length && req.width && req.height) {
-        const dimension = Math.max(req.length, req.width, req.height)
-        params.set("dimension", `${req.length}x${req.width}x${req.height}`)
-        params.set("dimensiontype", dimension > 60 ? "0" : "1")
-      }
+      // Если хоть одна коробка не рассчиталась — всю доставку считаем недоступной,
+      // чтобы клиент не получил неполную цену (лучше «нет тарифа», чем «недоплата»).
+      if (results.some((r) => r === null)) return []
 
-      try {
-        const [tariffRes, deliveryRes] = await Promise.allSettled([
-          fetchWithTimeout(`${TARIFF_API}?${params}`),
-          fetchWithTimeout(`${DELIVERY_API}?${new URLSearchParams({
-            "object": config.objectType.toString(),
-            "from": config.senderPostalCode,
-            "to": postalCode,
-          })}`),
-        ])
+      const valid = results as { price: number; minDays: number; maxDays: number }[]
+      const totalPrice = valid.reduce((s, r) => s + r.price, 0)
+      const minDays = Math.max(...valid.map((r) => r.minDays))
+      const maxDays = Math.max(...valid.map((r) => r.maxDays))
 
-        let price = 0
-        if (tariffRes.status === "fulfilled" && tariffRes.value.ok) {
-          const data = await tariffRes.value.json()
-          // Pochta returns price in kopecks
-          price = Math.ceil((data.ground?.val || data.paynds || 0) / 100)
-        } else {
-          const reason = tariffRes.status === "rejected" ? tariffRes.reason : `HTTP ${tariffRes.value.status}`
-          console.error("Pochta tariff API failed:", reason)
-          return []
-        }
-
-        let minDays = 5
-        let maxDays = 14
-        if (deliveryRes.status === "fulfilled" && deliveryRes.value.ok) {
-          const data = await deliveryRes.value.json()
-          minDays = data.delivery?.min || 5
-          maxDays = data.delivery?.max || 14
-        }
-
-        return [
-          {
-            carrier: "pochta",
-            carrierName: "Почта России",
-            tariffCode: config.objectType,
-            tariffName: "Почта России — До двери",
-            deliveryType: "door",
-            price,
-            priceWithMarkup: price,
-            minDays,
-            maxDays,
-          },
-          {
-            carrier: "pochta",
-            carrierName: "Почта России",
-            tariffCode: config.objectType + POCHTA_PVZ_TARIFF_OFFSET,
-            tariffName: "Почта России — До отделения",
-            deliveryType: "pvz",
-            price,
-            priceWithMarkup: price,
-            minDays: Math.max(minDays - 1, 1),
-            maxDays: Math.max(maxDays - 1, minDays),
-          },
-        ]
-      } catch (e) {
-        console.error("Pochta calculateRates error:", e)
-        return []
-      }
+      return [
+        {
+          carrier: "pochta",
+          carrierName: "Почта России",
+          tariffCode: config.objectType,
+          tariffName: "Почта России — До двери",
+          deliveryType: "door",
+          price: totalPrice,
+          priceWithMarkup: totalPrice,
+          minDays,
+          maxDays,
+        },
+        {
+          carrier: "pochta",
+          carrierName: "Почта России",
+          tariffCode: config.objectType + POCHTA_PVZ_TARIFF_OFFSET,
+          tariffName: "Почта России — До отделения",
+          deliveryType: "pvz",
+          price: totalPrice,
+          priceWithMarkup: totalPrice,
+          minDays: Math.max(minDays - 1, 1),
+          maxDays: Math.max(maxDays - 1, minDays),
+        },
+      ]
     },
 
     async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
@@ -201,32 +242,36 @@ export function createPochtaProvider(config: {
       if (!config.accessToken || !config.userAuth) {
         throw new Error("Pochta RF API tokens not configured")
       }
+      if (!req.packages || req.packages.length === 0) {
+        throw new Error("Pochta createShipment: пустой план упаковки")
+      }
 
-      const body = [
-        {
-          "address-type-to": "DEFAULT",
-          "given-name": req.recipientName.split(" ")[0] || req.recipientName,
-          "house-to": "",
-          "index-to": req.deliveryType === "pvz" && req.pickupPointCode
+      // Формируем по одной записи в backlog на каждую физическую коробку.
+      // У Почты каждая коробка = отдельный трек-номер.
+      const body = req.packages.map((pkg, idx) => ({
+        "address-type-to": "DEFAULT",
+        "given-name": req.recipientName.split(" ")[0] || req.recipientName,
+        "house-to": "",
+        "index-to":
+          req.deliveryType === "pvz" && req.pickupPointCode
             ? parseInt(req.pickupPointCode)
             : parseInt(req.recipientPostalCode || "0"),
-          "mail-category": "ORDINARY",
-          "mail-direct": 643,
-          "mail-type": "POSTAL_PARCEL",
-          "mass": req.weight,
-          "order-num": req.orderId,
-          "place-to": req.recipientAddress || "",
-          "postoffice-code": config.senderPostalCode,
-          "recipient-name": req.recipientName,
-          "str-index-to": req.recipientPostalCode || "",
-          "tel-address": parseInt(req.recipientPhone.replace(/\D/g, "")),
-          "dimension": {
-            "height": req.height * 10, // mm
-            "length": req.length * 10,
-            "width": req.width * 10,
-          },
+        "mail-category": "ORDINARY",
+        "mail-direct": 643,
+        "mail-type": "POSTAL_PARCEL",
+        "mass": pkg.weight,
+        "order-num": req.packages.length > 1 ? `${req.orderId}-${idx + 1}` : req.orderId,
+        "place-to": req.recipientAddress || "",
+        "postoffice-code": config.senderPostalCode,
+        "recipient-name": req.recipientName,
+        "str-index-to": req.recipientPostalCode || "",
+        "tel-address": parseInt(req.recipientPhone.replace(/\D/g, "")),
+        "dimension": {
+          height: pkg.height * 10, // mm
+          length: pkg.length * 10,
+          width: pkg.width * 10,
         },
-      ]
+      }))
 
       const res = await fetchWithTimeout(`${OTPRAVKA_API}/1.0/user/backlog`, {
         method: "PUT",
@@ -244,16 +289,23 @@ export function createPochtaProvider(config: {
       }
 
       const data = await res.json()
-      const result = data.result_ids?.[0]
+      const ids: string[] = (data.result_ids || []).map((r: unknown) => String(r))
+      const barcodes: string[] = (data.barcode || []).map((b: unknown) => String(b))
 
       return {
-        carrierOrderId: result?.toString() || "",
-        trackingNumber: data.barcode?.[0] || undefined,
+        // Если коробок несколько — соединяем id и трек-номера через запятую
+        carrierOrderId: ids.join(",") || "",
+        trackingNumber: barcodes.length > 0 ? barcodes.join(",") : undefined,
       }
     },
 
     async getTrackingStatus(barcode: string): Promise<TrackingStatus[]> {
       if (!config.trackingLogin || !config.trackingPassword || !barcode) return []
+
+      // Для мультикоробочных отправок трек-номера сохраняются через запятую;
+      // Берём первый (можно расширить до аггрегации, но статусы обычно синхронны).
+      const firstBarcode = barcode.split(",")[0].trim()
+      if (!firstBarcode) return []
 
       const soapBody = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope"
@@ -263,7 +315,7 @@ export function createPochtaProvider(config: {
   <soap:Body>
     <oper:getOperationHistory>
       <data:OperationHistoryRequest>
-        <data:Barcode>${barcode}</data:Barcode>
+        <data:Barcode>${firstBarcode}</data:Barcode>
         <data:MessageType>0</data:MessageType>
         <data:Language>RUS</data:Language>
       </data:OperationHistoryRequest>

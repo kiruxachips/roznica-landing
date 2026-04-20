@@ -32,12 +32,38 @@ interface SenderLocation {
   isDefault: boolean
 }
 
+interface BoxPreset {
+  code: string
+  name: string
+  length: number
+  width: number
+  height: number
+  tareGrams: number
+  maxWeightGrams: number
+  maxUnits: number
+}
+
+const DEFAULT_BOX_PRESETS: BoxPreset[] = [
+  { code: "S", name: "Маленькая 20×20×20", length: 20, width: 20, height: 20, tareGrams: 150, maxWeightGrams: 2500, maxUnits: 8 },
+  { code: "M", name: "Средняя 31×23×20",   length: 31, width: 23, height: 20, tareGrams: 220, maxWeightGrams: 4500, maxUnits: 14 },
+  { code: "L", name: "Большая 39×26×21",   length: 39, width: 26, height: 21, tareGrams: 300, maxWeightGrams: 7500, maxUnits: 23 },
+]
+
 function parseSenderLocations(json: string): SenderLocation[] {
   try {
     const arr = JSON.parse(json)
     if (Array.isArray(arr) && arr.length > 0) return arr
   } catch { /* ignore */ }
   return []
+}
+
+function parseBoxPresetsLocal(json: string | undefined): BoxPreset[] {
+  if (!json) return DEFAULT_BOX_PRESETS
+  try {
+    const arr = JSON.parse(json)
+    if (Array.isArray(arr) && arr.length > 0) return arr as BoxPreset[]
+  } catch { /* ignore */ }
+  return DEFAULT_BOX_PRESETS
 }
 
 export function DeliverySettingsForm({ settings, rules }: Props) {
@@ -50,6 +76,35 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
   const [senderLocations, setSenderLocations] = useState<SenderLocation[]>(() =>
     parseSenderLocations(settings.sender_locations || "[]")
   )
+  const [boxPresets, setBoxPresets] = useState<BoxPreset[]>(() =>
+    parseBoxPresetsLocal(settings.box_presets)
+  )
+
+  function updateBoxPresets(next: BoxPreset[]) {
+    setBoxPresets(next)
+    setLocalSettings((prev) => ({ ...prev, box_presets: JSON.stringify(next) }))
+  }
+
+  function setBoxPresetField<K extends keyof BoxPreset>(index: number, field: K, value: BoxPreset[K]) {
+    const next = boxPresets.map((p, i) => (i === index ? { ...p, [field]: value } : p))
+    updateBoxPresets(next)
+  }
+
+  function addBoxPreset() {
+    updateBoxPresets([
+      ...boxPresets,
+      { code: `X${boxPresets.length + 1}`, name: "Новая коробка", length: 30, width: 20, height: 15, tareGrams: 200, maxWeightGrams: 3000, maxUnits: 10 },
+    ])
+  }
+
+  function removeBoxPreset(index: number) {
+    if (boxPresets.length <= 1) return
+    updateBoxPresets(boxPresets.filter((_, i) => i !== index))
+  }
+
+  function resetBoxPresets() {
+    updateBoxPresets(DEFAULT_BOX_PRESETS)
+  }
 
   function set(key: string, value: string) {
     setLocalSettings((prev) => ({ ...prev, [key]: value }))
@@ -328,43 +383,131 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               />
             </div>
 
-            <h3 className="text-md font-semibold pt-2">Габариты по умолчанию</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <label className={labelClass}>Вес (г)</label>
-                <input
-                  className={inputClass}
-                  type="number"
-                  value={localSettings.default_weight_grams || ""}
-                  onChange={(e) => set("default_weight_grams", e.target.value)}
-                />
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-md font-semibold">Коробки для упаковки</h3>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={resetBoxPresets}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+                  >
+                    Сбросить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={addBoxPreset}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    Добавить коробку
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className={labelClass}>Длина (см)</label>
-                <input
-                  className={inputClass}
-                  type="number"
-                  value={localSettings.default_length_cm || ""}
-                  onChange={(e) => set("default_length_cm", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Ширина (см)</label>
-                <input
-                  className={inputClass}
-                  type="number"
-                  value={localSettings.default_width_cm || ""}
-                  onChange={(e) => set("default_width_cm", e.target.value)}
-                />
-              </div>
-              <div>
-                <label className={labelClass}>Высота (см)</label>
-                <input
-                  className={inputClass}
-                  type="number"
-                  value={localSettings.default_height_cm || ""}
-                  onChange={(e) => set("default_height_cm", e.target.value)}
-                />
+              <p className="text-xs text-muted-foreground">
+                Алгоритм упаковки выбирает минимальную коробку, куда укладывается заказ по весу и по юнитам
+                (юнит ≈ объём одной 250-граммовой пачки: 250 г = 1, 500 г = 2, 1 кг = 3). Если заказ не влезает —
+                добавляются дополнительные коробки.
+              </p>
+
+              <div className="space-y-3">
+                {boxPresets.map((p, i) => (
+                  <div key={i} className="border border-border rounded-lg p-4 space-y-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className={labelClass}>Код</label>
+                        <input
+                          className={inputClass}
+                          value={p.code}
+                          onChange={(e) => setBoxPresetField(i, "code", e.target.value)}
+                          placeholder="S / M / L"
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <label className={labelClass}>Название</label>
+                        <input
+                          className={inputClass}
+                          value={p.name}
+                          onChange={(e) => setBoxPresetField(i, "name", e.target.value)}
+                          placeholder="Маленькая 20×20×20"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className={labelClass}>Длина (см)</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          value={p.length}
+                          onChange={(e) => setBoxPresetField(i, "length", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Ширина (см)</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          value={p.width}
+                          onChange={(e) => setBoxPresetField(i, "width", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Высота (см)</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          value={p.height}
+                          onChange={(e) => setBoxPresetField(i, "height", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Тара (г)</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={0}
+                          value={p.tareGrams}
+                          onChange={(e) => setBoxPresetField(i, "tareGrams", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+                      <div>
+                        <label className={labelClass}>Макс. вес (г)</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          value={p.maxWeightGrams}
+                          onChange={(e) => setBoxPresetField(i, "maxWeightGrams", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Макс. юнитов</label>
+                        <input
+                          className={inputClass}
+                          type="number"
+                          min={1}
+                          value={p.maxUnits}
+                          onChange={(e) => setBoxPresetField(i, "maxUnits", parseInt(e.target.value) || 0)}
+                        />
+                      </div>
+                      <div className="sm:col-span-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => removeBoxPreset(i)}
+                          disabled={boxPresets.length <= 1}
+                          className="text-sm text-red-600 hover:text-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

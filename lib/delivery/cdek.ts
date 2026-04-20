@@ -107,20 +107,20 @@ export function createCdekProvider(config: {
     carrier: "cdek",
 
     async calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]> {
+      if (!req.packages || req.packages.length === 0) return []
+
       const body = {
         from_location: { code: parseInt(config.senderCityCode) || undefined },
         to_location: {
           code: req.toCityCode ? parseInt(req.toCityCode) : undefined,
           postal_code: req.toPostalCode || undefined,
         },
-        packages: [
-          {
-            weight: req.weight,
-            length: req.length || 20,
-            width: req.width || 15,
-            height: req.height || 10,
-          },
-        ],
+        packages: req.packages.map((p) => ({
+          weight: p.weight,
+          length: p.length,
+          width: p.width,
+          height: p.height,
+        })),
       }
 
       const data = await cdekFetch("/v2/calculator/tarifflist", {
@@ -199,6 +199,25 @@ export function createCdekProvider(config: {
     },
 
     async createShipment(req: CreateShipmentRequest): Promise<CreateShipmentResult> {
+      if (!req.packages || req.packages.length === 0) {
+        throw new Error("CDEK createShipment: пустой план упаковки")
+      }
+
+      // В CDEK один заказ может содержать несколько физических коробок. API требует
+      // items[] в каждой коробке. Мы не знаем реального распределения позиций
+      // по коробкам (bin-packing по конкретным пачкам), поэтому кладём все
+      // декларируемые позиции в первую коробку; остальные получают один
+      // placeholder-элемент с нулевой ценой — CDEK примет, а на цену и на трекинг
+      // это не влияет (цена считается по тарифу, а не по items).
+      const cdekItems = req.items.map((item, i) => ({
+        name: item.name,
+        ware_key: `item_${i}`,
+        payment: { value: 0 },
+        cost: item.price,
+        weight: item.weight,
+        amount: item.quantity,
+      }))
+
       const body: Record<string, unknown> = {
         tariff_code: req.tariffCode,
         from_location: { code: parseInt(req.senderCityCode) },
@@ -206,23 +225,26 @@ export function createCdekProvider(config: {
           name: req.recipientName,
           phones: [{ number: req.recipientPhone }],
         },
-        packages: [
-          {
-            number: "1",
-            weight: req.weight,
-            length: req.length,
-            width: req.width,
-            height: req.height,
-            items: req.items.map((item, i) => ({
-              name: item.name,
-              ware_key: `item_${i}`,
-              payment: { value: 0 },
-              cost: item.price,
-              weight: item.weight,
-              amount: item.quantity,
-            })),
-          },
-        ],
+        packages: req.packages.map((p, idx) => ({
+          number: String(idx + 1),
+          weight: p.weight,
+          length: p.length,
+          width: p.width,
+          height: p.height,
+          items:
+            idx === 0
+              ? cdekItems
+              : [
+                  {
+                    name: "Дополнительное грузовое место",
+                    ware_key: `extra_${idx}`,
+                    payment: { value: 0 },
+                    cost: 0,
+                    weight: p.weight,
+                    amount: 1,
+                  },
+                ],
+        })),
       }
 
       if (req.deliveryType === "pvz" && req.pickupPointCode) {

@@ -7,6 +7,7 @@ import {
 } from "@/lib/dal/delivery-settings"
 import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
+import { planPackages, parseBoxPresets, type ItemToPack, type Package } from "./packaging"
 import type { CreateShipmentRequest } from "./types"
 
 function parseWeightGrams(str: string): number {
@@ -17,6 +18,24 @@ function parseWeightGrams(str: string): number {
   if (isNaN(num)) return 0
   const unit = match[2] || "г"
   return unit === "кг" || unit === "kg" ? Math.round(num * 1000) : Math.round(num)
+}
+
+function isValidPackage(p: unknown): p is Package {
+  if (!p || typeof p !== "object") return false
+  const o = p as Record<string, unknown>
+  return (
+    typeof o.length === "number" && o.length > 0 &&
+    typeof o.width === "number" && o.width > 0 &&
+    typeof o.height === "number" && o.height > 0 &&
+    typeof o.weight === "number" && o.weight > 0 &&
+    typeof o.presetCode === "string"
+  )
+}
+
+function parsePackagePlan(raw: unknown): Package[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const valid = raw.filter(isValidPackage)
+  return valid.length > 0 ? valid : null
 }
 
 export async function createShipmentForOrder(
@@ -48,6 +67,21 @@ export async function createShipmentForOrder(
     sender = getDefaultSenderLocation(settings)
   }
 
+  // Берём сохранённый план упаковки, иначе пересчитываем из позиций заказа.
+  const storedPlan = parsePackagePlan(order.packagePlan as unknown)
+  let packages: Package[]
+  if (storedPlan && storedPlan.length > 0) {
+    packages = storedPlan
+  } else {
+    const presets = parseBoxPresets(settings.box_presets)
+    const items: ItemToPack[] = order.items.map((item) => ({
+      weightGrams:
+        parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300,
+      quantity: item.quantity,
+    }))
+    packages = planPackages(items, presets)
+  }
+
   const req: CreateShipmentRequest = {
     orderId: order.id,
     carrier: order.deliveryMethod as "cdek" | "pochta",
@@ -55,6 +89,7 @@ export async function createShipmentForOrder(
     deliveryType: (order.deliveryType as "door" | "pvz") || "pvz",
     pickupPointCode: order.pickupPointCode || undefined,
     senderCityCode: sender.cityCode,
+    senderPostalCode: sender.postalCode,
     recipientCityCode: order.destinationCityCode || undefined,
     recipientPostalCode: order.postalCode || undefined,
     recipientName: order.customerName,
@@ -62,17 +97,12 @@ export async function createShipmentForOrder(
     recipientAddress: order.deliveryAddress || undefined,
     items: order.items.map((item) => ({
       name: item.name,
-      weight: parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300,
+      weight:
+        parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300,
       price: item.price,
       quantity: item.quantity,
     })),
-    weight: order.packageWeight || order.items.reduce(
-      (sum, item) => sum + (parseWeightGrams(item.weight) || parseInt(settings.default_weight_grams) || 300) * item.quantity,
-      0
-    ),
-    length: parseInt(settings.default_length_cm) || 20,
-    width: parseInt(settings.default_width_cm) || 15,
-    height: parseInt(settings.default_height_cm) || 10,
+    packages,
   }
 
   let result
@@ -81,8 +111,11 @@ export async function createShipmentForOrder(
     if (!settings.cdek_client_id || !settings.cdek_client_secret) {
       throw new Error("CDEK credentials not configured")
     }
-    let tariffs: number[] = [136, 137]
-    try { tariffs = JSON.parse(settings.cdek_tariffs) } catch { /* defaults */ }
+    let tariffs: number[] = [233, 234, 136, 137]
+    try {
+      const parsed = JSON.parse(settings.cdek_tariffs)
+      if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed
+    } catch { /* defaults */ }
 
     const provider = createCdekProvider({
       clientId: settings.cdek_client_id,
@@ -122,8 +155,11 @@ export async function refreshTrackingForOrder(orderId: string) {
 
   if (order.deliveryMethod === "cdek") {
     const sender = getDefaultSenderLocation(settings)
-    let tariffs: number[] = [136, 137]
-    try { tariffs = JSON.parse(settings.cdek_tariffs) } catch { /* defaults */ }
+    let tariffs: number[] = [233, 234, 136, 137]
+    try {
+      const parsed = JSON.parse(settings.cdek_tariffs)
+      if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed
+    } catch { /* defaults */ }
 
     const provider = createCdekProvider({
       clientId: settings.cdek_client_id,
@@ -133,7 +169,10 @@ export async function refreshTrackingForOrder(orderId: string) {
       senderCityCode: sender.cityCode,
     })
 
-    const statuses = await provider.getTrackingStatus(order.carrierOrderId)
+    // Для CDEK сохранён UUID заказа (один). Мульти-коробки внутри одного заказа —
+    // CDEK возвращает агрегированные статусы.
+    const firstId = order.carrierOrderId.split(",")[0].trim()
+    const statuses = await provider.getTrackingStatus(firstId)
     if (statuses.length > 0) {
       const latest = statuses[0]
       await prisma.order.update({

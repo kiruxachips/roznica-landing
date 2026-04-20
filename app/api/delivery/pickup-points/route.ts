@@ -17,8 +17,11 @@ export async function GET(request: NextRequest) {
     const sender = getDefaultSenderLocation(settings)
 
     if (carrier === "cdek" && settings.cdek_enabled === "true") {
-      let tariffs: number[] = [136, 137]
-      try { tariffs = JSON.parse(settings.cdek_tariffs) } catch { /* defaults */ }
+      let tariffs: number[] = [233, 234, 136, 137]
+      try {
+        const parsed = JSON.parse(settings.cdek_tariffs)
+        if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed
+      } catch { /* defaults */ }
 
       const provider = createCdekProvider({
         clientId: settings.cdek_client_id,

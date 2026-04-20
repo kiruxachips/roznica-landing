@@ -1,3 +1,7 @@
+import type { Package } from "./packaging"
+
+export type { Package } from "./packaging"
+
 export interface DeliveryRateRequest {
   fromCityCode?: string
   fromPostalCode?: string
@@ -5,10 +9,8 @@ export interface DeliveryRateRequest {
   toPostalCode?: string
   toCity?: string
   toRegion?: string
-  weight: number // grams
-  length?: number // cm
-  width?: number // cm
-  height?: number // cm
+  /** Физический план упаковки — массив коробок. Не пустой. */
+  packages: Package[]
   cartTotal?: number // rubles, for markup filtering
 }
 
@@ -42,6 +44,7 @@ export interface CreateShipmentRequest {
   deliveryType: "door" | "pvz"
   pickupPointCode?: string
   senderCityCode: string
+  senderPostalCode?: string
   recipientCityCode?: string
   recipientPostalCode?: string
   recipientName: string
@@ -49,14 +52,12 @@ export interface CreateShipmentRequest {
   recipientAddress?: string
   items: {
     name: string
-    weight: number // grams
+    weight: number // grams per unit
     price: number // rubles
     quantity: number
   }[]
-  weight: number // total grams
-  length: number
-  width: number
-  height: number
+  /** Физический план упаковки — массив коробок. Не пустой. */
+  packages: Package[]
 }
 
 export interface CreateShipmentResult {

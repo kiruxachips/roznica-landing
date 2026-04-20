@@ -2,6 +2,11 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 import type { CartItem } from "@/lib/types"
 
+export interface CartItemForPacking {
+  weightGrams: number
+  quantity: number
+}
+
 interface CartState {
   items: CartItem[]
   promoCode: string | null
@@ -14,8 +19,10 @@ interface CartState {
   clearCart: () => void
   totalItems: () => number
   totalPrice: () => number
-  /** Total weight in grams with 20% packaging buffer */
+  /** Сумма НЕТТО-веса всех товаров (без тары коробок), грамм */
   totalWeight: () => number
+  /** Позиции корзины для расчёта плана упаковки */
+  itemsForPacking: () => CartItemForPacking[]
   setPromo: (code: string, type: "percent" | "fixed", value: number, discount: number) => void
   clearPromo: () => void
 }
@@ -25,10 +32,10 @@ function calcSubtotal(items: CartItem[]) {
 }
 
 /** Parse weight string like "250г", "500г", "1кг" into grams */
-function parseWeightGrams(w: string): number {
+export function parseWeightGrams(w: string): number {
   const n = parseFloat(w.replace(",", "."))
   if (isNaN(n)) return 0
-  if (w.includes("кг")) return Math.round(n * 1000)
+  if (w.toLowerCase().includes("кг")) return Math.round(n * 1000)
   return Math.round(n) // already grams
 }
 
@@ -100,10 +107,12 @@ export const useCartStore = create<CartState>()(
 
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
       totalPrice: () => get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
-      totalWeight: () => {
-        const net = get().items.reduce((sum, i) => sum + parseWeightGrams(i.weight) * i.quantity, 0)
-        return Math.ceil(net * 1.2) // +20% packaging buffer
-      },
+      totalWeight: () =>
+        get().items.reduce((sum, i) => sum + parseWeightGrams(i.weight) * i.quantity, 0),
+      itemsForPacking: () =>
+        get()
+          .items.map((i) => ({ weightGrams: parseWeightGrams(i.weight), quantity: i.quantity }))
+          .filter((i) => i.weightGrams > 0 && i.quantity > 0),
 
       setPromo: (code, type, value, discount) =>
         set({

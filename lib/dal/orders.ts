@@ -1,9 +1,20 @@
 import crypto from "crypto"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx } from "@/lib/dal/bonuses"
-import { calculateDeliveryRates } from "@/lib/delivery"
+import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
+
+function parseItemWeightGrams(w: string): number {
+  const lower = w.toLowerCase().trim()
+  const match = lower.match(/^([\d.,]+)\s*(кг|г|kg|g)?$/)
+  if (!match) return 0
+  const n = parseFloat(match[1].replace(",", "."))
+  if (isNaN(n)) return 0
+  const unit = match[2] || "г"
+  return unit === "кг" || unit === "kg" ? Math.round(n * 1000) : Math.round(n)
+}
 
 function generateOrderNumber(): string {
   const date = new Date()
@@ -64,12 +75,24 @@ export async function createOrder(data: OrderData) {
     bonusUsed = Math.min(data.bonusAmount, maxBonus, user?.bonusBalance ?? 0)
   }
 
+  // Позиции для расчёта плана упаковки и, соответственно, цены доставки
+  const packingItems: ItemToPack[] = data.items
+    .map((i) => ({ weightGrams: parseItemWeightGrams(i.weight), quantity: i.quantity }))
+    .filter((i) => i.weightGrams > 0 && i.quantity > 0)
+
+  // Строим физический план упаковки — сохраняем в заказ для прозрачности отгрузки.
+  const packagePlan = packingItems.length > 0 ? await buildPackagePlan(packingItems) : null
+  const totalPackageWeight = packagePlan
+    ? packagePlan.reduce((s, p) => s + p.weight, 0)
+    : null
+
   // Delivery price: always calculate server-side, never trust client price
   let deliveryPrice = 0
   if (data.tariffCode !== undefined && data.deliveryMethod) {
     const rates = await calculateDeliveryRates({
       toCityCode: data.destinationCityCode,
       toPostalCode: data.postalCode,
+      items: packingItems,
       cartTotal: afterDiscount - bonusUsed,
     })
     const matchingRate = rates.find(
@@ -126,6 +149,8 @@ export async function createOrder(data: OrderData) {
         estimatedDelivery: data.estimatedDelivery,
         tariffCode: data.tariffCode,
         postalCode: data.postalCode,
+        packagePlan: (packagePlan ?? undefined) as Prisma.InputJsonValue | undefined,
+        packageWeight: totalPackageWeight ?? undefined,
         items: {
           create: data.items.map((item) => ({
             productId: item.productId,

@@ -258,11 +258,18 @@ async function main() {
     sender_city: "",
     sender_city_code: "",
     sender_postal_code: "",
-    // Package defaults
+    // Package fallback (для старых путей расчёта) — используется когда в корзине нет items
     default_weight_grams: "300",
     default_length_cm: "20",
     default_width_cm: "15",
     default_height_cm: "10",
+    // Box presets — физические коробки, используемые для упаковки.
+    // Редактируются в админке, алгоритм planPackages выбирает подходящую.
+    box_presets: JSON.stringify([
+      { code: "S", name: "Маленькая 20×20×20", length: 20, width: 20, height: 20, tareGrams: 150, maxWeightGrams: 2500, maxUnits: 8 },
+      { code: "M", name: "Средняя 31×23×20",   length: 31, width: 23, height: 20, tareGrams: 220, maxWeightGrams: 4500, maxUnits: 14 },
+      { code: "L", name: "Большая 39×26×21",   length: 39, width: 26, height: 21, tareGrams: 300, maxWeightGrams: 7500, maxUnits: 23 },
+    ]),
     // Free delivery threshold
     free_delivery_threshold: "3000",
     // CDEK
@@ -270,7 +277,9 @@ async function main() {
     cdek_client_id: "",
     cdek_client_secret: "",
     cdek_test_mode: "true",
-    cdek_tariffs: JSON.stringify([136, 137]),
+    // Эконом-тарифы (233/234) первыми — они дешевле магистральных (136/137).
+    // Покупателю показываем оба: пусть сам выбирает между «подешевле» и «побыстрее».
+    cdek_tariffs: JSON.stringify([233, 234, 136, 137]),
     // Pochta RF — enabled by default (tariff API works without tokens)
     pochta_enabled: "true",
     pochta_access_token: "",

@@ -3,6 +3,7 @@ import { getDeliverySettings, getMarkupRules, getDefaultSenderLocation, getDeliv
 import { createCdekProvider } from "./cdek"
 import { createPochtaProvider } from "./pochta"
 import { createCourierProvider } from "./courier"
+import { planPackages, parseBoxPresets, totalPlanWeight, type ItemToPack } from "./packaging"
 import type { DeliveryMarkupRule, DeliveryRule } from "@prisma/client"
 
 function applyMarkups(
@@ -95,12 +96,17 @@ function matchesRule(
   return true
 }
 
+/**
+ * Основная точка расчёта тарифов доставки. Принимает позиции корзины,
+ * строит физический план упаковки и отправляет всем включённым провайдерам.
+ */
 export async function calculateDeliveryRates(params: {
   toCityCode?: string
   toPostalCode?: string
   toCity?: string
   toRegion?: string
-  cartWeight?: number
+  /** Позиции корзины для расчёта плана упаковки. Если не передано — берётся минимальный план из настроек. */
+  items?: ItemToPack[]
   cartTotal?: number
 }): Promise<DeliveryRate[]> {
   const settings = await getDeliverySettings()
@@ -108,7 +114,17 @@ export async function calculateDeliveryRates(params: {
   const deliveryRules = await getDeliveryRules()
   const sender = getDefaultSenderLocation(settings)
 
-  const weight = params.cartWeight || parseInt(settings.default_weight_grams) || 300
+  const presets = parseBoxPresets(settings.box_presets)
+
+  // Если items не передали (легаси-вызовы, тест-заказы) — строим план из default_weight_grams как одной «пачки».
+  const fallbackWeight = parseInt(settings.default_weight_grams) || 300
+  const items: ItemToPack[] =
+    params.items && params.items.length > 0
+      ? params.items
+      : [{ weightGrams: fallbackWeight, quantity: 1 }]
+
+  const packages = planPackages(items, presets)
+  const totalWeight = totalPlanWeight(packages)
   const cartTotal = params.cartTotal || 0
 
   const req: DeliveryRateRequest = {
@@ -118,10 +134,7 @@ export async function calculateDeliveryRates(params: {
     toPostalCode: params.toPostalCode,
     toCity: params.toCity,
     toRegion: params.toRegion,
-    weight,
-    length: parseInt(settings.default_length_cm) || 20,
-    width: parseInt(settings.default_width_cm) || 15,
-    height: parseInt(settings.default_height_cm) || 10,
+    packages,
     cartTotal,
   }
 
@@ -129,9 +142,10 @@ export async function calculateDeliveryRates(params: {
 
   // CDEK
   if (settings.cdek_enabled === "true" && settings.cdek_client_id && settings.cdek_client_secret) {
-    let tariffs: number[] = [136, 137]
+    let tariffs: number[] = [233, 234, 136, 137]
     try {
-      tariffs = JSON.parse(settings.cdek_tariffs)
+      const parsed = JSON.parse(settings.cdek_tariffs)
+      if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed
     } catch { /* use defaults */ }
 
     providers.push(
@@ -179,7 +193,7 @@ export async function calculateDeliveryRates(params: {
     }
   }
 
-  const withMarkups = applyMarkups(allRates, markupRules, cartTotal, weight)
+  const withMarkups = applyMarkups(allRates, markupRules, cartTotal, totalWeight)
 
   // Apply conditional delivery rules (free delivery, discounts, disabling)
   const withRules = applyDeliveryRules(withMarkups, deliveryRules, cartTotal, params.toCity)
@@ -188,7 +202,15 @@ export async function calculateDeliveryRates(params: {
   return withRules.sort((a, b) => a.priceWithMarkup - b.priceWithMarkup)
 }
 
+/** Построить план упаковки для текущих настроек — хелпер для переиспользования в слое создания заказа. */
+export async function buildPackagePlan(items: ItemToPack[]) {
+  const settings = await getDeliverySettings()
+  const presets = parseBoxPresets(settings.box_presets)
+  return planPackages(items, presets)
+}
+
 // Re-export providers for shipment creation
 export { createCdekProvider } from "./cdek"
 export { createPochtaProvider } from "./pochta"
 export { createCourierProvider } from "./courier"
+export type { ItemToPack, Package } from "./packaging"
