@@ -7,6 +7,21 @@ import { prisma } from "@/lib/prisma"
 // Performs token exchange (with device_id which @auth/core can't pass), creates/links user,
 // and issues a NextAuth-compatible session cookie so the rest of the app works unchanged.
 export async function GET(request: NextRequest) {
+  // Build public origin up-front so the catch-all error handler can redirect too
+  const headersList = await headers()
+  const forwardedHost = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "millor-coffee.ru"
+  const proto = headersList.get("x-forwarded-proto") ?? "https"
+  const origin = `${proto}://${forwardedHost}`
+
+  try {
+    return await handleCallback(request, origin, proto)
+  } catch (e) {
+    console.error("VK callback fatal error:", e)
+    return NextResponse.redirect(`${origin}/auth/login?error=vk_unexpected`)
+  }
+}
+
+async function handleCallback(request: NextRequest, origin: string, proto: string) {
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get("code")
   const deviceId = searchParams.get("device_id")
@@ -15,12 +30,6 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies()
   const codeVerifier = cookieStore.get("vk_code_verifier")?.value
   const expectedState = cookieStore.get("vk_state")?.value
-
-  // Build public origin from forwarded headers — `request.url` inside Docker resolves to 0.0.0.0:3000
-  const headersList = await headers()
-  const forwardedHost = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "millor-coffee.ru"
-  const proto = headersList.get("x-forwarded-proto") ?? "https"
-  const origin = `${proto}://${forwardedHost}`
 
   function fail(reason: string) {
     console.error("VK callback error:", reason)
@@ -205,11 +214,20 @@ export async function GET(request: NextRequest) {
     if (!user.avatarUrl && userInfo.avatar) updates.avatarUrl = userInfo.avatar
     if (!user.image && userInfo.avatar) updates.image = userInfo.avatar
     if (!user.email && emailLower) {
-      updates.email = emailLower
-      updates.emailVerified = new Date()
+      // Guard against unique email collision — another user may own this email already
+      const conflict = await prisma.user.findUnique({ where: { email: emailLower }, select: { id: true } })
+      if (!conflict || conflict.id === user.id) {
+        updates.email = emailLower
+        updates.emailVerified = new Date()
+      }
     }
     if (Object.keys(updates).length > 0) {
-      user = await prisma.user.update({ where: { id: user.id }, data: updates })
+      try {
+        user = await prisma.user.update({ where: { id: user.id }, data: updates })
+      } catch (e) {
+        console.error("VK backfill update failed:", e)
+        // Non-fatal — continue with the current user data
+      }
     }
   }
 
