@@ -550,12 +550,13 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               <label className={labelClass}>Тип отправления</label>
               <select
                 className={inputClass}
-                value={localSettings.pochta_object_type || "47030"}
+                value={localSettings.pochta_object_type || "23030"}
                 onChange={(e) => set("pochta_object_type", e.target.value)}
               >
-                <option value="47030">Посылка нестандартная</option>
-                <option value="27030">Посылка 1 класса нестандартная</option>
+                <option value="23030">Посылка онлайн обыкновенная — рекомендуется для интернет-магазина</option>
                 <option value="4030">Посылка обыкновенная</option>
+                <option value="47030">Посылка 1 класса (экспресс, дорого)</option>
+                <option value="27030">Посылка 1 класса нестандартная</option>
               </select>
             </div>
             <p className="text-xs text-muted-foreground">
