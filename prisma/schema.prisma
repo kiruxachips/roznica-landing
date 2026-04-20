@@ -52,6 +52,9 @@ model Product {
   body            Int?             // 0-100
   brewingMethods  String[]         @default([])
 
+  // Pack images
+  smallImage      String?          // 250г pack image path, e.g. /images/coffee/Small/Peru.jpg
+
   // SEO
   metaTitle       String?
   metaDescription String?

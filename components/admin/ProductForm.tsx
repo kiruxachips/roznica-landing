@@ -77,6 +77,7 @@ interface ProductFormProps {
     brewingMethods: string[]
     metaTitle: string | null
     metaDescription: string | null
+    smallImage: string | null
     variants: Variant[]
     images: ProductImage[]
   }
@@ -114,6 +115,7 @@ export function ProductForm({ product, categories, collections = [], productColl
   const [brewingMethods, setBrewingMethods] = useState<string[]>(product?.brewingMethods ?? [])
   const [metaTitle, setMetaTitle] = useState(product?.metaTitle ?? "")
   const [metaDescription, setMetaDescription] = useState(product?.metaDescription ?? "")
+  const [smallImage, setSmallImage] = useState(product?.smallImage ?? "")
 
   // Inline create state (only for new products)
   const [localVariants, setLocalVariants] = useState<LocalVariant[]>([])
@@ -248,6 +250,7 @@ export function ProductForm({ product, categories, collections = [], productColl
         productForm: productForm || undefined,
         metaTitle: metaTitle || undefined,
         metaDescription: metaDescription || undefined,
+        smallImage: smallImage || undefined,
       }
 
       // Only include attributes that are visible for this category
@@ -603,6 +606,27 @@ export function ProductForm({ product, categories, collections = [], productColl
           />
         </section>
       )}
+
+      {/* Pack images */}
+      <section className="bg-white rounded-xl p-6 shadow-sm border border-border">
+        <h2 className="text-lg font-semibold mb-4">Изображения по весу</h2>
+        <div>
+          <label className="block text-sm font-medium mb-1">Фото пачки 250г</label>
+          <input
+            value={smallImage}
+            onChange={(e) => setSmallImage(e.target.value)}
+            placeholder="/images/coffee/Small/Peru.jpg"
+            className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Путь к изображению маленькой пачки. Доступные файлы в{" "}
+            <code className="bg-muted px-1 rounded">/images/coffee/Small/</code>
+          </p>
+          {smallImage && (
+            <img src={smallImage} alt="250г preview" className="mt-2 h-20 object-contain rounded border" />
+          )}
+        </div>
+      </section>
 
       {/* SEO */}
       <section className="bg-white rounded-xl p-6 shadow-sm border border-border">

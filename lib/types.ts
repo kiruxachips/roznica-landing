@@ -13,6 +13,7 @@ export interface ProductCard {
   flavorNotes: string[]
   primaryImage: string | null
   primaryImageAlt: string | null
+  smallImage?: string | null
   minPrice: number | null
   minOldPrice: number | null
   reviewCount: number

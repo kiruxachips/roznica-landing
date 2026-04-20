@@ -24,9 +24,13 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
 
   const variants = product.variants ?? (product.firstVariant ? [product.firstVariant] : [])
   const availableVariants = variants.filter((v) => v.stock > 0)
-  const [selectedIdx, setSelectedIdx] = useState(0)
+  const defaultIdx = availableVariants.findIndex((v) => v.weight.includes("1к"))
+  const [selectedIdx, setSelectedIdx] = useState(defaultIdx >= 0 ? defaultIdx : 0)
   const selected = availableVariants[selectedIdx] || variants[0]
   const outOfStock = availableVariants.length === 0
+
+  const is250g = selected?.weight?.includes("250")
+  const displayImage = (is250g && product.smallImage) ? product.smallImage : product.primaryImage
 
   function handleQuickAdd(e: React.MouseEvent) {
     e.preventDefault()
@@ -72,9 +76,9 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
       <div className="h-full flex flex-col overflow-hidden rounded-xl bg-white border border-border/60 shadow-sm hover:shadow-md hover:border-border transition-all duration-300">
         {/* Image */}
         <div className="relative aspect-[4/5] bg-neutral-50 overflow-hidden">
-          {product.primaryImage ? (
+          {displayImage ? (
             <Image
-              src={product.primaryImage}
+              src={displayImage}
               alt={product.primaryImageAlt ?? product.name}
               fill
               className="object-cover object-top group-hover:scale-105 transition-transform duration-500"

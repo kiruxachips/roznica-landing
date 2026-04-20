@@ -46,3 +46,6 @@ client_secret_*.json
 *.png
 !public/images/tea/*.png
 !public/images/rastvorimka/*.png
+
+# Database backups
+backups/
