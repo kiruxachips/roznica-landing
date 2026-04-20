@@ -65,17 +65,29 @@ export function OAuthButtons() {
       </div>
 
       <div className="grid gap-2">
-        {enabledProviders.map((provider) => (
-          <button
-            key={provider.id}
-            type="button"
-            onClick={() => signIn(provider.id, { callbackUrl: "/account" })}
-            className={`flex items-center justify-center gap-3 w-full h-11 rounded-xl text-sm font-medium transition-colors ${provider.bg} ${provider.text}`}
-          >
-            {provider.icon}
-            Войти через {provider.name}
-          </button>
-        ))}
+        {enabledProviders.map((provider) => {
+          const className = `flex items-center justify-center gap-3 w-full h-11 rounded-xl text-sm font-medium transition-colors ${provider.bg} ${provider.text}`
+          // VK ID (id.vk.ru) uses our custom route — @auth/core can't pass device_id
+          if (provider.id === "vk") {
+            return (
+              <a key={provider.id} href="/api/auth/vk/start" className={className}>
+                {provider.icon}
+                Войти через {provider.name}
+              </a>
+            )
+          }
+          return (
+            <button
+              key={provider.id}
+              type="button"
+              onClick={() => signIn(provider.id, { callbackUrl: "/account" })}
+              className={className}
+            >
+              {provider.icon}
+              Войти через {provider.name}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
