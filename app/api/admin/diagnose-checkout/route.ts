@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
+import { createOrder as createOrderDAL } from "@/lib/dal/orders"
 
 /**
  * Диагностический эндпоинт — прогоняет стадии создания заказа БЕЗ реального save.
@@ -151,6 +152,73 @@ export async function POST(req: NextRequest) {
       })
     } catch (e) {
       pushErr("yookassa_env_check", e)
+    }
+
+    // 6. Попытка реального createOrderDAL (БЕЗ YooKassa payment) + откат
+    try {
+      const items = variants.map((v, i) => ({
+        productId: "", // reloads below
+        variantId: v.id,
+        name: v.name,
+        weight: v.weight,
+        price: v.price,
+        quantity: quantities[i],
+      }))
+      // Подтянем productId для каждого
+      for (let i = 0; i < variants.length; i++) {
+        const pv = await prisma.productVariant.findUnique({
+          where: { id: variants[i].id },
+          select: { productId: true },
+        })
+        items[i].productId = pv?.productId || ""
+      }
+
+      const testOrder = await createOrderDAL({
+        customerName: "DIAG TEST",
+        customerEmail: undefined,
+        customerPhone: "+79990000000",
+        deliveryAddress: "DIAG",
+        deliveryMethod,
+        paymentMethod: "online",
+        notes: "diagnose-checkout",
+        userId: undefined,
+        deliveryType: "door",
+        deliveryPrice: matchingRate?.priceWithMarkup ?? 0,
+        destinationCity: city,
+        destinationCityCode: cityCode,
+        estimatedDelivery: matchingRate ? `${matchingRate.minDays}-${matchingRate.maxDays} дн.` : undefined,
+        tariffCode,
+        postalCode,
+        items,
+      })
+      pushOk("dal_createOrder", {
+        orderId: testOrder.id,
+        orderNumber: testOrder.orderNumber,
+        total: testOrder.total,
+        deliveryPrice: testOrder.deliveryPrice,
+      })
+
+      // Откат: возвращаем stock через adjustStock + удаляем заказ + StockHistory
+      // Делаем простой delete — cascade уберёт items и историю через FK
+      await prisma.$transaction(async (tx) => {
+        // Восстановим stock напрямую (не через adjustStock, чтобы не писать в историю)
+        for (const item of testOrder.items) {
+          if (!item.variantId) continue
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          })
+        }
+        // Удалим записи истории стока для этого заказа
+        await tx.stockHistory.deleteMany({ where: { orderId: testOrder.id } })
+        // Удалим записи log статусов
+        await tx.orderStatusLog.deleteMany({ where: { orderId: testOrder.id } })
+        // Удалим сам заказ (items удалятся cascade)
+        await tx.order.delete({ where: { id: testOrder.id } })
+      })
+      pushOk("dal_createOrder_rollback", "order + stock + history cleaned up")
+    } catch (e) {
+      pushErr("dal_createOrder", e)
     }
 
     return NextResponse.json({ ok: true, steps })
