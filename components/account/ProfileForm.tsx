@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { updateProfile, changePassword } from "@/lib/actions/profile"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 interface ProfileFormProps {
   user: {
@@ -107,12 +108,10 @@ export function ProfileForm({ user }: ProfileFormProps) {
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Телефон</label>
-            <input
+            <PhoneInput
               name="phone"
-              type="tel"
               defaultValue={user.phone || ""}
               className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="+7 (999) 123-45-67"
             />
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react"
 import { createAddress, updateAddress } from "@/lib/actions/addresses"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 interface AddressFormProps {
   address?: {
@@ -88,11 +89,9 @@ export function AddressForm({ address, onDone }: AddressFormProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">Телефон получателя</label>
-          <input
+          <PhoneInput
             name="recipientPhone"
-            type="tel"
             defaultValue={address?.recipientPhone || ""}
-            placeholder="+7 (999) 123-45-67"
             className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>

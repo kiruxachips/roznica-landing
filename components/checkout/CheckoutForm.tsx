@@ -12,6 +12,7 @@ import { CitySearch } from "./CitySearch"
 import { AddressInput } from "./AddressInput"
 import { DeliveryOptions } from "./DeliveryOptions"
 import { PickupPointMap } from "./PickupPointMap"
+import { PhoneInput } from "@/components/ui/phone-input"
 
 interface UserProfile {
   name: string | null
@@ -241,14 +242,12 @@ export function CheckoutForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Телефон *</label>
-              <input
+              <PhoneInput
                 name="phone"
-                type="tel"
                 required
                 defaultValue={profile?.phone || ""}
                 onChange={() => setFieldErrors((e) => ({ ...e, phone: "" }))}
                 className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.phone ? "border-red-400" : "border-input"}`}
-                placeholder="+7 (999) 123-45-67"
               />
               {fieldErrors.phone && <p className="text-xs text-red-600 mt-1">{fieldErrors.phone}</p>}
             </div>
