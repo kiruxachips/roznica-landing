@@ -61,7 +61,7 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
       slug: rec.slug,
     })
     setAddedId(v.id)
-    openDrawer()
+    if (variant === "drawer") openDrawer()
     setTimeout(() => setAddedId(null), 1500)
   }
 
