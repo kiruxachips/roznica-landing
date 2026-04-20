@@ -88,12 +88,15 @@ export async function createOrder(data: OrderData) {
     ? packagePlan.reduce((s, p) => s + p.weight, 0)
     : null
 
-  // Delivery price: always calculate server-side, never trust client price
+  // Delivery price: always calculate server-side, never trust client price.
+  // Передаём ВСЕ доступные параметры локации (город-строка нужен для Почты,
+  // когда у клиента нет postalCode — провайдер разрешает через DaData/by-address).
   let deliveryPrice = 0
   if (data.tariffCode !== undefined && data.deliveryMethod) {
     const rates = await calculateDeliveryRates({
       toCityCode: data.destinationCityCode,
       toPostalCode: data.postalCode,
+      toCity: data.destinationCity,
       items: packingItems,
       cartTotal: afterDiscount - bonusUsed,
     })
@@ -101,7 +104,11 @@ export async function createOrder(data: OrderData) {
       (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod
     )
     if (!matchingRate) {
-      throw new Error("Выбранный тариф доставки недоступен. Обновите страницу и выберите доставку заново")
+      throw new Error(
+        `Выбранный тариф ${data.deliveryMethod}/${data.tariffCode} недоступен. ` +
+          `Провайдеры вернули: ${rates.map((r) => `${r.carrier}/${r.tariffCode}`).join(", ") || "ничего"}. ` +
+          `Обновите страницу и выберите доставку заново`
+      )
     }
     deliveryPrice = matchingRate.priceWithMarkup
   }
