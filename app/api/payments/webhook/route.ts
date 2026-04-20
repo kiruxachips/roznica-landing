@@ -171,6 +171,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({}, { status: 200 })
     }
 
+    // Stock restoration is in the same transaction as status update — atomic.
+    // If any step fails the whole transaction rolls back and nothing is lost.
     await prisma.$transaction([
       prisma.order.update({
         where: { id: order.id },
@@ -179,17 +181,15 @@ export async function POST(request: NextRequest) {
       prisma.orderStatusLog.create({
         data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
       }),
+      ...order.items
+        .filter((item) => item.variantId)
+        .map((item) =>
+          prisma.productVariant.update({
+            where: { id: item.variantId! },
+            data: { stock: { increment: item.quantity } },
+          })
+        ),
     ])
-
-    // Return stock for cancelled payment
-    for (const item of order.items) {
-      if (item.variantId) {
-        await prisma.productVariant.update({
-          where: { id: item.variantId },
-          data: { stock: { increment: item.quantity } },
-        })
-      }
-    }
 
     // Refund bonuses if used
     if (order.bonusUsed > 0 && order.userId) {

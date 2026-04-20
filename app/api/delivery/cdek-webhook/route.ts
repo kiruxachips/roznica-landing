@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.CDEK_WEBHOOK_SECRET
@@ -97,6 +98,13 @@ export async function POST(request: NextRequest) {
           changedBy: "cdek-webhook",
         },
       })
+
+      // Credit bonuses on delivery — same as admin panel updateOrderStatus path
+      if (updateData.status === "delivered" && order.userId) {
+        creditBonusesForOrder(order.userId, order.id, order.total).catch((e) =>
+          console.error("CDEK webhook: failed to credit bonuses for order", order.id, e)
+        )
+      }
     }
   }
 

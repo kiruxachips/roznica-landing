@@ -83,11 +83,20 @@ export async function createOrder(data: OrderData) {
   const total = afterDiscount - bonusUsed + deliveryPrice
 
   const order = await prisma.$transaction(async (tx) => {
+    // Atomically verify and increment promo usage inside the transaction.
+    // Pre-validation (above) is advisory; this is the real guard against race conditions.
     if (promoCodeId) {
-      await tx.promoCode.update({
-        where: { id: promoCodeId },
-        data: { usageCount: { increment: 1 } },
-      })
+      const affected = await tx.$executeRaw`
+        UPDATE "PromoCode"
+        SET "usageCount" = "usageCount" + 1
+        WHERE id = ${promoCodeId}
+          AND "isActive" = true
+          AND "endDate" > NOW()
+          AND ("maxUsage" IS NULL OR "usageCount" < "maxUsage")
+      `
+      if (affected === 0) {
+        throw new Error("Промокод недействителен или исчерпан. Попробуйте оформить заказ без него")
+      }
     }
 
     const created = await tx.order.create({

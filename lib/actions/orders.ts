@@ -49,10 +49,13 @@ export async function createOrder(data: OrderData) {
     data.userId = session.user.id
   }
 
-  // Server-side phone validation
+  // Server-side input validation
   const phoneDigits = data.customerPhone.replace(/\D/g, "")
   if (!/^[78]\d{10}$/.test(phoneDigits)) {
     throw new Error("Некорректный номер телефона")
+  }
+  if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.customerEmail)) {
+    throw new Error("Некорректный email")
   }
 
   const order = await createOrderDAL(data)
@@ -146,6 +149,10 @@ export async function createOrder(data: OrderData) {
 }
 
 export async function updateOrderStatus(id: string, status: string) {
+  const session = await auth()
+  const userType = (session?.user as Record<string, unknown>)?.userType
+  if (!session?.user?.id || userType !== "admin") throw new Error("Нет доступа")
+
   await updateOrderStatusDAL(id, status)
 
   // Send email notification + bonus logic
@@ -192,6 +199,10 @@ export async function updateOrderStatus(id: string, status: string) {
 }
 
 export async function updateOrderNotes(orderId: string, adminNotes: string) {
+  const session = await auth()
+  const userType = (session?.user as Record<string, unknown>)?.userType
+  if (!session?.user?.id || userType !== "admin") throw new Error("Нет доступа")
+
   await prisma.order.update({
     where: { id: orderId },
     data: { adminNotes },
