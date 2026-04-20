@@ -174,6 +174,12 @@ export function CheckoutForm() {
         })),
       })
 
+      if (!result.success) {
+        setError(result.error)
+        setLoading(false)
+        return
+      }
+
       clearCart()
       resetDelivery()
 
@@ -183,8 +189,10 @@ export function CheckoutForm() {
         const url = `/thank-you?order=${result.orderNumber}${result.thankYouToken ? `&token=${result.thankYouToken}` : ""}`
         router.push(url)
       }
-    } catch {
-      setError("Ошибка при оформлении заказа. Попробуйте ещё раз.")
+    } catch (e) {
+      console.error("Checkout submit failed:", e)
+      const msg = e instanceof Error ? e.message : "Попробуйте ещё раз"
+      setError(`Ошибка при оформлении заказа: ${msg}`)
     } finally {
       setLoading(false)
     }

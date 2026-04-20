@@ -57,7 +57,29 @@ async function rollbackOrder(
   }
 }
 
-export async function createOrder(data: OrderData) {
+export type CreateOrderResult =
+  | { success: true; orderNumber: string; id: string; thankYouToken: string | null; paymentUrl: string | null }
+  | { success: false; error: string }
+
+export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
+  try {
+    return await createOrderImpl(data)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Неизвестная ошибка при создании заказа"
+    console.error("[createOrder] failed:", {
+      customer: data.customerName,
+      phone: data.customerPhone,
+      method: data.deliveryMethod,
+      tariff: data.tariffCode,
+      items: data.items.length,
+      error: msg,
+      stack: e instanceof Error ? e.stack : undefined,
+    })
+    return { success: false, error: msg }
+  }
+}
+
+async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
   // Attach userId from session if logged in as customer
   const session = await auth()
   if (session?.user?.id && (session.user as Record<string, unknown>).userType === "customer") {
@@ -176,6 +198,7 @@ export async function createOrder(data: OrderData) {
     }
 
     return {
+      success: true,
       orderNumber: order.orderNumber,
       id: order.id,
       thankYouToken: order.thankYouToken,
@@ -183,7 +206,13 @@ export async function createOrder(data: OrderData) {
     }
   }
 
-  return { orderNumber: order.orderNumber, id: order.id, thankYouToken: order.thankYouToken, paymentUrl: null }
+  return {
+    success: true,
+    orderNumber: order.orderNumber,
+    id: order.id,
+    thankYouToken: order.thankYouToken,
+    paymentUrl: null,
+  }
 }
 
 export async function updateOrderStatus(id: string, status: string) {
