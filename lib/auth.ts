@@ -125,7 +125,31 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               scope: "vkid.personal_info email",
             },
           },
-          token: "https://id.vk.ru/oauth2/auth",
+          token: {
+            url: "https://id.vk.ru/oauth2/auth",
+            // VK ID requires device_id (from callback params) — not standard OAuth 2.0
+            async request(context: Record<string, unknown>) {
+              const provider = context.provider as Record<string, string>
+              const params = context.params as Record<string, string>
+              const checks = context.checks as Record<string, string>
+              const body = new URLSearchParams({
+                grant_type: "authorization_code",
+                code: params.code,
+                redirect_uri: provider.callbackUrl,
+                client_id: provider.clientId,
+                client_secret: provider.clientSecret,
+              })
+              if (checks.code_verifier) body.set("code_verifier", checks.code_verifier)
+              if (params.device_id) body.set("device_id", params.device_id)
+              const res = await fetch("https://id.vk.ru/oauth2/auth", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: body.toString(),
+              })
+              const tokens = await res.json()
+              return { tokens }
+            },
+          },
           userinfo: {
             url: "https://api.vk.com/method/users.get",
             request: async ({ tokens }: { tokens: { access_token: string; id_token?: string } }) => {
