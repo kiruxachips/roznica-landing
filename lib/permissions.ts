@@ -80,6 +80,10 @@ export const ALL_PERMISSIONS = [
   "integrations.view",
   "integrations.retry",
 
+  // Email dispatch — admin only
+  "email.view",
+  "email.retry",
+
   // Admin users management — admin only
   "users.view",
   "users.approve",
@@ -159,6 +163,10 @@ const ROLES_FOR_PERMISSION: Record<Permission, AdminRole[]> = {
   "integrations.view": ["admin"],
   "integrations.retry": ["admin"],
 
+  // --- Email dispatch — admin only ---
+  "email.view": ["admin"],
+  "email.retry": ["admin"],
+
   // --- Admin users management — admin only ---
   "users.view": ["admin"],
   "users.approve": ["admin"],
@@ -195,6 +203,7 @@ export const NAV_PERMISSIONS = {
   blog: "blog.view" as Permission,
   blogCategories: "blog.edit" as Permission,
   integrations: "integrations.view" as Permission,
+  emailDispatch: "email.view" as Permission,
   users: "users.view" as Permission,
   activity: "users.view" as Permission,
 }

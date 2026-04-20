@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation"
+import Link from "next/link"
 import { getOrderById } from "@/lib/dal/orders"
+import { prisma } from "@/lib/prisma"
 import { OrderStatusChanger } from "./OrderStatusChanger"
 import { OrderDeliverySection } from "./OrderDeliverySection"
 import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
@@ -11,6 +13,44 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   if (!order) notFound()
 
   const statusLogs = order.statusLogs
+
+  const emailDispatches = await prisma.emailDispatch.findMany({
+    where: { orderId: order.id },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      kind: true,
+      recipient: true,
+      status: true,
+      attempts: true,
+      messageId: true,
+      error: true,
+      sentAt: true,
+      createdAt: true,
+    },
+  })
+
+  const kindLabels: Record<string, string> = {
+    "order.confirmation": "Оформлен (клиенту)",
+    "order.payment_success": "Оплачен (клиенту)",
+    "order.payment_failed": "Отмена оплаты (клиенту)",
+    "order.shipped": "Отправлен (клиенту)",
+    "order.delivered": "Доставлен (клиенту)",
+    "admin.new_order": "Новый заказ (админу)",
+    "admin.payment_success": "Оплата получена (админу)",
+  }
+  const statusStyles: Record<string, string> = {
+    sent: "bg-green-50 text-green-700",
+    pending: "bg-amber-50 text-amber-700",
+    failed: "bg-red-50 text-red-700",
+    dead: "bg-gray-900 text-white",
+  }
+  const statusLabels: Record<string, string> = {
+    sent: "Отправлено",
+    pending: "Ожидает",
+    failed: "Ошибка",
+    dead: "Не дошло",
+  }
 
   return (
     <div className="max-w-3xl">
@@ -161,6 +201,43 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
                   {log.changedBy && (
                     <span className="text-xs text-muted-foreground">({log.changedBy})</span>
                   )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Email dispatch */}
+        {emailDispatches.length > 0 && (
+          <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Письма по заказу</h2>
+              <Link
+                href="/admin/email-dispatch"
+                className="text-xs text-primary hover:underline"
+              >
+                Все рассылки →
+              </Link>
+            </div>
+            <div className="space-y-2">
+              {emailDispatches.map((d) => (
+                <div key={d.id} className="flex items-start gap-3 text-sm border-b border-border last:border-0 pb-2 last:pb-0">
+                  <span className="text-muted-foreground text-xs whitespace-nowrap w-28">
+                    {new Date(d.createdAt).toLocaleString("ru-RU", {
+                      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
+                    })}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium">{kindLabels[d.kind] || d.kind}</p>
+                    <p className="text-xs text-muted-foreground truncate">→ {d.recipient}</p>
+                    {d.error && (
+                      <p className="text-xs text-red-700 mt-0.5 font-mono break-words">{d.error}</p>
+                    )}
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[d.status] || "bg-gray-100"}`}>
+                    {statusLabels[d.status] || d.status}
+                    {d.attempts > 1 && ` · ${d.attempts}`}
+                  </span>
                 </div>
               ))}
             </div>

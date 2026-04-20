@@ -18,6 +18,7 @@ import {
   Boxes,
   Users,
   Activity,
+  Mail,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
@@ -43,6 +44,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { name: "Статьи", href: "/admin/blog", icon: BookOpen, permission: "blog.view" },
   { name: "Рубрики блога", href: "/admin/blog/categories", icon: FolderTree, permission: "blog.edit" },
   { name: "Интеграции", href: "/admin/integrations", icon: Webhook, permission: "integrations.view" },
+  { name: "Рассылка писем", href: "/admin/email-dispatch", icon: Mail, permission: "email.view" },
   { name: "Пользователи", href: "/admin/users", icon: Users, permission: "users.view" },
   { name: "Журнал действий", href: "/admin/activity", icon: Activity, permission: "users.view" },
 ]
