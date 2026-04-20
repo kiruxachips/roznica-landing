@@ -145,8 +145,13 @@ export async function geolocateAddress(
 /** Look up postal code for a city (used by Pochta provider). */
 export async function getPostalCodeForCity(
   apiKey: string,
-  city: string
+  city: string,
+  region?: string
 ): Promise<string> {
-  const suggestions = await suggestAddress(apiKey, city, { count: 1 })
-  return suggestions[0]?.postalCode || ""
+  // Include region in query so DaData disambiguates cities with the same name
+  // and returns a street-level result with a real postal code.
+  const query = region ? `${city}, ${region}` : city
+  const suggestions = await suggestAddress(apiKey, query, { count: 5 })
+  const withCode = suggestions.find((s) => s.postalCode)
+  return withCode?.postalCode || ""
 }

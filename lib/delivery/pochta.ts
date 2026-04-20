@@ -42,7 +42,7 @@ export function createPochtaProvider(config: {
       if (!postalCode && req.toCity) {
         if (config.dadataApiKey) {
           try {
-            postalCode = await getPostalCodeForCity(config.dadataApiKey, req.toCity)
+            postalCode = await getPostalCodeForCity(config.dadataApiKey, req.toCity, req.toRegion)
           } catch {
             // continue to fallback
           }
