@@ -1,8 +1,16 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+import { CACHE_TAGS } from "@/lib/cache-tags"
+
+function invalidateReviewsCache() {
+  revalidateTag(CACHE_TAGS.products)
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidateTag(CACHE_TAGS.stats)
+  revalidatePath("/admin/reviews")
+}
 
 export async function toggleReviewVisibility(id: string) {
   const admin = await requireAdmin("reviews.moderate")
@@ -21,8 +29,7 @@ export async function toggleReviewVisibility(id: string) {
     entityId: id,
     payload: { wasVisible: review.isVisible, nowVisible: !review.isVisible },
   })
-  revalidatePath("/admin/reviews")
-  revalidatePath("/catalog")
+  invalidateReviewsCache()
 }
 
 export async function deleteReview(id: string) {
@@ -34,6 +41,5 @@ export async function deleteReview(id: string) {
     entityType: "review",
     entityId: id,
   })
-  revalidatePath("/admin/reviews")
-  revalidatePath("/catalog")
+  invalidateReviewsCache()
 }

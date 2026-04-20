@@ -10,8 +10,10 @@ const DISMISS_KEY = "millor-sticky-cta-dismissed"
 export function StickyMobileCTA() {
   const [visible, setVisible] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     if (typeof window !== "undefined") {
       setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1")
     }
@@ -58,7 +60,9 @@ export function StickyMobileCTA() {
     setDismissed(true)
   }
 
-  if (dismissed) return null
+  // До монтирования клиента и до чтения sessionStorage рендерим скрытое
+  // состояние, идентичное серверному, чтобы React не бросал hydration mismatch.
+  if (!mounted || dismissed) return null
 
   return (
     <div

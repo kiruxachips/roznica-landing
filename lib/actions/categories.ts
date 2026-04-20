@@ -1,8 +1,16 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+import { CACHE_TAGS } from "@/lib/cache-tags"
+
+function invalidateCategoriesCache() {
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidateTag(CACHE_TAGS.products)
+  revalidateTag(CACHE_TAGS.filters)
+  revalidatePath("/admin/categories")
+}
 
 export async function createCategory(data: {
   name: string
@@ -29,8 +37,7 @@ export async function createCategory(data: {
     entityId: category.id,
     payload: { name: category.name, slug: category.slug },
   })
-  revalidatePath("/admin/categories")
-  revalidatePath("/catalog")
+  invalidateCategoriesCache()
   return category
 }
 
@@ -58,8 +65,7 @@ export async function updateCategory(
     entityId: id,
     payload: { fields: Object.keys(data) },
   })
-  revalidatePath("/admin/categories")
-  revalidatePath("/catalog")
+  invalidateCategoriesCache()
   return category
 }
 
@@ -77,6 +83,5 @@ export async function deleteCategory(id: string) {
     entityType: "category",
     entityId: id,
   })
-  revalidatePath("/admin/categories")
-  revalidatePath("/catalog")
+  invalidateCategoriesCache()
 }

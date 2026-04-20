@@ -2,9 +2,16 @@
 
 import { prisma } from "@/lib/prisma"
 import { getStorage } from "@/lib/storage"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024 // 10 MB
+
+function invalidateProductImagesCache() {
+  revalidateTag(CACHE_TAGS.products)
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidatePath("/admin/products")
+}
 
 export async function uploadImage(formData: FormData) {
   const file = formData.get("file") as File
@@ -33,8 +40,7 @@ export async function uploadImage(formData: FormData) {
     },
   })
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateProductImagesCache()
   return image
 }
 
@@ -60,8 +66,7 @@ export async function deleteImage(id: string) {
     }
   }
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateProductImagesCache()
 }
 
 export async function setPrimaryImage(id: string) {
@@ -78,6 +83,5 @@ export async function setPrimaryImage(id: string) {
     data: { isPrimary: true },
   })
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateProductImagesCache()
 }

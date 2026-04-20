@@ -1,10 +1,18 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { adjustStock, adjustStockBatch, type StockReason } from "@/lib/dal/stock"
 import { notifyStockChange, notifyStockChanges } from "@/lib/integrations/stock-alerts"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+import { CACHE_TAGS } from "@/lib/cache-tags"
+
+function invalidateStockCache() {
+  revalidateTag(CACHE_TAGS.products)
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidatePath("/admin/warehouse")
+  revalidatePath("/admin/products")
+}
 
 export async function adjustStockAction(input: {
   variantId: string
@@ -29,9 +37,7 @@ export async function adjustStockAction(input: {
     payload: { delta: input.delta, reason: input.reason, notes: input.notes },
   })
 
-  revalidatePath("/admin/warehouse")
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateStockCache()
   return result
 }
 
@@ -58,9 +64,7 @@ export async function bulkIntakeAction(
     payload: { count: filtered.length, totalDelta: filtered.reduce((s, i) => s + i.delta, 0) },
   })
 
-  revalidatePath("/admin/warehouse")
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateStockCache()
   return results
 }
 
@@ -77,6 +81,5 @@ export async function setLowThresholdAction(variantId: string, threshold: number
     entityId: variantId,
     payload: { threshold },
   })
-  revalidatePath("/admin/warehouse")
-  revalidatePath("/admin/products")
+  invalidateStockCache()
 }

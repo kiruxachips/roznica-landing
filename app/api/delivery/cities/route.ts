@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const cities = await searchCities(q)
-    return NextResponse.json(cities)
+    return NextResponse.json(cities, {
+      headers: { "Cache-Control": "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600" },
+    })
   } catch {
     return NextResponse.json([], { status: 500 })
   }

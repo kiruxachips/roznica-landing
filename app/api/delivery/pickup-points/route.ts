@@ -32,7 +32,9 @@ export async function GET(request: NextRequest) {
       })
 
       const points = await provider.getPickupPoints(cityCode || "")
-      return NextResponse.json(points)
+      return NextResponse.json(points, {
+        headers: { "Cache-Control": "public, max-age=600, s-maxage=3600, stale-while-revalidate=3600" },
+      })
     }
 
     if (carrier === "pochta" && settings.pochta_enabled === "true" && city.trim()) {
@@ -45,7 +47,9 @@ export async function GET(request: NextRequest) {
       })
 
       const points = await provider.getPickupPoints(city)
-      return NextResponse.json(points)
+      return NextResponse.json(points, {
+        headers: { "Cache-Control": "public, max-age=600, s-maxage=3600, stale-while-revalidate=3600" },
+      })
     }
 
     return NextResponse.json([])
