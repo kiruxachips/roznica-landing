@@ -52,8 +52,13 @@ export async function createShipmentForOrder(
   if (!order.deliveryMethod || order.deliveryMethod === "courier") return
 
   // Validate pvz orders have pickup point code
-  if (order.deliveryType === "pvz" && order.deliveryMethod === "pochta" && !order.pickupPointCode) {
-    throw new Error("Не указан код почтового отделения для доставки до отделения")
+  if (order.deliveryType === "pvz" && !order.pickupPointCode) {
+    const label = order.deliveryMethod === "pochta" ? "код почтового отделения" : "код пункта выдачи"
+    throw new Error(`Не указан ${label} для заказа ПВЗ`)
+  }
+  // Validate door orders have address
+  if (order.deliveryType === "door" && !order.deliveryAddress) {
+    throw new Error("Не указан адрес доставки")
   }
 
   const settings = await getDeliverySettings()

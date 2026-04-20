@@ -106,11 +106,18 @@ export function OrderDeliverySection({
     setLoading(false)
   }
 
-  function getTrackingUrl(): string | null {
-    if (!trackingNumber) return null
-    if (deliveryMethod === "pochta") return `https://www.pochta.ru/tracking#${trackingNumber}`
-    if (deliveryMethod === "cdek") return `https://www.cdek.ru/ru/tracking?order_id=${trackingNumber}`
-    return null
+  /** Список трек-номеров с ссылками — для multi-box Pochta их может быть несколько через запятую. */
+  function getTrackingLinks(): Array<{ code: string; url: string | null }> {
+    if (!trackingNumber) return []
+    const codes = trackingNumber
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+    return codes.map((code) => {
+      if (deliveryMethod === "pochta") return { code, url: `https://www.pochta.ru/tracking#${code}` }
+      if (deliveryMethod === "cdek") return { code, url: `https://www.cdek.ru/ru/tracking?order_id=${code}` }
+      return { code, url: null }
+    })
   }
 
   return (
@@ -146,20 +153,26 @@ export function OrderDeliverySection({
           </div>
         )}
         {trackingNumber && (
-          <div>
-            <span className="text-muted-foreground">Трек-номер:</span>
-            <div className="flex items-center gap-2">
-              <p className="font-medium font-mono">{trackingNumber}</p>
-              {getTrackingUrl() && (
-                <a
-                  href={getTrackingUrl()!}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:text-primary/80"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </a>
-              )}
+          <div className="col-span-2">
+            <span className="text-muted-foreground">
+              Трек-номер{getTrackingLinks().length > 1 ? `а (${getTrackingLinks().length} коробки)` : ""}:
+            </span>
+            <div className="flex flex-col gap-1 mt-0.5">
+              {getTrackingLinks().map((t, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <p className="font-medium font-mono text-sm">{t.code}</p>
+                  {t.url && (
+                    <a
+                      href={t.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:text-primary/80"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
