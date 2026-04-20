@@ -16,19 +16,22 @@ export async function GET(request: NextRequest) {
   const codeVerifier = cookieStore.get("vk_code_verifier")?.value
   const expectedState = cookieStore.get("vk_state")?.value
 
+  // Build public origin from forwarded headers — `request.url` inside Docker resolves to 0.0.0.0:3000
+  const headersList = await headers()
+  const forwardedHost = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "millor-coffee.ru"
+  const proto = headersList.get("x-forwarded-proto") ?? "https"
+  const origin = `${proto}://${forwardedHost}`
+
   function fail(reason: string) {
     console.error("VK callback error:", reason)
-    return NextResponse.redirect(new URL(`/auth/login?error=vk_${reason}`, request.url))
+    return NextResponse.redirect(`${origin}/auth/login?error=vk_${reason}`)
   }
 
   if (!code || !deviceId || !state) return fail("missing_params")
   if (!codeVerifier || !expectedState) return fail("missing_cookies")
   if (state !== expectedState) return fail("state_mismatch")
 
-  const headersList = await headers()
-  const host = headersList.get("host") ?? "millor-coffee.ru"
-  const proto = headersList.get("x-forwarded-proto") ?? "https"
-  const redirectUri = `${proto}://${host}/api/auth/callback/vk`
+  const redirectUri = `${origin}/api/auth/callback/vk`
 
   const clientId = process.env.VK_CLIENT_ID!
   const clientSecret = process.env.VK_CLIENT_SECRET!
@@ -182,7 +185,7 @@ export async function GET(request: NextRequest) {
     maxAge,
   })
 
-  const response = NextResponse.redirect(new URL("/account", request.url))
+  const response = NextResponse.redirect(`${origin}/account`)
   response.cookies.set(cookieName, sessionToken, {
     httpOnly: true,
     secure: useSecure,

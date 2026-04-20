@@ -16,7 +16,7 @@ export async function GET() {
   const state = crypto.randomBytes(16).toString("base64url")
 
   const headersList = await headers()
-  const host = headersList.get("host") ?? "millor-coffee.ru"
+  const host = headersList.get("x-forwarded-host") ?? headersList.get("host") ?? "millor-coffee.ru"
   const proto = headersList.get("x-forwarded-proto") ?? "https"
   const redirectUri = `${proto}://${host}/api/auth/callback/vk`
 
