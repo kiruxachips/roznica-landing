@@ -2,7 +2,6 @@ import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
 import Google from "next-auth/providers/google"
 import Yandex from "next-auth/providers/yandex"
-import VK from "next-auth/providers/vk"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
@@ -113,13 +112,61 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...(process.env.YANDEX_CLIENT_ID
       ? [Yandex({ clientId: process.env.YANDEX_CLIENT_ID!, clientSecret: process.env.YANDEX_CLIENT_SECRET! })]
       : []),
+    // VK ID (новая платформа id.vk.ru, OAuth 2.1 с PKCE — несовместима с устаревшим oauth.vk.com)
     ...(process.env.VK_CLIENT_ID
-      ? [VK({
+      ? [{
+          id: "vk",
+          name: "ВКонтакте",
+          type: "oauth" as const,
+          authorization: {
+            url: "https://id.vk.ru/authorize",
+            params: {
+              response_type: "code",
+              scope: "vkid.personal_info email",
+            },
+          },
+          token: "https://id.vk.ru/oauth2/auth",
+          userinfo: {
+            request: async ({ tokens }: { tokens: { access_token: string; id_token?: string } }) => {
+              // VK ID embeds user info (incl. email) in id_token JWT — decode it directly
+              if (tokens.id_token) {
+                try {
+                  const payload = JSON.parse(
+                    Buffer.from(tokens.id_token.split(".")[1], "base64url").toString("utf8")
+                  )
+                  // Enrich with photo from VK API (id_token doesn't include photo_200)
+                  const res = await fetch(
+                    `https://api.vk.com/method/users.get?fields=photo_200&access_token=${encodeURIComponent(tokens.access_token)}&v=5.199`
+                  )
+                  const apiData = await res.json()
+                  const apiUser = apiData.response?.[0] ?? {}
+                  return { ...payload, photo_200: apiUser.photo_200 }
+                } catch {
+                  // fall through to VK API below
+                }
+              }
+              const res = await fetch(
+                `https://api.vk.com/method/users.get?fields=photo_200&access_token=${encodeURIComponent(tokens.access_token)}&v=5.199`
+              )
+              const data = await res.json()
+              return data.response?.[0] ?? {}
+            },
+          },
+          checks: ["pkce", "state"] as ("pkce" | "state" | "none")[],
+          client: { token_endpoint_auth_method: "client_secret_post" },
           clientId: process.env.VK_CLIENT_ID!,
           clientSecret: process.env.VK_CLIENT_SECRET!,
-          client: { token_endpoint_auth_method: "client_secret_post" },
-          checks: ["state"],
-        })]
+          profile(profile: Record<string, unknown>) {
+            // id_token payload uses 'sub' as user ID; VK API uses 'id'
+            const id = String(profile.sub ?? profile.id ?? "")
+            return {
+              id,
+              name: [profile.first_name, profile.last_name].filter(Boolean).join(" ") || null,
+              email: (profile.email as string) ?? null,
+              image: (profile.photo_200 as string) ?? (profile.avatar as string) ?? null,
+            }
+          },
+        }]
       : []),
   ],
   callbacks: {
