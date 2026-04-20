@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 
 export interface ShopStats {
   reviewsCount: number
@@ -11,12 +13,13 @@ export interface ShopStats {
  * Real-world shop stats used on the home page social proof strip.
  * Returns conservative values (nulls / 0) if DB is unreachable.
  */
-export async function getShopStats(): Promise<ShopStats> {
+async function getShopStatsUncached(): Promise<ShopStats> {
   try {
-    const [reviews, orders, productsCount] = await Promise.all([
-      prisma.review.findMany({
+    const [reviewsAgg, orders, productsCount] = await Promise.all([
+      prisma.review.aggregate({
         where: { isVisible: true },
-        select: { rating: true },
+        _avg: { rating: true },
+        _count: { _all: true },
       }),
       prisma.order.count({
         where: {
@@ -26,11 +29,9 @@ export async function getShopStats(): Promise<ShopStats> {
       prisma.product.count({ where: { isActive: true } }),
     ])
 
-    const reviewsCount = reviews.length
-    const averageRating =
-      reviewsCount > 0
-        ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviewsCount) * 10) / 10
-        : null
+    const reviewsCount = reviewsAgg._count._all
+    const avg = reviewsAgg._avg.rating
+    const averageRating = avg !== null && avg !== undefined ? Math.round(avg * 10) / 10 : null
 
     return {
       reviewsCount,
@@ -42,3 +43,9 @@ export async function getShopStats(): Promise<ShopStats> {
     return { reviewsCount: 0, averageRating: null, ordersCount: 0, activeProductsCount: 0 }
   }
 }
+
+export const getShopStats = unstable_cache(
+  getShopStatsUncached,
+  ["shop-stats"],
+  { revalidate: 600, tags: [CACHE_TAGS.stats, CACHE_TAGS.products] }
+)

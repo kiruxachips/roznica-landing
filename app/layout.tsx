@@ -4,7 +4,6 @@ import { Inter } from "next/font/google"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"
 import { WebVitals } from "@/components/ui/web-vitals"
-import { SessionProvider } from "@/components/providers/SessionProvider"
 import "./globals.css"
 
 const inter = Inter({
@@ -94,9 +93,7 @@ export default function RootLayout({
             ]),
           }}
         />
-        <SessionProvider>
         {children}
-        </SessionProvider>
         <CookieBanner />
         <Analytics />
         <WebVitals />

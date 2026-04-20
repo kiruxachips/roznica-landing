@@ -1,10 +1,21 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
 import { adjustStock } from "@/lib/dal/stock"
 import { notifyStockChange } from "@/lib/integrations/stock-alerts"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+import { CACHE_TAGS } from "@/lib/cache-tags"
+
+function invalidateCatalogCache() {
+  revalidateTag(CACHE_TAGS.products)
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidateTag(CACHE_TAGS.homepage)
+  revalidateTag(CACHE_TAGS.filters)
+  revalidateTag(CACHE_TAGS.stats)
+  revalidateTag(CACHE_TAGS.sitemap)
+  revalidatePath("/admin/products")
+}
 
 export async function createProduct(data: {
   name: string
@@ -78,9 +89,7 @@ export async function createProduct(data: {
     },
   })
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
-  revalidatePath("/")
+  invalidateCatalogCache()
 
   void logAdminAction({
     admin,
@@ -128,10 +137,8 @@ export async function updateProduct(
     data,
   })
 
-  revalidatePath("/admin/products")
-  revalidatePath(`/catalog/${product.slug}`)
-  revalidatePath("/catalog")
-  revalidatePath("/")
+  invalidateCatalogCache()
+  revalidateTag(CACHE_TAGS.product(product.slug))
 
   void logAdminAction({
     admin,
@@ -148,9 +155,7 @@ export async function deleteProduct(id: string) {
   const snapshot = await prisma.product.findUnique({ where: { id }, select: { name: true, slug: true } })
   await prisma.product.delete({ where: { id } })
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
-  revalidatePath("/")
+  invalidateCatalogCache()
 
   void logAdminAction({
     admin,
@@ -171,9 +176,7 @@ export async function toggleProductActive(id: string) {
     data: { isActive: !product.isActive },
   })
 
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
-  revalidatePath("/")
+  invalidateCatalogCache()
 
   void logAdminAction({
     admin,
@@ -211,9 +214,8 @@ export async function createVariant(data: {
       changedBy: admin.userId,
     })
   }
-  revalidatePath("/admin/products")
   revalidatePath("/admin/warehouse")
-  revalidatePath("/catalog")
+  invalidateCatalogCache()
   void logAdminAction({
     admin,
     action: "variant.created",
@@ -266,9 +268,8 @@ export async function updateVariant(
       ? await prisma.productVariant.update({ where: { id }, data: rest })
       : await prisma.productVariant.findUnique({ where: { id } })
 
-  revalidatePath("/admin/products")
   revalidatePath("/admin/warehouse")
-  revalidatePath("/catalog")
+  invalidateCatalogCache()
   void logAdminAction({
     admin,
     action: "variant.updated",
@@ -293,8 +294,7 @@ export async function deleteVariant(id: string) {
     entityId: id,
     payload: snapshot || undefined,
   })
-  revalidatePath("/admin/products")
-  revalidatePath("/catalog")
+  invalidateCatalogCache()
 }
 
 // Promotions
@@ -329,6 +329,5 @@ export async function updatePromotion(
   }
 
   revalidatePath("/admin/promotions")
-  revalidatePath("/catalog")
-  revalidatePath("/")
+  invalidateCatalogCache()
 }

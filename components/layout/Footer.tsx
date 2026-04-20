@@ -20,7 +20,7 @@ function VKIcon({ className }: { className?: string }) {
 }
 
 export function Footer() {
-  const currentYear = 2026
+  const currentYear = new Date().getFullYear()
 
   return (
     <footer className="bg-coffee-900 text-white">

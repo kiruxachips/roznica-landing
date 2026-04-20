@@ -2,10 +2,48 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { scoreProducts } from "@/lib/recommendations"
+import { unstable_cache } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 import type { TasteProfile, ProductType } from "@/lib/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+const getAllProductsForRecommendations = unstable_cache(
+  () =>
+    prisma.product.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        productType: true,
+        flavorNotes: true,
+        origin: true,
+        roastLevel: true,
+        images: { where: { isPrimary: true }, take: 1, select: { url: true, alt: true } },
+        variants: {
+          where: { isActive: true },
+          select: { id: true, weight: true, price: true, stock: true },
+        },
+        _count: { select: { reviews: { where: { isVisible: true } } } },
+      },
+    }),
+  ["recommendations-all-products"],
+  { revalidate: 600, tags: [CACHE_TAGS.products] }
+)
+
+const getCartProductDetails = unstable_cache(
+  async (ids: string[]) => {
+    if (ids.length === 0) return []
+    return prisma.product.findMany({
+      where: { id: { in: ids } },
+      select: { flavorNotes: true, origin: true, roastLevel: true, productType: true },
+    })
+  },
+  ["cart-product-details"],
+  { revalidate: 600, tags: [CACHE_TAGS.products] }
+)
 
 export async function POST(request: Request) {
   let body: { cartProductIds?: string[]; cartTotal?: number }
@@ -25,34 +63,12 @@ export async function POST(request: Request) {
       : null
 
   const [allProducts, settings, cartProductDetails, userData] = await Promise.all([
-    prisma.product.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        productType: true,
-        flavorNotes: true,
-        origin: true,
-        roastLevel: true,
-        images: { where: { isPrimary: true }, take: 1, select: { url: true, alt: true } },
-        variants: {
-          where: { isActive: true },
-          select: { id: true, weight: true, price: true, stock: true },
-        },
-        reviews: { where: { isVisible: true }, select: { id: true } },
-      },
-    }),
+    getAllProductsForRecommendations(),
     prisma.deliverySetting.findMany({
       where: { key: { in: ["free_delivery_threshold", "gift_threshold"] } },
       select: { key: true, value: true },
     }),
-    cartProductIds.length > 0
-      ? prisma.product.findMany({
-          where: { id: { in: cartProductIds } },
-          select: { flavorNotes: true, origin: true, roastLevel: true, productType: true },
-        })
-      : Promise.resolve([]),
+    getCartProductDetails(cartProductIds),
     userId
       ? prisma.user.findUnique({ where: { id: userId }, select: { tasteProfile: true } })
       : Promise.resolve(null),
@@ -67,7 +83,7 @@ export async function POST(request: Request) {
   const cartRoastLevels = [...new Set(cartProductDetails.map((p) => p.roastLevel).filter(Boolean))] as string[]
   const cartProductTypes = [...new Set(cartProductDetails.map((p) => p.productType))] as ProductType[]
 
-  const maxReviews = Math.max(1, ...allProducts.map((p) => p.reviews.length))
+  const maxReviews = Math.max(1, ...allProducts.map((p) => p._count.reviews))
 
   const candidates = allProducts.map((p) => ({
     id: p.id,
@@ -79,7 +95,7 @@ export async function POST(request: Request) {
     flavorNotes: p.flavorNotes,
     origin: p.origin,
     roastLevel: p.roastLevel,
-    reviewCount: p.reviews.length,
+    reviewCount: p._count.reviews,
     variants: p.variants,
   }))
 
@@ -100,5 +116,8 @@ export async function POST(request: Request) {
     4
   )
 
-  return NextResponse.json({ recommendations })
+  return NextResponse.json(
+    { recommendations },
+    { headers: { "Cache-Control": "private, max-age=30" } }
+  )
 }

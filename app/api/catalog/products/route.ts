@@ -51,11 +51,20 @@ export async function GET(request: Request) {
 
   const hasMore = page * PAGE_SIZE < total
 
-  return NextResponse.json({
-    products,
-    total,
-    hasMore,
-    page,
-    favoriteIds: isCustomer ? favIds : null,
-  })
+  // Per-user каталог (favoriteIds) → private, даже для анонимов кэшируем коротко,
+  // чтобы быстрый back/forward в браузере не бил в БД.
+  const cacheControl = isCustomer
+    ? "private, max-age=30, stale-while-revalidate=60"
+    : "public, max-age=60, s-maxage=300, stale-while-revalidate=120"
+
+  return NextResponse.json(
+    {
+      products,
+      total,
+      hasMore,
+      page,
+      favoriteIds: isCustomer ? favIds : null,
+    },
+    { headers: { "Cache-Control": cacheControl } }
+  )
 }

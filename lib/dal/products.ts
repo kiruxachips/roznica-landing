@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import type { ProductCard, ProductDetail, ProductFilters, ProductType } from "@/lib/types"
 import { Prisma } from "@prisma/client"
+import { unstable_cache } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 
 // Shared select shape for ProductCard listings — keeps payload minimal
 const productCardSelect = {
@@ -230,7 +232,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
   }
 }
 
-export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
+async function getFeaturedProductsUncached(limit: number): Promise<ProductCard[]> {
   const items = await prisma.product.findMany({
     where: { isActive: true, isFeatured: true },
     orderBy: { sortOrder: "asc" },
@@ -246,7 +248,6 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
   })
 
   return items.map((p) => {
-    // Get the 1kg variant price for featured display, or first variant
     const displayVariant = p.variants.find((v) => v.weight === "1кг") ?? p.variants[0]
     return {
       id: p.id,
@@ -272,6 +273,14 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
           : null,
     }
   })
+}
+
+export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
+  return unstable_cache(
+    () => getFeaturedProductsUncached(limit),
+    ["featured-products", String(limit)],
+    { revalidate: 300, tags: [CACHE_TAGS.products, CACHE_TAGS.homepage] }
+  )()
 }
 
 export async function getRelatedProducts(
@@ -318,15 +327,19 @@ export async function getRelatedProducts(
   }))
 }
 
-export async function getProductSlugs(): Promise<string[]> {
-  const products = await prisma.product.findMany({
-    where: { isActive: true },
-    select: { slug: true },
-  })
-  return products.map((p) => p.slug)
-}
+export const getProductSlugs = unstable_cache(
+  async (): Promise<string[]> => {
+    const products = await prisma.product.findMany({
+      where: { isActive: true },
+      select: { slug: true },
+    })
+    return products.map((p) => p.slug)
+  },
+  ["product-slugs"],
+  { revalidate: 86400, tags: [CACHE_TAGS.products, CACHE_TAGS.sitemap] }
+)
 
-export async function getFilterOptions(productType?: ProductType) {
+async function getFilterOptionsUncached(productType?: ProductType) {
   const baseWhere: Prisma.ProductWhereInput = {
     isActive: true,
     ...(productType ? { productType } : {}),
@@ -390,4 +403,12 @@ export async function getFilterOptions(productType?: ProductType) {
     teaTypes: [],
     productForms: [],
   }
+}
+
+export async function getFilterOptions(productType?: ProductType) {
+  return unstable_cache(
+    () => getFilterOptionsUncached(productType),
+    ["filter-options", productType ?? "all"],
+    { revalidate: 3600, tags: [CACHE_TAGS.filters, CACHE_TAGS.products] }
+  )()
 }

@@ -193,6 +193,19 @@ export async function getStockSnapshot(
     where.product = productWhere
   }
 
+  // Push status filter into SQL when possible — избавляет от полного скана всех вариантов.
+  // "low" требует сравнения двух колонок (stock vs lowStockThreshold), Prisma WHERE
+  // не умеет column-to-column, поэтому для "low" пред-фильтруем stock > 0
+  // и добивaем финальный фильтр в памяти — но уже на заведомо меньшей выборке.
+  if (filters.status === "out") {
+    where.stock = { lte: 0 }
+  } else if (filters.status === "low") {
+    where.stock = { gt: 0 }
+    where.lowStockThreshold = { not: null }
+  } else if (filters.status === "in_stock") {
+    where.stock = { gt: 0 }
+  }
+
   const variants = await prisma.productVariant.findMany({
     where,
     select: {
@@ -247,7 +260,8 @@ export async function getStockSnapshot(
     }
   })
 
-  if (filters.status && filters.status !== "all") {
+  // Финальный dis-ambig для "low" (column-to-column сравнение) и "in_stock".
+  if (filters.status === "low" || filters.status === "in_stock") {
     mapped = mapped.filter((r) => r.status === filters.status)
   }
   if (filters.weightGrams && filters.weightGrams > 0) {

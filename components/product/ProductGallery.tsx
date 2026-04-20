@@ -46,7 +46,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   i === activeIndex ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
                 )}
               >
-                <Image src={img.url} alt={img.alt ?? ""} fill className="object-cover" sizes="80px" />
+                <Image src={img.url} alt={img.alt ?? ""} fill className="object-cover" sizes="80px" loading="lazy" />
               </button>
             ))}
           </div>
@@ -66,7 +66,7 @@ export function ProductGallery({ images, productName }: ProductGalleryProps) {
                   i === activeIndex ? "border-primary" : "border-transparent opacity-60 hover:opacity-100"
                 )}
               >
-                <Image src={img.url} alt={img.alt ?? ""} fill className="object-cover" sizes="80px" />
+                <Image src={img.url} alt={img.alt ?? ""} fill className="object-cover" sizes="80px" loading="lazy" />
               </button>
             ))}
           </div>

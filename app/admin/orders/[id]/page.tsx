@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation"
 import { getOrderById } from "@/lib/dal/orders"
-import { prisma } from "@/lib/prisma"
 import { OrderStatusChanger } from "./OrderStatusChanger"
 import { OrderDeliverySection } from "./OrderDeliverySection"
 import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
@@ -11,10 +10,7 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
 
   if (!order) notFound()
 
-  const statusLogs = await prisma.orderStatusLog.findMany({
-    where: { orderId: order.id },
-    orderBy: { createdAt: "desc" },
-  })
+  const statusLogs = order.statusLogs
 
   return (
     <div className="max-w-3xl">

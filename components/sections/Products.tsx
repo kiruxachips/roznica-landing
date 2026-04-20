@@ -130,7 +130,7 @@ export async function Products() {
                     {product.averageRating && (
                       <div className="flex items-center gap-1 mb-1">
                         {Array.from({ length: Math.round(product.averageRating) }).map((_, i) => (
-                          <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                          <Star key={`star-${product.id}-${i}`} className="w-3 h-3 fill-amber-400 text-amber-400" />
                         ))}
                         <span className="text-xs text-muted-foreground ml-1">
                           ({product.reviewCount})

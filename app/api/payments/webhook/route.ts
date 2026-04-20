@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, type OrderEmailData } from "@/lib/email"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
@@ -131,11 +132,19 @@ export async function POST(request: NextRequest) {
       paymentMethod: order.paymentMethod || undefined,
     }
 
-    // Send payment success emails (customer + admin, non-blocking)
-    Promise.allSettled([
-      emailData.customerEmail ? sendPaymentSuccessEmail(emailData) : Promise.resolve(),
-      sendAdminPaymentSuccessEmail(emailData),
-    ]).catch((e) => console.error("Failed to send payment emails:", e))
+    // Send payment success emails AFTER response to YooKassa — next/server's `after()`
+    // runs the callback once the response has been flushed, so SMTP latency (2-5s) does not
+    // block the webhook handler and does not trigger YooKassa retries.
+    after(async () => {
+      try {
+        await Promise.allSettled([
+          emailData.customerEmail ? sendPaymentSuccessEmail(emailData) : Promise.resolve(),
+          sendAdminPaymentSuccessEmail(emailData),
+        ])
+      } catch (e) {
+        console.error("Failed to send payment emails:", e)
+      }
+    })
 
     // Auto-create shipment with carrier
     try {

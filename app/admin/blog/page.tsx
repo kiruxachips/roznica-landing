@@ -6,13 +6,33 @@ import { prisma } from "@/lib/prisma"
 import { Plus } from "lucide-react"
 import { ArticleActions } from "./ArticleActions"
 
-export default async function AdminBlogPage() {
-  const articles = await prisma.article.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      category: { select: { name: true } },
-    },
-  })
+const PAGE_SIZE = 50
+
+export default async function AdminBlogPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string }>
+}) {
+  const sp = (await searchParams) ?? {}
+  const page = Math.max(1, Number(sp.page) || 1)
+
+  const [articles, total] = await Promise.all([
+    prisma.article.findMany({
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: {
+        category: { select: { name: true } },
+      },
+    }),
+    prisma.article.count(),
+  ])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  function pageHref(p: number) {
+    return p > 1 ? `/admin/blog?page=${p}` : "/admin/blog"
+  }
 
   return (
     <div>
@@ -86,6 +106,32 @@ export default async function AdminBlogPage() {
           <div className="p-8 text-center text-muted-foreground">Нет статей</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm">
+          <p className="text-muted-foreground">
+            Всего: <span className="font-medium text-foreground">{total}</span> · Стр. {page} из {totalPages}
+          </p>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link
+                href={pageHref(page - 1)}
+                className="px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                ← Предыдущая
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link
+                href={pageHref(page + 1)}
+                className="px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Следующая →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

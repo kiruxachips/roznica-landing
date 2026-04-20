@@ -4,11 +4,16 @@ import { prisma } from "@/lib/prisma"
 import { getStorage } from "@/lib/storage"
 import { revalidatePath } from "next/cache"
 
+const MAX_UPLOAD_SIZE = 10 * 1024 * 1024 // 10 MB
+
 export async function uploadImage(formData: FormData) {
   const file = formData.get("file") as File
   const productId = formData.get("productId") as string
 
   if (!file || !productId) throw new Error("Missing file or productId")
+  if (file.size > MAX_UPLOAD_SIZE) {
+    throw new Error(`Файл больше ${MAX_UPLOAD_SIZE / 1024 / 1024} МБ`)
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer())
   const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`

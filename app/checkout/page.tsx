@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { CheckoutForm } from "@/components/checkout/CheckoutForm"
+import { SessionProvider } from "@/components/providers/SessionProvider"
 
 export const metadata: Metadata = {
   title: "Оформление заказа | Millor Coffee",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function CheckoutPage() {
   return (
-    <>
+    <SessionProvider>
       <Header />
       <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 bg-secondary/20 min-h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -19,6 +20,6 @@ export default function CheckoutPage() {
         </div>
       </main>
       <Footer />
-    </>
+    </SessionProvider>
   )
 }

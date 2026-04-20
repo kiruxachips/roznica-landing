@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import type { ArticleCard, ArticleDetail, ArticleFilters } from "@/lib/types"
 import { Prisma } from "@prisma/client"
+import { unstable_cache } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 
 export function estimateReadingTime(html: string): number {
   const text = html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim()
@@ -110,13 +112,17 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
   }
 }
 
-export async function getArticleSlugs(): Promise<string[]> {
-  const articles = await prisma.article.findMany({
-    where: { isPublished: true },
-    select: { slug: true },
-  })
-  return articles.map((a) => a.slug)
-}
+export const getArticleSlugs = unstable_cache(
+  async (): Promise<string[]> => {
+    const articles = await prisma.article.findMany({
+      where: { isPublished: true },
+      select: { slug: true },
+    })
+    return articles.map((a) => a.slug)
+  },
+  ["article-slugs"],
+  { revalidate: 86400, tags: [CACHE_TAGS.articles, CACHE_TAGS.sitemap] }
+)
 
 export async function getRelatedArticles(articleId: string, categoryId: string | null, limit = 3): Promise<ArticleCard[]> {
   const where: Prisma.ArticleWhereInput = {

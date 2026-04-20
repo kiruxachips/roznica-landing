@@ -258,6 +258,9 @@ export async function getOrderById(id: string) {
       promoCode: {
         select: { code: true, name: true, type: true, value: true },
       },
+      statusLogs: {
+        orderBy: { createdAt: "desc" },
+      },
     },
   })
 }

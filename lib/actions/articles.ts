@@ -1,7 +1,8 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 import { getStorage } from "@/lib/storage"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
@@ -36,6 +37,8 @@ export async function createArticle(data: {
   void logAdminAction({ admin, action: "article.created", entityType: "article", entityId: article.id, payload: { title: article.title, slug: article.slug } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
+  revalidateTag(CACHE_TAGS.articles)
+  revalidateTag(CACHE_TAGS.sitemap)
   return article
 }
 
@@ -81,6 +84,8 @@ export async function updateArticle(
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
   revalidatePath(`/blog/${article.slug}`)
+  revalidateTag(CACHE_TAGS.articles)
+  revalidateTag(CACHE_TAGS.article(article.slug))
   return article
 }
 
@@ -100,6 +105,8 @@ export async function deleteArticle(id: string) {
   void logAdminAction({ admin, action: "article.deleted", entityType: "article", entityId: id, payload: { title: article.title } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
+  revalidateTag(CACHE_TAGS.articles)
+  revalidateTag(CACHE_TAGS.sitemap)
 }
 
 export async function toggleArticlePublished(id: string) {
@@ -120,6 +127,8 @@ export async function toggleArticlePublished(id: string) {
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
   revalidatePath(`/blog/${article.slug}`)
+  revalidateTag(CACHE_TAGS.articles)
+  revalidateTag(CACHE_TAGS.sitemap)
 }
 
 export async function uploadArticleCoverImage(formData: FormData) {

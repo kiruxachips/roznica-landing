@@ -2,16 +2,22 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import { useSession, signOut } from "next-auth/react"
+import { signOut } from "next-auth/react"
 import { User, ShoppingBag, LogOut } from "lucide-react"
 
-export function UserMenu() {
-  const { data: session, status } = useSession()
+interface UserMenuProps {
+  user?: {
+    name?: string | null
+    email?: string | null
+    userType?: string | null
+  } | null
+}
+
+export function UserMenu({ user }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
-  const userType = (session?.user as Record<string, unknown>)?.userType as string | undefined
-  const isCustomer = status === "authenticated" && userType === "customer"
+  const isCustomer = user?.userType === "customer"
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -22,8 +28,6 @@ export function UserMenu() {
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
-
-  if (status === "loading") return null
 
   if (!isCustomer) {
     return (
@@ -37,7 +41,7 @@ export function UserMenu() {
     )
   }
 
-  const name = session?.user?.name || ""
+  const name = user?.name || ""
   const initials = name
     .split(" ")
     .map((n) => n[0])
@@ -59,7 +63,7 @@ export function UserMenu() {
         <div className="absolute right-0 top-12 w-56 bg-white rounded-xl shadow-lg border border-border py-2 z-50">
           <div className="px-4 py-2 border-b border-border">
             <p className="font-medium text-sm truncate">{name}</p>
-            <p className="text-xs text-muted-foreground truncate">{session?.user?.email}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
 
           <Link

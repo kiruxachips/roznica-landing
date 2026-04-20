@@ -8,6 +8,14 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASSWORD,
   },
+  // Пул TCP-соединений: переиспользуем сокеты для последовательных писем,
+  // не создавая новый handshake на каждый sendMail. rateLimit ограничивает
+  // скорость отправки, чтобы Beget не закрыл соединение с "too many requests".
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 50,
+  rateDelta: 1000,
+  rateLimit: 10,
 })
 
 const fromEmail = process.env.SMTP_USER || "noreply@millor-coffee.ru"

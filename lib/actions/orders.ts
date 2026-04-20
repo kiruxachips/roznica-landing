@@ -5,6 +5,7 @@ import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 import { updateTasteProfile } from "@/lib/dal/taste-profile"
 import type { OrderData } from "@/lib/types"
 import { revalidatePath } from "next/cache"
+import { after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmail, type OrderEmailData } from "@/lib/email"
@@ -152,11 +153,19 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     notes: data.notes,
   }
 
-  // Send customer confirmation + admin notification (non-blocking)
-  Promise.allSettled([
-    sendOrderConfirmationEmail(emailData),
-    sendAdminNewOrderEmail(emailData),
-  ]).catch((e) => console.error("Failed to send order emails:", e))
+  // Send customer confirmation + admin notification after the response is flushed.
+  // В action это особенно важно для карточного checkout'а, где ответ от YooKassa
+  // ждут в браузере — не хотим удерживать его на SMTP.
+  after(async () => {
+    try {
+      await Promise.allSettled([
+        sendOrderConfirmationEmail(emailData),
+        sendAdminNewOrderEmail(emailData),
+      ])
+    } catch (e) {
+      console.error("Failed to send order emails:", e)
+    }
+  })
 
   // Online payment via YooKassa
   if (data.paymentMethod === "online") {
@@ -239,14 +248,21 @@ export async function updateOrderStatus(id: string, status: string) {
         select: { email: true, name: true, notifyOrderStatus: true },
       })
 
-      // Send email only for customer-visible statuses
+      // Send email only for customer-visible statuses — non-blocking via after()
       const customerVisibleStatuses = ["paid", "confirmed", "shipped", "delivered", "cancelled"]
       if (user?.email && user.notifyOrderStatus && customerVisibleStatuses.includes(status)) {
-        await sendOrderStatusEmail({
+        const emailArgs = {
           to: user.email,
           customerName: user.name || "Клиент",
           orderNumber: order.orderNumber,
           newStatus: status,
+        }
+        after(async () => {
+          try {
+            await sendOrderStatusEmail(emailArgs)
+          } catch (e) {
+            console.error("sendOrderStatusEmail failed:", e)
+          }
         })
       }
 

@@ -1,11 +1,26 @@
 export const dynamic = "force-dynamic"
 
+import Link from "next/link"
 import { getAllReviews } from "@/lib/dal/reviews"
 import { ReviewActions } from "./ReviewActions"
 import { Star } from "lucide-react"
 
-export default async function AdminReviewsPage() {
-  const reviews = await getAllReviews()
+const PAGE_SIZE = 50
+
+export default async function AdminReviewsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string }>
+}) {
+  const sp = (await searchParams) ?? {}
+  const page = Math.max(1, Number(sp.page) || 1)
+
+  const { reviews, total } = await getAllReviews({ page, limit: PAGE_SIZE })
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  function pageHref(p: number) {
+    return p > 1 ? `/admin/reviews?page=${p}` : "/admin/reviews"
+  }
 
   return (
     <div>
@@ -34,7 +49,7 @@ export default async function AdminReviewsPage() {
                 <td className="px-4 py-3">
                   <div className="flex">
                     {Array.from({ length: review.rating }).map((_, i) => (
-                      <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <Star key={`star-${review.id}-${i}`} className="w-3 h-3 fill-amber-400 text-amber-400" />
                     ))}
                   </div>
                 </td>
@@ -57,6 +72,32 @@ export default async function AdminReviewsPage() {
           <div className="p-8 text-center text-muted-foreground">Нет отзывов</div>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm">
+          <p className="text-muted-foreground">
+            Всего: <span className="font-medium text-foreground">{total}</span> · Стр. {page} из {totalPages}
+          </p>
+          <div className="flex gap-2">
+            {page > 1 && (
+              <Link
+                href={pageHref(page - 1)}
+                className="px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                ← Предыдущая
+              </Link>
+            )}
+            {page < totalPages && (
+              <Link
+                href={pageHref(page + 1)}
+                className="px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Следующая →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

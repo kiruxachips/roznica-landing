@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { Header } from "@/components/layout/Header"
+import { HeaderClient } from "@/components/layout/HeaderClient"
 import { Footer } from "@/components/layout/Footer"
 
 export default function CatalogError({
@@ -17,7 +17,7 @@ export default function CatalogError({
 
   return (
     <>
-      <Header />
+      <HeaderClient user={null} />
       <main className="pt-16">
         <section className="py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center max-w-md">

@@ -32,17 +32,28 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
   useEffect(() => {
     const key = cartProductIds.slice().sort().join(",")
     if (key === prevKeyRef.current) return
-    prevKeyRef.current = key
 
     const total = totalPrice()
-    fetch("/api/cart/recommendations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cartProductIds, cartTotal: total }),
-    })
-      .then((r) => r.json())
-      .then((data) => setProducts(data.recommendations ?? []))
-      .catch(() => {})
+    // Debounce: при быстрых кликах "+"/"-" ждём 300мс покоя, чтобы не
+    // сжечь бэкенд параллельными одинаковыми запросами.
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => {
+      prevKeyRef.current = key
+      fetch("/api/cart/recommendations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cartProductIds, cartTotal: total }),
+        signal: ctrl.signal,
+      })
+        .then((r) => r.json())
+        .then((data) => setProducts(data.recommendations ?? []))
+        .catch(() => {})
+    }, 300)
+
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
   }, [cartProductIds, totalPrice])
 
   if (products.length === 0) return null

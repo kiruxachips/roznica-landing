@@ -21,52 +21,60 @@ model Category {
   products    Product[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
+  @@index([isActive, sortOrder])
 }
 
 model Product {
-  id              String           @id @default(cuid())
+  id              String   @id @default(cuid())
   name            String
-  slug            String           @unique
+  slug            String   @unique
   description     String
-  fullDescription String?          @db.Text
+  fullDescription String?  @db.Text
   categoryId      String
-  category        Category         @relation(fields: [categoryId], references: [id])
-  isActive        Boolean          @default(true)
-  isFeatured      Boolean          @default(false)
+  category        Category @relation(fields: [categoryId], references: [id])
+  isActive        Boolean  @default(true)
+  isFeatured      Boolean  @default(false)
   badge           String?
-  sortOrder       Int              @default(0)
-  productType     String           @default("coffee") // "coffee" | "tea" | "instant"
-  productForm     String?          // tea: "листовой" | "пакетики" | instant: "гранулы" | "порошок" | "капсулы"
+  sortOrder       Int      @default(0)
+  productType     String   @default("coffee") // "coffee" | "tea" | "instant"
+  productForm     String? // tea: "листовой" | "пакетики" | instant: "гранулы" | "порошок" | "капсулы"
 
   // Coffee attributes (nullable for non-coffee products)
-  origin          String?
-  region          String?
-  farm            String?
-  altitude        String?
-  roastLevel      String?
+  origin           String?
+  region           String?
+  farm             String?
+  altitude         String?
+  roastLevel       String?
   processingMethod String?
-  flavorNotes     String[]         @default([])
-  acidity         Int?             // 0-100
-  sweetness       Int?             // 0-100
-  bitterness      Int?             // 0-100
-  body            Int?             // 0-100
-  brewingMethods  String[]         @default([])
+  flavorNotes      String[] @default([])
+  acidity          Int? // 0-100
+  sweetness        Int? // 0-100
+  bitterness       Int? // 0-100
+  body             Int? // 0-100
+  brewingMethods   String[] @default([])
 
   // Pack images
-  smallImage      String?          // 250г pack image path, e.g. /images/coffee/Small/Peru.jpg
+  smallImage String? // 250г pack image path, e.g. /images/coffee/Small/Peru.jpg
 
   // SEO
   metaTitle       String?
   metaDescription String?
 
-  images          ProductImage[]
-  variants        ProductVariant[]
-  reviews         Review[]
-  orderItems      OrderItem[]
-  favorites       Favorite[]
-  collections     ProductCollectionItem[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  images      ProductImage[]
+  variants    ProductVariant[]
+  reviews     Review[]
+  orderItems  OrderItem[]
+  favorites   Favorite[]
+  collections ProductCollectionItem[]
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@index([isActive, categoryId])
+  @@index([isActive, productType])
+  @@index([isActive, isFeatured, sortOrder])
 }
 
 model ProductImage {
@@ -80,33 +88,36 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id        String      @id @default(cuid())
-  productId String
-  product   Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  weight    String      // "250г", "500г", "1кг"
-  price     Int         // price in rubles
-  oldPrice  Int?
-  sku       String?
-  stock     Int         @default(0)
-  lowStockThreshold Int?        // null = не отслеживать; при переходе stock ≤ threshold → уведомление в бот
-  isActive  Boolean     @default(true)
-  sortOrder Int         @default(0)
-  orderItems OrderItem[]
-  stockHistory StockHistory[]
+  id                String         @id @default(cuid())
+  productId         String
+  product           Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  weight            String // "250г", "500г", "1кг"
+  price             Int // price in rubles
+  oldPrice          Int?
+  sku               String?
+  stock             Int            @default(0)
+  lowStockThreshold Int? // null = не отслеживать; при переходе stock ≤ threshold → уведомление в бот
+  isActive          Boolean        @default(true)
+  sortOrder         Int            @default(0)
+  orderItems        OrderItem[]
+  stockHistory      StockHistory[]
+
+  @@index([isActive, productId])
+  @@index([stock])
 }
 
 model StockHistory {
-  id           String   @id @default(cuid())
-  variantId    String
-  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  delta        Int      // +N приход / -N списание
-  stockBefore  Int
-  stockAfter   Int
-  reason       String   // order_placed | order_cancelled | order_restored | supplier_received | inventory_correction | write_off
-  orderId      String?  // связанный заказ, если применимо
-  notes        String?  @db.Text
-  changedBy    String?  // AdminUser.id | "customer" | "system"
-  createdAt    DateTime @default(now())
+  id          String         @id @default(cuid())
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  delta       Int // +N приход / -N списание
+  stockBefore Int
+  stockAfter  Int
+  reason      String // order_placed | order_cancelled | order_restored | supplier_received | inventory_correction | write_off
+  orderId     String? // связанный заказ, если применимо
+  notes       String?        @db.Text
+  changedBy   String? // AdminUser.id | "customer" | "system"
+  createdAt   DateTime       @default(now())
 
   @@index([variantId, createdAt])
   @@index([orderId])
@@ -119,19 +130,22 @@ model Review {
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   name      String
   text      String   @db.Text
-  rating    Int      // 1-5
+  rating    Int // 1-5
   isVisible Boolean  @default(true)
-  date      String?  // display date like "Ноябрь 2025"
+  date      String? // display date like "Ноябрь 2025"
   createdAt DateTime @default(now())
+
+  @@index([productId, isVisible])
+  @@index([isVisible])
 }
 
 model AdminUser {
-  id           String @id @default(cuid())
-  email        String @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   passwordHash String
   name         String
-  role         String @default("manager") // "admin" | "manager"
-  status       String @default("active")  // "active" | "pending" | "blocked"
+  role         String   @default("manager") // "admin" | "manager"
+  status       String   @default("active") // "active" | "pending" | "blocked"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -139,16 +153,16 @@ model AdminUser {
 }
 
 model AdminActivityLog {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   adminUserId String?
   admin       AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
-  adminName   String?   // snapshot — чтобы лог выжил при удалении пользователя
-  adminRole   String?   // "admin" | "manager" в момент действия
-  action      String    // "order.status_changed", "stock.adjusted", "product.updated", "user.approved" и т.д.
-  entityType  String?   // "order" | "variant" | "product" | "review" | "admin_user" ...
+  adminName   String? // snapshot — чтобы лог выжил при удалении пользователя
+  adminRole   String? // "admin" | "manager" в момент действия
+  action      String // "order.status_changed", "stock.adjusted", "product.updated", "user.approved" и т.д.
+  entityType  String? // "order" | "variant" | "product" | "review" | "admin_user" ...
   entityId    String?
-  payload     Json?     // произвольные детали: до/после, причина, старый/новый статус
-  createdAt   DateTime  @default(now())
+  payload     Json? // произвольные детали: до/после, причина, старый/новый статус
+  createdAt   DateTime   @default(now())
 
   @@index([adminUserId, createdAt])
   @@index([action, createdAt])
@@ -157,29 +171,29 @@ model AdminActivityLog {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String?   @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  name          String?
-  image         String?
-  phone         String?
-  avatarUrl     String?
-  defaultAddress String?  @db.Text
-  telegramId    String?   @unique
-  notifyOrderStatus  Boolean   @default(true)
-  notifyPromotions   Boolean   @default(false)
-  notifyNewProducts  Boolean   @default(false)
-  bonusBalance       Int       @default(0)
-  tasteProfile       Json?             // aggregated taste profile, updated on each order
-  accounts           Account[]
-  orders             Order[]
-  sessions           Session[]
-  favorites          Favorite[]
-  addresses          Address[]
-  bonusTransactions  BonusTransaction[]
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                String             @id @default(cuid())
+  email             String?            @unique
+  emailVerified     DateTime?
+  passwordHash      String?
+  name              String?
+  image             String?
+  phone             String?
+  avatarUrl         String?
+  defaultAddress    String?            @db.Text
+  telegramId        String?            @unique
+  notifyOrderStatus Boolean            @default(true)
+  notifyPromotions  Boolean            @default(false)
+  notifyNewProducts Boolean            @default(false)
+  bonusBalance      Int                @default(0)
+  tasteProfile      Json? // aggregated taste profile, updated on each order
+  accounts          Account[]
+  orders            Order[]
+  sessions          Session[]
+  favorites         Favorite[]
+  addresses         Address[]
+  bonusTransactions BonusTransaction[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Account {
@@ -211,7 +225,7 @@ model VerificationCode {
   id        String   @id @default(cuid())
   email     String
   code      String
-  type      String   // "email_verify" | "password_reset"
+  type      String // "email_verify" | "password_reset"
   expiresAt DateTime
   attempts  Int      @default(0)
   used      Boolean  @default(false)
@@ -221,75 +235,79 @@ model VerificationCode {
 }
 
 model PromoCode {
-  id          String    @id @default(cuid())
-  name        String
-  comment     String?   @db.Text
-  code        String    @unique
-  type        String    // "percent" | "fixed"
-  value       Int       // 10 = 10% or 500 = 500₽
-  startDate   DateTime
-  endDate     DateTime
-  usageCount     Int       @default(0)
+  id             String   @id @default(cuid())
+  name           String
+  comment        String?  @db.Text
+  code           String   @unique
+  type           String // "percent" | "fixed"
+  value          Int // 10 = 10% or 500 = 500₽
+  startDate      DateTime
+  endDate        DateTime
+  usageCount     Int      @default(0)
   maxUsage       Int?
   maxPerCustomer Int?
   minOrderSum    Int?
-  isActive    Boolean   @default(true)
-  orders      Order[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  isActive       Boolean  @default(true)
+  orders         Order[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 model Order {
-  id             String      @id @default(cuid())
-  orderNumber    String      @unique
-  status         String      @default("pending") // pending/confirmed/shipped/delivered/cancelled
-  customerName   String
-  customerEmail  String?
-  customerPhone  String
-  deliveryAddress String?    @db.Text
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique
+  status          String      @default("pending") // pending/confirmed/shipped/delivered/cancelled
+  customerName    String
+  customerEmail   String?
+  customerPhone   String
+  deliveryAddress String?     @db.Text
   deliveryMethod  String?
   paymentMethod   String?
-  subtotal       Int
-  deliveryPrice  Int         @default(0)
-  discount       Int         @default(0)
-  total          Int
-  bonusUsed      Int         @default(0)
-  bonusEarned    Int         @default(0)
-  paymentId      String?     // UUID платежа ЮKassa
-  paymentStatus  String?     // "pending" | "succeeded" | "canceled"
-  notes          String?     @db.Text
-  thankYouToken  String?     @unique
-  userId         String?
-  user           User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
-  promoCodeId    String?
-  promoCode      PromoCode?  @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
-  items          OrderItem[]
+  subtotal        Int
+  deliveryPrice   Int         @default(0)
+  discount        Int         @default(0)
+  total           Int
+  bonusUsed       Int         @default(0)
+  bonusEarned     Int         @default(0)
+  paymentId       String? // UUID платежа ЮKassa
+  paymentStatus   String? // "pending" | "succeeded" | "canceled"
+  notes           String?     @db.Text
+  thankYouToken   String?     @unique
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  promoCodeId     String?
+  promoCode       PromoCode?  @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
+  items           OrderItem[]
 
   // Delivery module fields
-  carrierOrderId      String?   // UUID заказа у перевозчика
-  carrierOrderNum     String?   // человекочитаемый номер
+  carrierOrderId      String? // UUID заказа у перевозчика
+  carrierOrderNum     String? // человекочитаемый номер
   trackingNumber      String?
-  pickupPointCode     String?   // код ПВЗ
-  pickupPointName     String?   // название (снапшот)
-  deliveryType        String?   // "door" | "pvz"
+  pickupPointCode     String? // код ПВЗ
+  pickupPointName     String? // название (снапшот)
+  deliveryType        String? // "door" | "pvz"
   destinationCity     String?
   destinationCityCode String?
-  carrierStatus       String?   // последний статус от перевозчика
-  estimatedDelivery   String?   // "3-5 дней"
-  packageWeight       Int?      // суммарный брутто-вес всех коробок, граммы
-  packagePlan         Json?     // физический план упаковки: массив коробок (length/width/height/weight/presetCode)
-  tariffCode          Int?      // код тарифа перевозчика
-  postalCode          String?   // почтовый индекс получателя
-  adminNotes          String?   @db.Text
+  carrierStatus       String? // последний статус от перевозчика
+  estimatedDelivery   String? // "3-5 дней"
+  packageWeight       Int? // суммарный брутто-вес всех коробок, граммы
+  packagePlan         Json? // физический план упаковки: массив коробок (length/width/height/weight/presetCode)
+  tariffCode          Int? // код тарифа перевозчика
+  postalCode          String? // почтовый индекс получателя
+  adminNotes          String? @db.Text
 
-  statusLogs     OrderStatusLog[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  statusLogs OrderStatusLog[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@index([paymentId])
   @@index([status])
   @@index([deliveryMethod, status])
   @@index([userId])
+  @@index([createdAt])
+  @@index([customerPhone])
+  @@index([customerEmail])
+  @@index([status, createdAt])
 }
 
 model OrderStatusLog {
@@ -312,9 +330,9 @@ model OrderItem {
   product   Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
   variantId String?
   variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  name      String          // snapshot
-  weight    String          // snapshot
-  price     Int             // snapshot
+  name      String // snapshot
+  weight    String // snapshot
+  price     Int // snapshot
   quantity  Int
 }
 
@@ -347,6 +365,9 @@ model Article {
   metaDescription String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+
+  @@index([isPublished, publishedAt])
+  @@index([categoryId, isPublished])
 }
 
 model Favorite {
@@ -381,7 +402,7 @@ model BonusTransaction {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount      Int
-  type        String   // "earned" | "spent" | "admin_adjustment"
+  type        String // "earned" | "spent" | "admin_adjustment"
   description String
   orderId     String?
   createdAt   DateTime @default(now())
@@ -426,12 +447,12 @@ model DeliverySetting {
 model DeliveryMarkupRule {
   id        String   @id @default(cuid())
   name      String
-  carrier   String   // "cdek" | "pochta" | "all"
-  type      String   // "percent" | "fixed" | "replace"
-  value     Int      // 15 = +15%, 200 = +200₽
+  carrier   String // "cdek" | "pochta" | "all"
+  type      String // "percent" | "fixed" | "replace"
+  value     Int // 15 = +15%, 200 = +200₽
   minWeight Int?
   maxWeight Int?
-  minPrice  Int?     // мин. сумма корзины
+  minPrice  Int? // мин. сумма корзины
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
@@ -441,13 +462,13 @@ model DeliveryMarkupRule {
 model DeliveryRule {
   id               String   @id @default(cuid())
   name             String
-  carrier          String   // "pochta" | "cdek" | "courier" | "all"
-  deliveryType     String?  // "pvz" | "door" | null = any
-  minCartTotal     Int?     // cart total >= X
-  maxDeliveryPrice Int?     // calculated delivery price < Y
-  city             String?  // specific city name (exact match)
-  action           String   // "free" | "discount" | "disable"
-  discountAmount   Int?     // for "discount" action: reduce by N₽
+  carrier          String // "pochta" | "cdek" | "courier" | "all"
+  deliveryType     String? // "pvz" | "door" | null = any
+  minCartTotal     Int? // cart total >= X
+  maxDeliveryPrice Int? // calculated delivery price < Y
+  city             String? // specific city name (exact match)
+  action           String // "free" | "discount" | "disable"
+  discountAmount   Int? // for "discount" action: reduce by N₽
   isActive         Boolean  @default(true)
   sortOrder        Int      @default(0)
   createdAt        DateTime @default(now())
@@ -456,18 +477,18 @@ model DeliveryRule {
 
 // Outbox pattern: events queued for delivery to external systems (millorbot, etc.)
 model OutboxEvent {
-  id             String   @id @default(cuid())
-  eventId        String   @unique              // UUID — used for idempotency on receiver side
-  topic          String                         // "order.paid" | "order.status.changed" | ...
-  payload        Json                           // full event body
-  status         String   @default("pending")   // "pending" | "delivered" | "failed" | "dead"
-  attempts       Int      @default(0)
-  nextAttemptAt  DateTime @default(now())
-  lastError      String?  @db.Text
+  id             String    @id @default(cuid())
+  eventId        String    @unique // UUID — used for idempotency on receiver side
+  topic          String // "order.paid" | "order.status.changed" | ...
+  payload        Json // full event body
+  status         String    @default("pending") // "pending" | "delivered" | "failed" | "dead"
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  lastError      String?   @db.Text
   lastStatusCode Int?
   deliveredAt    DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@index([status, nextAttemptAt])
   @@index([topic])
@@ -478,7 +499,7 @@ model OutboxEvent {
 // An entry is inserted only AFTER successful processing, so failed attempts can be retried.
 model ProcessedInboundEvent {
   id        String   @id @default(cuid())
-  source    String                             // "millorbot" | ...
+  source    String // "millorbot" | ...
   eventId   String
   createdAt DateTime @default(now())
 
@@ -489,10 +510,10 @@ model ProcessedInboundEvent {
 // Log of all integration events (inbound + outbound) for diagnostics
 model IntegrationLog {
   id         String   @id @default(cuid())
-  direction  String                             // "inbound" | "outbound"
-  source     String                             // "millorbot" | "cdek" | "pochta" | "yookassa"
-  event      String                             // "order.paid" | "tracking.updated" | ...
-  eventId    String?                            // optional — matches OutboxEvent.eventId or inbound event_id
+  direction  String // "inbound" | "outbound"
+  source     String // "millorbot" | "cdek" | "pochta" | "yookassa"
+  event      String // "order.paid" | "tracking.updated" | ...
+  eventId    String? // optional — matches OutboxEvent.eventId or inbound event_id
   statusCode Int?
   request    Json?
   response   Json?

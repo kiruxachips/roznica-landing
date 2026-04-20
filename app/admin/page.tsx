@@ -2,23 +2,32 @@ import Link from "next/link"
 import { prisma } from "@/lib/prisma"
 import { Package, ShoppingCart, MessageSquare, FolderTree, AlertTriangle, Boxes } from "lucide-react"
 import { getStockMetrics } from "@/lib/dal/stock"
+import { unstable_cache } from "next/cache"
 
 export const dynamic = "force-dynamic"
 
+// Дашборд открывают часто — recentOrders кэшируем на 60 с, этого достаточно
+// для оперативного контроля и убирает N*6 запросов в минуту при активной работе.
+const getCachedRecentOrders = unstable_cache(
+  () =>
+    prisma.order.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      include: { _count: { select: { items: true } } },
+    }),
+  ["admin-dashboard-recent-orders"],
+  { revalidate: 60 }
+)
+
 async function getStats() {
-  const [products, orders, reviews, categories, stock] = await Promise.all([
+  const [products, orders, reviews, categories, stock, recentOrders] = await Promise.all([
     prisma.product.count({ where: { isActive: true } }),
     prisma.order.count(),
     prisma.review.count(),
     prisma.category.count({ where: { isActive: true } }),
     getStockMetrics(),
+    getCachedRecentOrders(),
   ])
-
-  const recentOrders = await prisma.order.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 5,
-    include: { _count: { select: { items: true } } },
-  })
 
   return { products, orders, reviews, categories, stock, recentOrders }
 }

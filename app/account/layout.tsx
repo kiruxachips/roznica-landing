@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { AccountSidebar } from "@/components/account/AccountSidebar"
+import { SessionProvider } from "@/components/providers/SessionProvider"
 
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <SessionProvider>
       <Header />
       <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 bg-secondary/20 min-h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -22,6 +23,6 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
         </div>
       </main>
       <Footer />
-    </>
+    </SessionProvider>
   )
 }

@@ -1,8 +1,17 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { revalidatePath } from "next/cache"
+import { revalidatePath, revalidateTag } from "next/cache"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+
+function invalidateCollections() {
+  revalidateTag(CACHE_TAGS.collections)
+  revalidateTag(CACHE_TAGS.catalog)
+  revalidateTag(CACHE_TAGS.products)
+  revalidatePath("/admin/collections")
+  revalidatePath("/catalog")
+}
 
 export async function createCollection(data: {
   name: string
@@ -13,8 +22,7 @@ export async function createCollection(data: {
   const admin = await requireAdmin("collections.edit")
   const col = await prisma.productCollection.create({ data })
   void logAdminAction({ admin, action: "collection.created", entityType: "collection", entityId: col.id, payload: data })
-  revalidatePath("/admin/collections")
-  revalidatePath("/catalog")
+  invalidateCollections()
 }
 
 export async function updateCollection(
@@ -31,17 +39,15 @@ export async function updateCollection(
   const admin = await requireAdmin("collections.edit")
   await prisma.productCollection.update({ where: { id }, data })
   void logAdminAction({ admin, action: "collection.updated", entityType: "collection", entityId: id, payload: { fields: Object.keys(data) } })
-  revalidatePath("/admin/collections")
+  invalidateCollections()
   revalidatePath(`/admin/collections/${id}`)
-  revalidatePath("/catalog")
 }
 
 export async function deleteCollection(id: string) {
   const admin = await requireAdmin("collections.delete")
   await prisma.productCollection.delete({ where: { id } })
   void logAdminAction({ admin, action: "collection.deleted", entityType: "collection", entityId: id })
-  revalidatePath("/admin/collections")
-  revalidatePath("/catalog")
+  invalidateCollections()
 }
 
 export async function addProductToCollection(collectionId: string, productId: string) {
@@ -54,8 +60,8 @@ export async function addProductToCollection(collectionId: string, productId: st
   await prisma.productCollectionItem.create({
     data: { collectionId, productId, sortOrder: (maxSort?.sortOrder ?? 0) + 1 },
   })
+  invalidateCollections()
   revalidatePath(`/admin/collections/${collectionId}`)
-  revalidatePath("/catalog")
 }
 
 export async function removeProductFromCollection(collectionId: string, productId: string) {
@@ -63,8 +69,8 @@ export async function removeProductFromCollection(collectionId: string, productI
   await prisma.productCollectionItem.deleteMany({
     where: { collectionId, productId },
   })
+  invalidateCollections()
   revalidatePath(`/admin/collections/${collectionId}`)
-  revalidatePath("/catalog")
 }
 
 export async function syncProductCollections(productId: string, collectionIds: string[]) {
@@ -77,5 +83,5 @@ export async function syncProductCollections(productId: string, collectionIds: s
       })
     ),
   ])
-  revalidatePath("/catalog")
+  invalidateCollections()
 }
