@@ -11,13 +11,16 @@ import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmai
 import { createPayment, createRefund } from "@/lib/yookassa"
 import { headers } from "next/headers"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
+import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
+import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
 
 async function rollbackOrder(
   orderId: string,
-  items: { variantId: string; quantity: number }[],
+  items: { variantId: string; quantity: number; name?: string }[],
   bonusUsed: number,
   userId: string | null | undefined
 ) {
+  const stockResults: StockAdjustResult[] = []
   try {
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
@@ -25,10 +28,18 @@ async function rollbackOrder(
         data: { status: "cancelled" },
       })
       for (const item of items) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
-          data: { stock: { increment: item.quantity } },
-        })
+        const res = await adjustStock(
+          {
+            variantId: item.variantId,
+            delta: +item.quantity,
+            reason: "order_cancelled",
+            orderId,
+            notes: "Откат при ошибке создания платежа",
+            changedBy: "system",
+          },
+          tx
+        )
+        stockResults.push(res)
       }
       if (bonusUsed > 0 && userId) {
         await tx.user.update({
@@ -37,6 +48,9 @@ async function rollbackOrder(
         })
       }
     })
+    if (stockResults.length > 0) {
+      void notifyStockChanges(stockResults)
+    }
   } catch (rollbackErr) {
     console.error("Critical: failed to rollback order", orderId, rollbackErr)
   }
@@ -263,6 +277,7 @@ export async function cancelOrder(orderId: string) {
     }
   }
 
+  const stockResults: StockAdjustResult[] = []
   await prisma.$transaction(async (tx) => {
     // Update order status
     await tx.order.update({
@@ -279,13 +294,20 @@ export async function cancelOrder(orderId: string) {
       },
     })
 
-    // Return stock
+    // Возврат остатков через adjustStock — фиксируется в истории
     for (const item of order.items) {
       if (item.variantId) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
-          data: { stock: { increment: item.quantity } },
-        })
+        const res = await adjustStock(
+          {
+            variantId: item.variantId,
+            delta: +item.quantity,
+            reason: "order_cancelled",
+            orderId: order.id,
+            changedBy: "customer",
+          },
+          tx
+        )
+        stockResults.push(res)
       }
     }
 
@@ -306,6 +328,10 @@ export async function cancelOrder(orderId: string) {
       })
     }
   })
+
+  if (stockResults.length > 0) {
+    void notifyStockChanges(stockResults)
+  }
 
   revalidatePath("/account/orders")
   revalidatePath(`/account/orders/${orderId}`)

@@ -88,9 +88,29 @@ model ProductVariant {
   oldPrice  Int?
   sku       String?
   stock     Int         @default(0)
+  lowStockThreshold Int?        // null = не отслеживать; при переходе stock ≤ threshold → уведомление в бот
   isActive  Boolean     @default(true)
   sortOrder Int         @default(0)
   orderItems OrderItem[]
+  stockHistory StockHistory[]
+}
+
+model StockHistory {
+  id           String   @id @default(cuid())
+  variantId    String
+  variant      ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  delta        Int      // +N приход / -N списание
+  stockBefore  Int
+  stockAfter   Int
+  reason       String   // order_placed | order_cancelled | order_restored | supplier_received | inventory_correction | write_off
+  orderId      String?  // связанный заказ, если применимо
+  notes        String?  @db.Text
+  changedBy    String?  // AdminUser.id | "customer" | "system"
+  createdAt    DateTime @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([orderId])
+  @@index([reason])
 }
 
 model Review {

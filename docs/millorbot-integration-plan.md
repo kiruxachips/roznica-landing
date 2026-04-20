@@ -878,3 +878,66 @@ ssh beget 'cd ~/roznica-landing && sed -i "s/MILLORBOT_ENABLED=false/MILLORBOT_E
 2. Правильный ли URL бота (resolve внутри docker-сети).
 3. Время контейнеров (`docker exec ... date`).
 4. Что написано в `last_error` у failed-события в outbox.
+
+---
+
+## 9. Stock events (добавлено 2026-04-20)
+
+Сайт шлёт в millorbot события о критичных изменениях складских остатков.
+Используются для того, чтобы менеджеры получали уведомления в Telegram-чат
+о закончившихся товарах и могли пополнить склад при следующем привозе.
+
+### Топики
+
+| Topic | Endpoint в боте | Когда срабатывает |
+|---|---|---|
+| `product.stock.depleted` | `/api/products/stock/depleted` | Переход `stock > 0 → stock == 0` |
+| `product.stock.low` | `/api/products/stock/low` | Переход `stock > threshold → stock ≤ threshold` (и `lowStockThreshold != null`) |
+
+### Payload (оба топика идентичны по форме)
+
+```json
+{
+  "event_id": "stock_depleted_<variantId>_<stockBefore>_to_0",
+  "event": "product.stock.depleted",
+  "occurred_at": "2026-04-20T13:45:12.000Z",
+  "product": {
+    "id": "cluxp...xx",
+    "name": "Эфиопия Иргачеффе",
+    "slug": "ethiopia-yirgacheffe",
+    "adminUrl": "https://millor-coffee.ru/admin/products/cluxp...xx"
+  },
+  "variant": {
+    "id": "cluyy...zz",
+    "weight": "250г",
+    "sku": "ETH-250"
+  },
+  "stock": {
+    "before": 1,
+    "after": 0,
+    "threshold": null
+  }
+}
+```
+
+### Идемпотентность
+
+`event_id` детерминирован на основе перехода `(variantId, stockBefore, stockAfter)`.
+Один и тот же stock-переход всегда даст один `event_id` → на стороне сайта
+UNIQUE-констрейнт предотвратит дубли в outbox.
+
+На стороне бота рекомендуется хранить `event_id` в `processed_events` для защиты
+от повторной доставки.
+
+### Ожидаемое поведение бота
+
+- Сообщение в Telegram-чат менеджеров формата:
+  - `⚠️ Товар закончился: Эфиопия Иргачеффе — 250г. Остаток был 1 → стал 0.`
+  - `🔔 Низкий остаток: Эфиопия Иргачеффе — 250г. Осталось 2 (порог: 3).`
+- Deep-link на админку через `product.adminUrl` (кнопка-Inline).
+- Возможность подтвердить получение («принято, пополним при привозе») —
+  опционально, на усмотрение команды бота.
+
+### Ответ бота
+
+Стандартный: `200 { "ok": true, "event_id": "..." }` — сайт пометит событие как `delivered`.

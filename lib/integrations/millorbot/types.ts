@@ -52,7 +52,29 @@ export interface MillorbotOrderPaidPayload {
   order: MillorbotOrder
 }
 
-export type MillorbotOutboxPayload = MillorbotOrderPaidPayload
+export interface MillorbotStockPayload {
+  event_id: string
+  event: "product.stock.depleted" | "product.stock.low"
+  occurred_at: string
+  product: {
+    id: string
+    name: string
+    slug: string
+    adminUrl: string
+  }
+  variant: {
+    id: string
+    weight: string
+    sku: string | null
+  }
+  stock: {
+    before: number
+    after: number
+    threshold: number | null
+  }
+}
+
+export type MillorbotOutboxPayload = MillorbotOrderPaidPayload | MillorbotStockPayload
 
 // Inbound from bot
 export type NormalizedTrackingStatus =

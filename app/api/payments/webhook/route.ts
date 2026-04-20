@@ -5,6 +5,8 @@ import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { getPayment } from "@/lib/yookassa"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 import { buildOrderPaidPayload } from "@/lib/integrations/millorbot/payload"
+import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
+import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
 
 // YooKassa IP ranges (first line of defense)
 const YOOKASSA_IPS = [
@@ -173,23 +175,34 @@ export async function POST(request: NextRequest) {
 
     // Stock restoration is in the same transaction as status update — atomic.
     // If any step fails the whole transaction rolls back and nothing is lost.
-    await prisma.$transaction([
-      prisma.order.update({
+    const stockResults: StockAdjustResult[] = []
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
         where: { id: order.id },
         data: { status: "cancelled", paymentStatus: "canceled" },
-      }),
-      prisma.orderStatusLog.create({
+      })
+      await tx.orderStatusLog.create({
         data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
-      }),
-      ...order.items
-        .filter((item) => item.variantId)
-        .map((item) =>
-          prisma.productVariant.update({
-            where: { id: item.variantId! },
-            data: { stock: { increment: item.quantity } },
-          })
-        ),
-    ])
+      })
+      for (const item of order.items) {
+        if (!item.variantId) continue
+        const res = await adjustStock(
+          {
+            variantId: item.variantId,
+            delta: +item.quantity,
+            reason: "order_cancelled",
+            orderId: order.id,
+            notes: "Платёж отменён YooKassa",
+            changedBy: "system",
+          },
+          tx
+        )
+        stockResults.push(res)
+      }
+    })
+    if (stockResults.length > 0) {
+      void notifyStockChanges(stockResults)
+    }
 
     // Refund bonuses if used
     if (order.bonusUsed > 0 && order.userId) {

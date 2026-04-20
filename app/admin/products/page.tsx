@@ -12,10 +12,26 @@ export default async function AdminProductsPage() {
     include: {
       category: { select: { name: true } },
       images: { where: { isPrimary: true }, take: 1 },
-      variants: { where: { isActive: true }, orderBy: { price: "asc" }, take: 1 },
+      variants: {
+        where: { isActive: true },
+        orderBy: { price: "asc" },
+        select: { id: true, price: true, stock: true, lowStockThreshold: true },
+      },
       _count: { select: { reviews: true } },
     },
   })
+
+  function stockBadge(variants: { stock: number; lowStockThreshold: number | null }[]) {
+    if (variants.length === 0) return { label: "—", cls: "bg-gray-50 text-gray-500" }
+    const total = variants.reduce((s, v) => s + v.stock, 0)
+    const allOut = variants.every((v) => v.stock <= 0)
+    const anyLow = variants.some(
+      (v) => v.stock > 0 && v.lowStockThreshold !== null && v.stock <= v.lowStockThreshold
+    )
+    if (allOut) return { label: `${total} · нет в наличии`, cls: "bg-red-50 text-red-700" }
+    if (anyLow) return { label: `${total} · низкий`, cls: "bg-amber-50 text-amber-700" }
+    return { label: `${total}`, cls: "bg-green-50 text-green-700" }
+  }
 
   return (
     <div>
@@ -37,6 +53,7 @@ export default async function AdminProductsPage() {
               <th className="text-left px-4 py-3 font-medium">Товар</th>
               <th className="text-left px-4 py-3 font-medium">Категория</th>
               <th className="text-left px-4 py-3 font-medium">Цена</th>
+              <th className="text-left px-4 py-3 font-medium">Остаток</th>
               <th className="text-left px-4 py-3 font-medium">Отзывы</th>
               <th className="text-left px-4 py-3 font-medium">Статус</th>
               <th className="w-24 px-4 py-3"></th>
@@ -67,6 +84,16 @@ export default async function AdminProductsPage() {
                 <td className="px-4 py-3 text-muted-foreground">{product.category.name}</td>
                 <td className="px-4 py-3">
                   {product.variants[0] ? `от ${product.variants[0].price}₽` : "—"}
+                </td>
+                <td className="px-4 py-3">
+                  {(() => {
+                    const badge = stockBadge(product.variants)
+                    return (
+                      <span className={`px-2 py-1 rounded-md text-xs font-medium ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{product._count.reviews}</td>
                 <td className="px-4 py-3">

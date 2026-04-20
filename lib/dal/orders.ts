@@ -5,6 +5,8 @@ import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx } from "@/lib/dal/bonuses"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
+import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
+import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
 
 function parseItemWeightGrams(w: string): number {
   const lower = w.toLowerCase().trim()
@@ -165,16 +167,27 @@ export async function createOrder(data: OrderData) {
       include: { items: true },
     })
 
-    // Atomically decrement stock — rejects if insufficient.
-    // This is the real safety check (pre-validation above is advisory for UX).
+    // Декремент остатков через adjustStock — атомарно, с историей и пересечением порогов.
+    const stockResults: StockAdjustResult[] = []
     for (const item of data.items) {
-      const affected = await tx.$executeRaw`
-        UPDATE "ProductVariant"
-        SET stock = stock - ${item.quantity}
-        WHERE id = ${item.variantId} AND stock >= ${item.quantity}
-      `
-      if (affected === 0) {
-        throw new Error(`"${item.name}" — недостаточно на складе. Обновите корзину`)
+      try {
+        const res = await adjustStock(
+          {
+            variantId: item.variantId,
+            delta: -item.quantity,
+            reason: "order_placed",
+            orderId: created.id,
+            changedBy: data.userId || "customer",
+          },
+          tx
+        )
+        stockResults.push(res)
+      } catch (e) {
+        throw new Error(
+          e instanceof Error && e.message.startsWith("Недостаточно")
+            ? `"${item.name}" — недостаточно на складе. Обновите корзину`
+            : `Ошибка списания со склада для "${item.name}"`
+        )
       }
     }
 
@@ -183,10 +196,13 @@ export async function createOrder(data: OrderData) {
       await deductBonusesInTx(tx, data.userId, created.id, bonusUsed)
     }
 
-    return created
+    return { created, stockResults }
   })
 
-  return order
+  // После commit — асинхронно уведомляем millorbot о критичных переходах
+  void notifyStockChanges(order.stockResults)
+
+  return order.created
 }
 
 export async function getOrders(filters: { status?: string; search?: string; page?: number; limit?: number } = {}) {
@@ -270,7 +286,7 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 export async function updateOrderStatus(id: string, status: string, changedBy?: string) {
   const order = await prisma.order.findUnique({
     where: { id },
-    select: { status: true },
+    include: { items: { select: { variantId: true, quantity: true, name: true } } },
   })
   if (!order) throw new Error("Заказ не найден")
 
@@ -279,20 +295,74 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
     throw new Error(`Нельзя перевести заказ из "${order.status}" в "${status}"`)
   }
 
-  const [updated] = await prisma.$transaction([
-    prisma.order.update({
+  // Логика stock при смене статуса:
+  // - Любой → cancelled: вернуть товар на склад (inflate).
+  // - cancelled → pending: снять со склада заново (decrement).
+  // В остальных случаях stock не трогаем (paid/confirmed/shipped/delivered).
+  const isCancelling = status === "cancelled" && order.status !== "cancelled"
+  const isRestoring = order.status === "cancelled" && status === "pending"
+
+  const stockResults: StockAdjustResult[] = []
+
+  const updated = await prisma.$transaction(async (tx) => {
+    if (isCancelling) {
+      for (const item of order.items) {
+        if (!item.variantId) continue
+        const res = await adjustStock(
+          {
+            variantId: item.variantId,
+            delta: +item.quantity,
+            reason: "order_cancelled",
+            orderId: id,
+            changedBy: changedBy || "admin",
+          },
+          tx
+        )
+        stockResults.push(res)
+      }
+    } else if (isRestoring) {
+      for (const item of order.items) {
+        if (!item.variantId) continue
+        try {
+          const res = await adjustStock(
+            {
+              variantId: item.variantId,
+              delta: -item.quantity,
+              reason: "order_restored",
+              orderId: id,
+              changedBy: changedBy || "admin",
+            },
+            tx
+          )
+          stockResults.push(res)
+        } catch (e) {
+          throw new Error(
+            e instanceof Error && e.message.startsWith("Недостаточно")
+              ? `"${item.name}" — недостаточно на складе для восстановления заказа`
+              : `Ошибка восстановления со склада для "${item.name}"`
+          )
+        }
+      }
+    }
+
+    const upd = await tx.order.update({
       where: { id },
       data: { status },
-    }),
-    prisma.orderStatusLog.create({
+    })
+    await tx.orderStatusLog.create({
       data: {
         orderId: id,
         fromStatus: order.status,
         toStatus: status,
         changedBy: changedBy || null,
       },
-    }),
-  ])
+    })
+    return upd
+  })
+
+  if (stockResults.length > 0) {
+    void notifyStockChanges(stockResults)
+  }
   return updated
 }
 

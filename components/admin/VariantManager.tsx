@@ -12,6 +12,7 @@ interface Variant {
   price: number
   oldPrice: number | null
   stock: number
+  lowStockThreshold: number | null
   sortOrder: number
   isActive: boolean
 }
@@ -52,7 +53,13 @@ export function VariantManager({ productId, variants }: { productId: string; var
   }
 
   async function handleUpdate(id: string, field: string, value: string) {
-    const numValue = Number(value)
+    const trimmed = value.trim()
+    if (field === "lowStockThreshold" && trimmed === "") {
+      await updateVariant(id, { lowStockThreshold: null })
+      router.refresh()
+      return
+    }
+    const numValue = Number(trimmed)
     if (isNaN(numValue)) return
     await updateVariant(id, { [field]: numValue })
     router.refresh()
@@ -72,6 +79,7 @@ export function VariantManager({ productId, variants }: { productId: string; var
             <th className="text-left py-2 font-medium">Цена</th>
             <th className="text-left py-2 font-medium">Старая цена</th>
             <th className="text-left py-2 font-medium">Остаток</th>
+            <th className="text-left py-2 font-medium" title="Порог уведомления о низком остатке">Порог</th>
             <th className="text-left py-2 font-medium">Активен</th>
             <th className="w-10"></th>
           </tr>
@@ -102,6 +110,16 @@ export function VariantManager({ productId, variants }: { productId: string; var
                   defaultValue={v.stock}
                   onBlur={(e) => handleUpdate(v.id, "stock", e.target.value)}
                   className="w-20 h-8 px-2 rounded border border-input text-sm"
+                />
+              </td>
+              <td className="py-2">
+                <input
+                  type="number"
+                  min={0}
+                  defaultValue={v.lowStockThreshold ?? ""}
+                  placeholder="—"
+                  onBlur={(e) => handleUpdate(v.id, "lowStockThreshold", e.target.value)}
+                  className="w-16 h-8 px-2 rounded border border-input text-sm"
                 />
               </td>
               <td className="py-2">

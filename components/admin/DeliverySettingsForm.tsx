@@ -80,9 +80,32 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
     parseBoxPresetsLocal(settings.box_presets)
   )
 
+  function validateBoxPresets(presets: BoxPreset[]): string | null {
+    if (presets.length === 0) return "Должна быть хотя бы одна коробка"
+    const codes = new Set<string>()
+    for (const p of presets) {
+      if (!p.code.trim()) return "У каждой коробки должен быть код"
+      if (codes.has(p.code)) return `Код "${p.code}" дублируется`
+      codes.add(p.code)
+      if (p.length <= 0 || p.width <= 0 || p.height <= 0) return `"${p.code}": габариты должны быть > 0`
+      if (p.tareGrams < 0) return `"${p.code}": тара не может быть отрицательной`
+      if (p.maxWeightGrams <= 0) return `"${p.code}": максимальный вес должен быть > 0`
+      if (p.maxUnits <= 0) return `"${p.code}": максимум юнитов должен быть > 0`
+    }
+    return null
+  }
+
+  const [boxPresetError, setBoxPresetError] = useState<string | null>(null)
+
   function updateBoxPresets(next: BoxPreset[]) {
     setBoxPresets(next)
-    setLocalSettings((prev) => ({ ...prev, box_presets: JSON.stringify(next) }))
+    const err = validateBoxPresets(next)
+    setBoxPresetError(err)
+    // Сохраняем в settings только если валидно — иначе оставляем предыдущее значение,
+    // чтобы нельзя было нажать «Сохранить» и уложить битый JSON в БД.
+    if (!err) {
+      setLocalSettings((prev) => ({ ...prev, box_presets: JSON.stringify(next) }))
+    }
   }
 
   function setBoxPresetField<K extends keyof BoxPreset>(index: number, field: K, value: BoxPreset[K]) {
@@ -156,6 +179,10 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
   }
 
   async function handleSave() {
+    if (boxPresetError) {
+      setMessage(`Коробки: ${boxPresetError}`)
+      return
+    }
     setSaving(true)
     setMessage("")
     try {
@@ -408,6 +435,11 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
                 (юнит ≈ объём одной 250-граммовой пачки: 250 г = 1, 500 г = 2, 1 кг = 3). Если заказ не влезает —
                 добавляются дополнительные коробки.
               </p>
+              {boxPresetError && (
+                <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
+                  {boxPresetError}
+                </div>
+              )}
 
               <div className="space-y-3">
                 {boxPresets.map((p, i) => (

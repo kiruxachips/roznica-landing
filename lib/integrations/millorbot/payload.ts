@@ -1,5 +1,5 @@
-import type { Order, OrderItem } from "@prisma/client"
-import type { MillorbotCarrier, MillorbotOrderPaidPayload } from "./types"
+import type { Order, OrderItem, Product, ProductVariant } from "@prisma/client"
+import type { MillorbotCarrier, MillorbotOrderPaidPayload, MillorbotStockPayload } from "./types"
 
 type OrderWithItems = Order & { items: OrderItem[] }
 
@@ -65,6 +65,42 @@ export function buildOrderPaidPayload(
       paymentMethod: order.paymentMethod,
       paymentId: order.paymentId,
       adminUrl: `${siteUrl()}/admin/orders/${order.id}`,
+    },
+  }
+}
+
+type VariantWithProduct = ProductVariant & { product: Product }
+
+export function buildStockPayload(
+  event: "product.stock.depleted" | "product.stock.low",
+  opts: {
+    variant: VariantWithProduct
+    stockBefore: number
+    stockAfter: number
+    eventId: string
+    occurredAt?: Date
+  },
+): MillorbotStockPayload {
+  const occurredAt = (opts.occurredAt ?? new Date()).toISOString()
+  return {
+    event_id: opts.eventId,
+    event,
+    occurred_at: occurredAt,
+    product: {
+      id: opts.variant.product.id,
+      name: opts.variant.product.name,
+      slug: opts.variant.product.slug,
+      adminUrl: `${siteUrl()}/admin/products/${opts.variant.product.id}`,
+    },
+    variant: {
+      id: opts.variant.id,
+      weight: opts.variant.weight,
+      sku: opts.variant.sku,
+    },
+    stock: {
+      before: opts.stockBefore,
+      after: opts.stockAfter,
+      threshold: opts.variant.lowStockThreshold,
     },
   }
 }

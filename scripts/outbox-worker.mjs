@@ -27,6 +27,8 @@ function log(level, message, extra) {
 function topicToPath(topic) {
   if (topic === "order.paid") return "/api/orders/paid"
   if (topic === "order.status.changed") return "/api/orders/status"
+  if (topic === "product.stock.depleted") return "/api/products/stock/depleted"
+  if (topic === "product.stock.low") return "/api/products/stock/low"
   return `/api/${String(topic).replace(/\./g, "/")}`
 }
 

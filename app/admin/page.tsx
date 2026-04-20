@@ -1,14 +1,17 @@
+import Link from "next/link"
 import { prisma } from "@/lib/prisma"
-import { Package, ShoppingCart, MessageSquare, FolderTree } from "lucide-react"
+import { Package, ShoppingCart, MessageSquare, FolderTree, AlertTriangle, Boxes } from "lucide-react"
+import { getStockMetrics } from "@/lib/dal/stock"
 
 export const dynamic = "force-dynamic"
 
 async function getStats() {
-  const [products, orders, reviews, categories] = await Promise.all([
+  const [products, orders, reviews, categories, stock] = await Promise.all([
     prisma.product.count({ where: { isActive: true } }),
     prisma.order.count(),
     prisma.review.count(),
     prisma.category.count({ where: { isActive: true } }),
+    getStockMetrics(),
   ])
 
   const recentOrders = await prisma.order.findMany({
@@ -17,7 +20,7 @@ async function getStats() {
     include: { _count: { select: { items: true } } },
   })
 
-  return { products, orders, reviews, categories, recentOrders }
+  return { products, orders, reviews, categories, stock, recentOrders }
 }
 
 export default async function AdminDashboard() {
@@ -30,11 +33,42 @@ export default async function AdminDashboard() {
     { label: "Категории", value: stats.categories, icon: FolderTree, color: "text-purple-600 bg-purple-50" },
   ]
 
+  const stockCards = [
+    {
+      label: "Суммарный остаток",
+      value: stats.stock.totalStock,
+      icon: Boxes,
+      color: "text-slate-600 bg-slate-50",
+      href: "/admin/warehouse",
+    },
+    {
+      label: "Нет в наличии",
+      value: stats.stock.outOfStock,
+      icon: AlertTriangle,
+      color: stats.stock.outOfStock > 0 ? "text-red-600 bg-red-50" : "text-muted-foreground bg-muted/40",
+      href: "/admin/warehouse?status=out",
+    },
+    {
+      label: "Низкий остаток",
+      value: stats.stock.lowStock,
+      icon: AlertTriangle,
+      color: stats.stock.lowStock > 0 ? "text-amber-600 bg-amber-50" : "text-muted-foreground bg-muted/40",
+      href: "/admin/warehouse?status=low",
+    },
+    {
+      label: "Поставки за 7 дней",
+      value: stats.stock.intakesLast7Days,
+      icon: Package,
+      color: "text-green-600 bg-green-50",
+      href: "/admin/warehouse",
+    },
+  ]
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-8">Дашборд</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {cards.map((card) => (
           <div key={card.label} className="bg-white rounded-xl p-6 shadow-sm border border-border">
             <div className="flex items-center gap-4">
@@ -47,6 +81,26 @@ export default async function AdminDashboard() {
               </div>
             </div>
           </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        {stockCards.map((card) => (
+          <Link
+            key={card.label}
+            href={card.href}
+            className="bg-white rounded-xl p-6 shadow-sm border border-border hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-lg ${card.color}`}>
+                <card.icon className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tabular-nums">{card.value.toLocaleString("ru-RU")}</p>
+                <p className="text-sm text-muted-foreground">{card.label}</p>
+              </div>
+            </div>
+          </Link>
         ))}
       </div>
 

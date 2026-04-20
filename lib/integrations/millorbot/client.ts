@@ -16,6 +16,8 @@ function topicToPath(topic: string): string {
   // "order.paid" -> "/api/orders/paid"
   if (topic === "order.paid") return "/api/orders/paid"
   if (topic === "order.status.changed") return "/api/orders/status"
+  if (topic === "product.stock.depleted") return "/api/products/stock/depleted"
+  if (topic === "product.stock.low") return "/api/products/stock/low"
   // Fallback: dot-to-slash mapping, prefixed with /api/
   return `/api/${topic.replace(/\./g, "/")}`
 }

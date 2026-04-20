@@ -31,6 +31,7 @@ interface Variant {
   price: number
   oldPrice: number | null
   stock: number
+  lowStockThreshold: number | null
   sortOrder: number
   isActive: boolean
 }

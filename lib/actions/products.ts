@@ -2,6 +2,9 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { adjustStock } from "@/lib/dal/stock"
+import { notifyStockChange } from "@/lib/integrations/stock-alerts"
+import { auth } from "@/lib/auth"
 
 export async function createProduct(data: {
   name: string
@@ -156,8 +159,26 @@ export async function createVariant(data: {
   stock?: number
   sortOrder?: number
 }) {
-  const variant = await prisma.productVariant.create({ data })
+  // Вариант создаём с нулевым stock, потом отдельной записью adjustStock
+  // фиксируем начальное количество как «приход» — чтобы StockHistory содержала
+  // полную историю с момента создания.
+  const initialStock = data.stock ?? 0
+  const variant = await prisma.productVariant.create({
+    data: { ...data, stock: 0 },
+  })
+  if (initialStock > 0) {
+    const session = await auth()
+    const adminId = (session?.user as { id?: string } | undefined)?.id || "admin"
+    await adjustStock({
+      variantId: variant.id,
+      delta: initialStock,
+      reason: "supplier_received",
+      notes: "Начальное количество при создании варианта",
+      changedBy: adminId,
+    })
+  }
   revalidatePath("/admin/products")
+  revalidatePath("/admin/warehouse")
   revalidatePath("/catalog")
   return variant
 }
@@ -170,12 +191,43 @@ export async function updateVariant(
     oldPrice?: number | null
     sku?: string
     stock?: number
+    lowStockThreshold?: number | null
     isActive?: boolean
     sortOrder?: number
   }
 ) {
-  const variant = await prisma.productVariant.update({ where: { id }, data })
+  const { stock, ...rest } = data
+
+  // Stock меняется через adjustStock — чтобы зафиксировать причину и историю
+  if (stock !== undefined) {
+    const current = await prisma.productVariant.findUnique({
+      where: { id },
+      select: { stock: true },
+    })
+    if (!current) throw new Error("Вариант не найден")
+    const delta = stock - current.stock
+    if (delta !== 0) {
+      const session = await auth()
+      const adminId = (session?.user as { id?: string } | undefined)?.id || "admin"
+      const result = await adjustStock({
+        variantId: id,
+        delta,
+        reason: "inventory_correction",
+        notes: "Inline-редактирование в админке",
+        changedBy: adminId,
+      })
+      void notifyStockChange(result)
+    }
+  }
+
+  // Остальные поля обновляем напрямую
+  const variant =
+    Object.keys(rest).length > 0
+      ? await prisma.productVariant.update({ where: { id }, data: rest })
+      : await prisma.productVariant.findUnique({ where: { id } })
+
   revalidatePath("/admin/products")
+  revalidatePath("/admin/warehouse")
   revalidatePath("/catalog")
   return variant
 }

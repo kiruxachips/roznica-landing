@@ -63,6 +63,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             carrierOrderNum={order.carrierOrderNum}
             carrierStatus={order.carrierStatus}
             pickupPointName={order.pickupPointName}
+            packagePlan={order.packagePlan}
+            packageWeight={order.packageWeight}
+            tariffCode={order.tariffCode}
           />
         )}
 

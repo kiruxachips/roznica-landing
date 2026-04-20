@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { ExternalLink } from "lucide-react"
 import { createShipmentManual, refreshTracking } from "@/lib/actions/delivery"
+import { PackagePlanViewer } from "@/components/admin/PackagePlanViewer"
 
 interface TrackingEvent {
   code: string
@@ -30,6 +31,9 @@ interface Props {
   carrierOrderNum: string | null
   carrierStatus: string | null
   pickupPointName: string | null
+  packagePlan: unknown
+  packageWeight: number | null
+  tariffCode: number | null
 }
 
 const carrierLabels: Record<string, string> = {
@@ -49,6 +53,9 @@ export function OrderDeliverySection({
   carrierOrderNum,
   carrierStatus,
   pickupPointName,
+  packagePlan,
+  packageWeight,
+  tariffCode,
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState("")
@@ -168,6 +175,13 @@ export function OrderDeliverySection({
             <p className="font-medium">{carrierStatus}</p>
           </div>
         )}
+        {tariffCode !== null && (
+          <div>
+            <span className="text-muted-foreground">Код тарифа:</span>
+            <p className="font-medium font-mono">{tariffCode}</p>
+          </div>
+        )}
+        <PackagePlanViewer plan={packagePlan} totalWeight={packageWeight} />
       </div>
 
       {/* Sender location picker + Create shipment */}
