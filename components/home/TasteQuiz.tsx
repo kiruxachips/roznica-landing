@@ -106,7 +106,7 @@ export function TasteQuiz() {
                   <Sparkles className="w-4 h-4" strokeWidth={1.75} />
                   Подбор за 60 секунд
                 </div>
-                <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4 leading-tight">
+                <h2 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-4 leading-tight">
                   Не знаете какой кофе выбрать?
                 </h2>
                 <p className="text-base sm:text-lg text-muted-foreground mb-6 max-w-2xl mx-auto">

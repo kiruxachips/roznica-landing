@@ -87,7 +87,7 @@ export function VerifyCodeForm() {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8">
-      <h1 className="text-2xl font-serif font-bold text-center mb-2">Подтверждение email</h1>
+      <h1 className="text-2xl font-sans font-bold text-center mb-2">Подтверждение email</h1>
       <p className="text-sm text-muted-foreground text-center mb-6 break-words">
         Введите код, отправленный на <span className="font-medium text-foreground">{email}</span>
       </p>

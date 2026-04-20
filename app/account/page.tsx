@@ -33,7 +33,7 @@ export default async function AccountPage() {
   return (
     <div className="space-y-5 sm:space-y-6">
       <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6">
-        <h1 className="text-xl sm:text-2xl font-serif font-bold mb-1">
+        <h1 className="text-xl sm:text-2xl font-sans font-bold mb-1">
           {user.name ? `Привет, ${user.name}!` : "Личный кабинет"}
         </h1>
         <p className="text-muted-foreground text-sm">

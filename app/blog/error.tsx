@@ -21,7 +21,7 @@ export default function BlogError({
       <main className="pt-16">
         <section className="py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center max-w-md">
-            <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-3">
+            <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-3">
               Не удалось загрузить статьи
             </h1>
             <p className="text-muted-foreground mb-6">

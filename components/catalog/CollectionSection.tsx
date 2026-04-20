@@ -19,7 +19,7 @@ export function CollectionSection({ name, slug, emoji, products, favoritedIds }:
   return (
     <section className="mb-8">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="font-serif text-xl font-bold">
+        <h2 className="font-sans text-xl font-bold">
           {emoji && <span className="mr-2">{emoji}</span>}
           {name}
         </h2>

@@ -9,7 +9,7 @@ export function About() {
         <div className="grid lg:grid-cols-2 gap-10 sm:gap-12 lg:gap-16 items-center">
           {/* Content */}
           <div className="order-1">
-            <h2 className="font-serif text-3xl sm:text-4xl font-bold text-foreground mb-5">
+            <h2 className="font-sans text-3xl sm:text-4xl font-bold text-foreground mb-5">
               Кофе для ценителей вкуса
             </h2>
             <p className="text-muted-foreground text-base sm:text-lg mb-4 leading-relaxed">

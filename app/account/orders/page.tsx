@@ -30,7 +30,7 @@ export default async function OrdersPage({
   if (orders.length === 0) {
     return (
       <div>
-        <h1 className="text-xl sm:text-2xl font-serif font-bold mb-5 sm:mb-6">Мои заказы</h1>
+        <h1 className="text-xl sm:text-2xl font-sans font-bold mb-5 sm:mb-6">Мои заказы</h1>
         <div className="bg-white rounded-2xl shadow-sm p-6 sm:p-12 text-center">
           <ShoppingBag className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-base sm:text-lg font-medium mb-2">У вас пока нет заказов</p>
@@ -48,7 +48,7 @@ export default async function OrdersPage({
 
   return (
     <div>
-      <h1 className="text-xl sm:text-2xl font-serif font-bold mb-5 sm:mb-6">Мои заказы</h1>
+      <h1 className="text-xl sm:text-2xl font-sans font-bold mb-5 sm:mb-6">Мои заказы</h1>
 
       <div className="space-y-3">
         {orders.map((order) => (

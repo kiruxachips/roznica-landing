@@ -19,7 +19,7 @@ export async function FeaturedBlog() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-6 sm:mb-10">
           <div className="max-w-2xl">
-            <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3">
+            <h2 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-2 sm:mb-3">
               Читайте о кофе
             </h2>
             <p className="text-sm sm:text-base text-muted-foreground">

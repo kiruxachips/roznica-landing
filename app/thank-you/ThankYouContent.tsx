@@ -44,7 +44,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <Clock className="w-10 h-10 text-amber-600" />
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Оплата не завершена</h1>
+          <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-2">Оплата не завершена</h1>
           <p className="text-muted-foreground">
             Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> ожидает оплаты
           </p>
@@ -81,7 +81,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
             <XCircle className="w-10 h-10 text-red-600" />
           </div>
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Оплата не прошла</h1>
+          <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-2">Оплата не прошла</h1>
           <p className="text-muted-foreground">
             Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> не был оплачен
           </p>
@@ -118,7 +118,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
         <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle className="w-10 h-10 text-green-600" />
         </div>
-        <h1 className="font-serif text-3xl font-bold mb-2">Спасибо за покупку!</h1>
+        <h1 className="font-sans text-3xl font-bold mb-2">Спасибо за покупку!</h1>
         <p className="text-muted-foreground">
           Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> успешно оформлен
         </p>

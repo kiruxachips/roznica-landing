@@ -57,7 +57,7 @@ export function CartGiftProgress({ total }: CartGiftProgressProps) {
       <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-3 text-sm">
         <div className="flex items-center gap-2 text-amber-800 font-medium">
           <Gift className="w-4 h-4 text-amber-500 shrink-0" />
-          <span>Бесплатная доставка + {giftDescription}!</span>
+          <span>Бесплатная доставка Почтой России + {giftDescription}!</span>
         </div>
       </div>
     )
@@ -78,12 +78,12 @@ export function CartGiftProgress({ total }: CartGiftProgressProps) {
         {!hasFreeDelivery && freeDelivery > 0 ? (
           <span className="flex items-center gap-1 text-muted-foreground">
             <Package className="w-3 h-3" />
-            До бесплатной доставки — <span className="font-semibold text-foreground">{remaining}₽</span>
+            До бесплатной доставки (Почта России) — <span className="font-semibold text-foreground">{remaining}₽</span>
           </span>
         ) : (
           <span className="flex items-center gap-1 text-green-600 font-medium">
             <Package className="w-3 h-3" />
-            Бесплатная доставка
+            Бесплатная доставка Почтой России
           </span>
         )}
 

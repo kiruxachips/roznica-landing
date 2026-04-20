@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Minus, Plus, Trash2, Tag, X, Loader2 } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { CartGiftProgress } from "./CartGiftProgress"
+import { CartUpsell } from "./CartUpsell"
 
 export function CartPage() {
   const items = useCartStore((s) => s.items)
@@ -29,8 +30,7 @@ export function CartPage() {
   if (!mounted) return null
 
   const subtotal = totalPrice()
-  const deliveryPrice = subtotal - promoDiscount >= 3000 ? 0 : 300
-  const finalTotal = subtotal - promoDiscount + deliveryPrice
+  const afterDiscount = subtotal - promoDiscount
 
   if (items.length === 0) {
     return (
@@ -133,6 +133,8 @@ export function CartPage() {
             </div>
           </div>
         ))}
+
+        <CartUpsell cartProductIds={items.map((i) => i.productId)} onClose={() => {}} />
       </div>
 
       {/* Summary */}
@@ -180,7 +182,7 @@ export function CartPage() {
           </div>
 
           {/* Gift / free delivery progress */}
-          <CartGiftProgress total={subtotal - promoDiscount} />
+          <CartGiftProgress total={afterDiscount} />
 
           {/* Totals */}
           <div className="border-t border-border pt-4 space-y-2 text-sm">
@@ -196,11 +198,11 @@ export function CartPage() {
             )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">Доставка</span>
-              <span>{deliveryPrice === 0 ? "Бесплатно" : `${deliveryPrice}₽`}</span>
+              <span className="text-muted-foreground text-xs">при оформлении</span>
             </div>
             <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
               <span>Итого</span>
-              <span className="text-primary">{finalTotal}₽</span>
+              <span className="text-primary">{afterDiscount}₽</span>
             </div>
           </div>
 

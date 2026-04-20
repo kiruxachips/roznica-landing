@@ -27,7 +27,7 @@ export default async function CheckoutSuccessPage({
               <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-600" />
             </div>
 
-            <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Заказ принят!</h1>
+            <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-3 sm:mb-4">Заказ принят!</h1>
 
             {orderNumber && (
               <p className="text-base sm:text-lg text-muted-foreground mb-2">

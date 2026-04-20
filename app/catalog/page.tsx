@@ -107,7 +107,7 @@ export default async function CatalogPage({
         <section className="py-4 sm:py-6">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mb-3 sm:mb-4 flex items-baseline gap-3">
-              <h1 className="font-serif text-xl sm:text-2xl font-bold">{heading}</h1>
+              <h1 className="font-sans text-xl sm:text-2xl font-bold">{heading}</h1>
               {countLabel && (
                 <p className="text-xs sm:text-sm text-muted-foreground">{countLabel}</p>
               )}

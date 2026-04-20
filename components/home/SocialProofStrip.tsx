@@ -68,7 +68,7 @@ export async function SocialProofStrip() {
                   {item.icon}
                 </span>
                 <div className="flex flex-col leading-tight min-w-0">
-                  <span className="font-serif font-bold text-xl sm:text-2xl lg:text-3xl text-foreground truncate">
+                  <span className="font-sans font-bold text-xl sm:text-2xl lg:text-3xl text-foreground truncate">
                     {item.primary}
                   </span>
                   <span className="text-[11px] sm:text-xs text-muted-foreground mt-1 truncate">

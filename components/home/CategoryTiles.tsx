@@ -29,7 +29,7 @@ export async function CategoryTiles() {
     <section aria-label="Категории по способу заваривания" className="py-12 sm:py-16 lg:py-20 bg-secondary/30">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-12">
-          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3">
+          <h2 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3">
             Подберите кофе под ваш способ
           </h2>
           <p className="text-sm sm:text-base text-muted-foreground">

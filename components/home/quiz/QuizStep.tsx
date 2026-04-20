@@ -28,7 +28,7 @@ export function QuizStep({ title, subtitle, options, selected, onSelect }: QuizS
 
   return (
     <div className="animate-fade-in">
-      <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2">
+      <h2 className="font-sans text-xl sm:text-2xl lg:text-3xl font-bold text-foreground mb-2">
         {title}
       </h2>
       {subtitle && (

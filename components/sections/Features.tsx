@@ -14,7 +14,7 @@ export function Features() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-16">
-          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
+          <h2 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-3 sm:mb-4">
             Почему выбирают нас
           </h2>
           <p className="text-muted-foreground text-base sm:text-lg">

@@ -19,7 +19,7 @@ export default async function AddressesPage() {
   return (
     <div>
       <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
-        <h1 className="text-lg sm:text-xl font-serif font-bold">Адресная книга</h1>
+        <h1 className="text-lg sm:text-xl font-sans font-bold">Адресная книга</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Сохраните адреса для быстрого оформления заказов
         </p>

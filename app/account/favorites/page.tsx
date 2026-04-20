@@ -69,7 +69,7 @@ export default async function FavoritesPage({
   return (
     <div>
       <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 mb-5 sm:mb-6">
-        <h1 className="text-lg sm:text-xl font-serif font-bold">Избранное</h1>
+        <h1 className="text-lg sm:text-xl font-sans font-bold">Избранное</h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           {total > 0 ? `${total} товаров` : "Пока пусто"}
         </p>

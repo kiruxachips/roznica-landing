@@ -1,6 +1,6 @@
 import "@/lib/env" // Validate critical env vars on startup
 import type { Metadata } from "next"
-import { Inter, Playfair_Display } from "next/font/google"
+import { Inter } from "next/font/google"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"
 import { WebVitals } from "@/components/ui/web-vitals"
@@ -14,12 +14,6 @@ const inter = Inter({
   display: "swap",
 })
 
-const playfair = Playfair_Display({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-playfair",
-  display: "swap",
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://millor-coffee.ru"),
@@ -58,7 +52,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="ru" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="ru" className={inter.variable}>
       <head>
         <link rel="preconnect" href="https://mc.yandex.ru" crossOrigin="" />
         <link rel="dns-prefetch" href="https://api-maps.yandex.ru" />

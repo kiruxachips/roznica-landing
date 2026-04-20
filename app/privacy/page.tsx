@@ -27,7 +27,7 @@ export default function PrivacyPage() {
 
           {/* Content */}
           <article className="max-w-4xl mx-auto bg-white rounded-2xl shadow-sm p-5 sm:p-8 lg:p-12">
-            <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
+            <h1 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
               Политика конфиденциальности
             </h1>
 

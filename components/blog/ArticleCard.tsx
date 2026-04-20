@@ -37,7 +37,7 @@ export function ArticleCard({ article }: { article: ArticleCardType }) {
 
         {/* Content */}
         <div className="p-4 sm:p-5 flex flex-col flex-1">
-          <h3 className="font-serif text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors mb-2">
+          <h3 className="font-sans text-lg font-bold text-foreground line-clamp-2 group-hover:text-primary transition-colors mb-2">
             {article.title}
           </h3>
           <p className="text-sm text-muted-foreground line-clamp-2 mb-3">

@@ -145,13 +145,13 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
             </div>
 
             {/* Title */}
-            <h1 className="font-serif text-2xl sm:text-4xl md:text-5xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
+            <h1 className="font-sans text-2xl sm:text-4xl md:text-5xl font-bold text-foreground mb-6 sm:mb-8 leading-tight">
               {article.title}
             </h1>
 
             {/* Content */}
             <div
-              className="prose prose-base sm:prose-lg max-w-none prose-headings:font-serif prose-a:text-primary prose-img:rounded-lg break-words"
+              className="prose prose-base sm:prose-lg max-w-none prose-headings:font-sans prose-a:text-primary prose-img:rounded-lg break-words"
               dangerouslySetInnerHTML={{ __html: article.content }}
             />
 
@@ -176,7 +176,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         {relatedArticles.length > 0 && (
           <section className="py-8 sm:py-16 bg-secondary/30">
             <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-              <h2 className="font-serif text-xl sm:text-3xl font-bold text-foreground mb-5 sm:mb-8">
+              <h2 className="font-sans text-xl sm:text-3xl font-bold text-foreground mb-5 sm:mb-8">
                 Читайте также
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

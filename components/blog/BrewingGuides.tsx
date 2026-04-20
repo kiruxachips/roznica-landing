@@ -157,7 +157,7 @@ function GuideModal({ method, onClose }: { method: BrewingMethod; onClose: () =>
         {/* Header */}
         <div className="sticky top-0 bg-white rounded-t-2xl sm:rounded-t-3xl border-b border-border/50 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div>
-            <h2 className="font-serif text-lg sm:text-xl font-bold">{method.name}</h2>
+            <h2 className="font-sans text-lg sm:text-xl font-bold">{method.name}</h2>
           </div>
           <button
             onClick={onClose}
@@ -210,7 +210,7 @@ export function BrewingGuides() {
     <>
       <section className="py-8 sm:py-12 bg-secondary/30">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-center mb-6 sm:mb-8 px-2">
+          <h2 className="font-sans text-xl sm:text-2xl lg:text-3xl font-bold text-center mb-6 sm:mb-8 px-2">
             Приготовление кофе разными способами
           </h2>
           <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 sm:gap-4 max-w-3xl mx-auto">

@@ -261,7 +261,7 @@ export function CoffeeShopsMap() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border shrink-0">
-              <h2 className="font-serif text-lg sm:text-xl font-bold text-foreground">Наши кофе-шопы</h2>
+              <h2 className="font-sans text-lg sm:text-xl font-bold text-foreground">Наши кофе-шопы</h2>
               <button
                 onClick={() => setOpen(false)}
                 className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted transition-colors"

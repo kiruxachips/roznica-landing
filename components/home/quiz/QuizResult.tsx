@@ -60,7 +60,7 @@ export function QuizResult({ products, matches, onRestart }: QuizResultProps) {
     <div className="animate-fade-in">
       <div className="flex items-center gap-2 mb-2">
         <Sparkles className="w-5 h-5 text-primary" strokeWidth={1.75} />
-        <h2 className="font-serif text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+        <h2 className="font-sans text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
           Вам точно понравится
         </h2>
       </div>

@@ -40,7 +40,7 @@ export function LoginForm() {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-8">
-      <h1 className="text-2xl font-serif font-bold text-center mb-6">Вход</h1>
+      <h1 className="text-2xl font-sans font-bold text-center mb-6">Вход</h1>
 
       {verified === "1" && (
         <p className="text-sm text-green-700 bg-green-50 rounded-xl px-4 py-3 mb-4 text-center">

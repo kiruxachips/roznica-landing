@@ -136,7 +136,7 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
           </div>
 
           {/* Name — 2 lines forced for card height uniformity */}
-          <h3 className="font-serif text-sm sm:text-base font-bold text-foreground leading-snug line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem] group-hover:text-primary transition-colors">
+          <h3 className="font-sans text-sm sm:text-base font-bold text-foreground leading-snug line-clamp-2 min-h-[2.25rem] sm:min-h-[2.5rem] group-hover:text-primary transition-colors">
             {product.name}
           </h3>
 

@@ -150,7 +150,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
                 {/* Name */}
                 <div className="flex items-start gap-3">
-                  <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground flex-1 leading-tight">
+                  <h1 className="font-sans text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground flex-1 leading-tight">
                     {product.name}
                   </h1>
                   {isCustomer && (
@@ -225,7 +225,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
             {/* Related products */}
             {relatedProducts.length > 0 && (
               <div className="mt-14 sm:mt-20">
-                <h2 className="font-serif text-xl sm:text-2xl font-bold mb-6">С этим также покупают</h2>
+                <h2 className="font-sans text-xl sm:text-2xl font-bold mb-6">С этим также покупают</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                   {relatedProducts.map((p) => (
                     <ProductCard key={p.id} product={p} />

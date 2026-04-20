@@ -21,7 +21,7 @@ export function Hero() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-16 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Heading */}
-          <h1 className="font-serif text-[2rem] leading-[1.15] sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-5 sm:mb-6 animate-fade-in [animation-delay:100ms]">
+          <h1 className="font-sans text-[2rem] leading-[1.15] sm:text-5xl md:text-6xl lg:text-7xl font-bold text-foreground mb-5 sm:mb-6 animate-fade-in [animation-delay:100ms]">
             Свежеобжаренный{" "}
             <span className="text-primary">кофе</span>{" "}
             для дома с доставкой
@@ -54,15 +54,15 @@ export function Hero() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 sm:gap-8 max-w-lg mx-auto mt-12 sm:mt-16 animate-fade-in [animation-delay:400ms]">
             <div className="text-center">
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-primary">15+</div>
+              <div className="font-sans text-3xl sm:text-4xl font-bold text-primary">15+</div>
               <div className="text-sm text-muted-foreground mt-1">сортов</div>
             </div>
             <div className="text-center">
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-primary">100%</div>
+              <div className="font-sans text-3xl sm:text-4xl font-bold text-primary">100%</div>
               <div className="text-sm text-muted-foreground mt-1">арабика</div>
             </div>
             <div className="text-center">
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-primary">2-3</div>
+              <div className="font-sans text-3xl sm:text-4xl font-bold text-primary">2-3</div>
               <div className="text-sm text-muted-foreground mt-1">дня доставка</div>
             </div>
           </div>
