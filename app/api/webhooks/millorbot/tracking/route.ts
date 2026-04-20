@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
+import { after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifySignature } from "@/lib/integrations/hmac"
 import { logIntegration } from "@/lib/dal/integration-log"
 import { sendOrderShippedEmail, sendOrderDeliveredEmail, type ShippedEmailData, type OrderEmailData } from "@/lib/email"
+import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { ALLOWED_TRANSITIONS } from "@/lib/dal/orders"
 import type { MillorbotTrackingPayload, NormalizedTrackingStatus } from "@/lib/integrations/millorbot/types"
 
@@ -194,9 +196,11 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Fire customer emails on status transitions (non-blocking).
-  // Respect user notification preference if user is linked.
-  if (statusChanged) {
+  // Fire customer emails on status transitions — после flush'а ответа millorbot'у.
+  // dispatchEmail кладёт в EmailDispatch, второй webhook с тем же переходом не отправит
+  // письмо повторно (хотя processedInboundEvent уже защищает от повторной обработки,
+  // это второй слой idempotency).
+  if (statusChanged && order.customerEmail) {
     const user = order.userId
       ? await prisma.user.findUnique({
           where: { id: order.userId },
@@ -205,20 +209,32 @@ export async function POST(request: NextRequest) {
       : null
     const shouldNotify = user ? user.notifyOrderStatus : true
 
-    if (shouldNotify && order.customerEmail) {
+    if (shouldNotify) {
+      const recipient = order.customerEmail
+      const orderIdForEmail = order.id
       const emailData = buildEmailData(order)
       if (statusChanged.to === "shipped") {
         const shippedData: ShippedEmailData = {
           ...emailData,
           trackingNumber: (updates.trackingNumber as string) || order.trackingNumber || undefined,
         }
-        sendOrderShippedEmail(shippedData).catch((e) =>
-          console.error("sendOrderShippedEmail failed:", e),
-        )
+        after(async () => {
+          await dispatchEmail({
+            orderId: orderIdForEmail,
+            kind: "order.shipped",
+            recipient,
+            send: () => sendOrderShippedEmail(shippedData),
+          })
+        })
       } else if (statusChanged.to === "delivered") {
-        sendOrderDeliveredEmail(emailData).catch((e) =>
-          console.error("sendOrderDeliveredEmail failed:", e),
-        )
+        after(async () => {
+          await dispatchEmail({
+            orderId: orderIdForEmail,
+            kind: "order.delivered",
+            recipient,
+            send: () => sendOrderDeliveredEmail(emailData),
+          })
+        })
       }
     }
   }

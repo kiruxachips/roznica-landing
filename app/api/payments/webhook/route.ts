@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, type OrderEmailData } from "@/lib/email"
+import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, getAdminNotificationEmails, type OrderEmailData } from "@/lib/email"
+import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { getPayment } from "@/lib/yookassa"
 import { enqueueOutbox } from "@/lib/dal/outbox"
@@ -132,18 +133,34 @@ export async function POST(request: NextRequest) {
       paymentMethod: order.paymentMethod || undefined,
     }
 
-    // Send payment success emails AFTER response to YooKassa — next/server's `after()`
-    // runs the callback once the response has been flushed, so SMTP latency (2-5s) does not
-    // block the webhook handler and does not trigger YooKassa retries.
+    // Send payment success emails AFTER response to YooKassa.
+    // dispatchEmail гарантирует, что повторный webhook (YooKassa может ретраить до 5 раз)
+    // не вызовет дублирующую отправку — EmailDispatch хранит по (orderId, kind, recipient).
+    const orderIdForEmail = order.id
+    const adminEmails = getAdminNotificationEmails()
     after(async () => {
-      try {
-        await Promise.allSettled([
-          emailData.customerEmail ? sendPaymentSuccessEmail(emailData) : Promise.resolve(),
-          sendAdminPaymentSuccessEmail(emailData),
-        ])
-      } catch (e) {
-        console.error("Failed to send payment emails:", e)
+      const tasks: Promise<void>[] = []
+      if (emailData.customerEmail) {
+        tasks.push(
+          dispatchEmail({
+            orderId: orderIdForEmail,
+            kind: "order.payment_success",
+            recipient: emailData.customerEmail,
+            send: () => sendPaymentSuccessEmail(emailData),
+          })
+        )
       }
+      for (const admin of adminEmails) {
+        tasks.push(
+          dispatchEmail({
+            orderId: orderIdForEmail,
+            kind: "admin.payment_success",
+            recipient: admin,
+            send: () => sendAdminPaymentSuccessEmail(emailData, admin),
+          })
+        )
+      }
+      await Promise.allSettled(tasks)
     })
 
     // Auto-create shipment with carrier
@@ -232,18 +249,26 @@ export async function POST(request: NextRequest) {
       ])
     }
 
-    // Send email notification
-    if (order.user?.email && order.user.notifyOrderStatus) {
-      try {
-        await sendOrderStatusEmail({
-          to: order.user.email,
-          customerName: order.user.name || "Клиент",
-          orderNumber: order.orderNumber,
-          newStatus: "payment_failed",
-        })
-      } catch (e) {
-        console.error("Failed to send payment failure email:", e)
+    // Send email notification about payment failure — non-blocking via after(),
+    // используем customerEmail (гости тоже узнают об отмене).
+    const recipient = order.customerEmail
+    const mayNotify = order.user ? order.user.notifyOrderStatus : true
+    if (recipient && mayNotify) {
+      const emailArgs = {
+        to: recipient,
+        customerName: order.customerName || order.user?.name || "Клиент",
+        orderNumber: order.orderNumber,
+        newStatus: "payment_failed",
       }
+      const orderIdForEmail = order.id
+      after(async () => {
+        await dispatchEmail({
+          orderId: orderIdForEmail,
+          kind: "order.payment_failed",
+          recipient,
+          send: () => sendOrderStatusEmail(emailArgs),
+        })
+      })
     }
   }
 

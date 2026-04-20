@@ -8,7 +8,8 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmail, type OrderEmailData } from "@/lib/email"
+import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmail, getAdminNotificationEmails, type OrderEmailData } from "@/lib/email"
+import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { createPayment, createRefund } from "@/lib/yookassa"
 import { headers } from "next/headers"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
@@ -154,17 +155,33 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
   }
 
   // Send customer confirmation + admin notification after the response is flushed.
-  // В action это особенно важно для карточного checkout'а, где ответ от YooKassa
-  // ждут в браузере — не хотим удерживать его на SMTP.
+  // Каждое письмо идёт через dispatchEmail → запись в EmailDispatch (audit + idempotency).
+  // Если createOrder вызван повторно для того же orderId (ретрай из UI), письмо не дублируется.
+  const orderIdForEmail = order.id
+  const adminEmails = getAdminNotificationEmails()
   after(async () => {
-    try {
-      await Promise.allSettled([
-        sendOrderConfirmationEmail(emailData),
-        sendAdminNewOrderEmail(emailData),
-      ])
-    } catch (e) {
-      console.error("Failed to send order emails:", e)
+    const tasks: Promise<void>[] = []
+    if (emailData.customerEmail) {
+      tasks.push(
+        dispatchEmail({
+          orderId: orderIdForEmail,
+          kind: "order.confirmation",
+          recipient: emailData.customerEmail,
+          send: () => sendOrderConfirmationEmail(emailData),
+        })
+      )
     }
+    for (const admin of adminEmails) {
+      tasks.push(
+        dispatchEmail({
+          orderId: orderIdForEmail,
+          kind: "admin.new_order",
+          recipient: admin,
+          send: () => sendAdminNewOrderEmail(emailData, admin),
+        })
+      )
+    }
+    await Promise.allSettled(tasks)
   })
 
   // Online payment via YooKassa
@@ -248,21 +265,28 @@ export async function updateOrderStatus(id: string, status: string) {
         select: { email: true, name: true, notifyOrderStatus: true },
       })
 
-      // Send email only for customer-visible statuses — non-blocking via after()
+      // Send email only for customer-visible statuses — non-blocking via after().
+      // ВАЖНО: используем order.customerEmail, а не user.email. customer для гостей = null,
+      // но customerEmail хранится в Order. notifyOrderStatus применяем только если есть user
+      // (гости не могут выключить — получают все уведомления).
       const customerVisibleStatuses = ["paid", "confirmed", "shipped", "delivered", "cancelled"]
-      if (user?.email && user.notifyOrderStatus && customerVisibleStatuses.includes(status)) {
+      const recipient = order.customerEmail
+      const mayNotify = user ? user.notifyOrderStatus : true
+      if (recipient && mayNotify && customerVisibleStatuses.includes(status)) {
         const emailArgs = {
-          to: user.email,
-          customerName: user.name || "Клиент",
+          to: recipient,
+          customerName: order.customerName || user?.name || "Клиент",
           orderNumber: order.orderNumber,
           newStatus: status,
         }
+        const orderIdForEmail = order.id
         after(async () => {
-          try {
-            await sendOrderStatusEmail(emailArgs)
-          } catch (e) {
-            console.error("sendOrderStatusEmail failed:", e)
-          }
+          await dispatchEmail({
+            orderId: orderIdForEmail,
+            kind: `order.status:${status}` as const,
+            recipient,
+            send: () => sendOrderStatusEmail(emailArgs),
+          })
         })
       }
 

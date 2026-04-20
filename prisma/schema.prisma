@@ -507,6 +507,27 @@ model ProcessedInboundEvent {
   @@index([createdAt])
 }
 
+// Email dispatch registry — audit + idempotency для всех исходящих писем.
+// Одна запись на попытку отправки. status="sent" считается terminal — повторная
+// попытка с той же (orderId, kind, recipient) не выполняется (dispatchEmail проверяет).
+// status="failed" фиксирует ошибку для последующего ручного/автоматического retry.
+model EmailDispatch {
+  id        String   @id @default(cuid())
+  orderId   String? // null для non-order писем (verif/reset)
+  kind      String // "order.confirmation" | "order.payment_success" | "admin.new_order" | "admin.payment_success" | "order.shipped" | "order.delivered" | "order.status:paid" | "order.status:cancelled" | ...
+  recipient String // email получателя
+  status    String // "sent" | "failed"
+  messageId String? // SMTP message-id из ответа nodemailer
+  response  String?  @db.Text // raw SMTP response ("250 OK id=...")
+  error     String?  @db.Text // при status="failed"
+  createdAt DateTime @default(now())
+
+  @@index([orderId, kind, recipient, status])
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([kind, createdAt])
+}
+
 // Log of all integration events (inbound + outbound) for diagnostics
 model IntegrationLog {
   id         String   @id @default(cuid())

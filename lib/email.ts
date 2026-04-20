@@ -16,12 +16,39 @@ const transporter = nodemailer.createTransport({
   maxMessages: 50,
   rateDelta: 1000,
   rateLimit: 10,
+  // Явные таймауты вместо дефолтных ~3 мин: не даём SMTP подвесить event-loop
+  // при зависании Beget. connectionTimeout — на открытие TCP, socketTimeout —
+  // на полный обмен (greet+auth+send).
+  connectionTimeout: 5000,
+  socketTimeout: 10000,
+  greetingTimeout: 5000,
 })
 
 const fromEmail = process.env.SMTP_USER || "noreply@millor-coffee.ru"
 const siteUrl = (process.env.NEXTAUTH_URL || "https://millor-coffee.ru").replace(/\/$/, "")
 
-const ADMIN_NOTIFICATION_EMAIL = "newrefining@yandex.ru"
+// Список ящиков для админ-уведомлений: запятые в ADMIN_NOTIFICATION_EMAILS → массив.
+// fallback на исторический newrefining@yandex.ru чтобы ничего не сломать, если env не выставлен.
+const ADMIN_NOTIFICATION_EMAILS = (process.env.ADMIN_NOTIFICATION_EMAILS || "newrefining@yandex.ru")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+export function getAdminNotificationEmails(): string[] {
+  return ADMIN_NOTIFICATION_EMAILS
+}
+
+/**
+ * Извлекает messageId + response из результата nodemailer.sendMail.
+ * Нормализует shape для EmailDispatch.
+ */
+interface SendResult {
+  messageId?: string
+  response?: string
+}
+function extractResult(info: { messageId?: string; response?: string }): SendResult {
+  return { messageId: info.messageId, response: info.response }
+}
 
 // ── Helpers ──
 
@@ -174,8 +201,8 @@ function wrapEmail(content: string): string {
 
 // ── Verification / Password Reset (unchanged) ──
 
-export async function sendVerificationCode(email: string, code: string) {
-  await transporter.sendMail({
+export async function sendVerificationCode(email: string, code: string): Promise<SendResult> {
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: email,
     subject: "Код подтверждения — Millor Coffee",
@@ -192,10 +219,11 @@ export async function sendVerificationCode(email: string, code: string) {
       </p>
     `),
   })
+  return extractResult(info)
 }
 
-export async function sendPasswordResetCode(email: string, code: string) {
-  await transporter.sendMail({
+export async function sendPasswordResetCode(email: string, code: string): Promise<SendResult> {
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: email,
     subject: "Сброс пароля — Millor Coffee",
@@ -212,6 +240,7 @@ export async function sendPasswordResetCode(email: string, code: string) {
       </p>
     `),
   })
+  return extractResult(info)
 }
 
 // ── Order Status Email (for customer) ──
@@ -226,10 +255,10 @@ export async function sendOrderStatusEmail({
   customerName: string
   orderNumber: string
   newStatus: string
-}) {
+}): Promise<SendResult> {
   const statusText = statusLabels[newStatus] || newStatus
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to,
     subject: `Заказ ${orderNumber} — ${statusText}`,
@@ -246,12 +275,20 @@ export async function sendOrderStatusEmail({
       </p>
     `),
   })
+  return extractResult(info)
 }
 
 // ── Customer: Order Confirmation ──
 
-export async function sendOrderConfirmationEmail(data: OrderEmailData) {
-  if (!data.customerEmail) return
+export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
+
+  // Для COD-заказов добавляем уточнение про оплату при получении — чтобы клиент
+  // не перепутал письмо "оформлен" с "оплачен".
+  const paymentNote =
+    data.paymentMethod === "online"
+      ? `<p style="color: #888; font-size: 14px; margin-top: 16px;">Мы пришлём отдельное письмо после подтверждения оплаты.</p>`
+      : `<p style="color: #555; font-size: 14px; margin-top: 16px;">Оплата принимается при получении посылки.</p>`
 
   const html = wrapEmail(`
     <h2 style="color: #7c4a1e; margin-bottom: 16px;">Заказ оформлен</h2>
@@ -262,24 +299,26 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData) {
     ${buildItemsTableHtml(data.items)}
     ${buildTotalsHtml(data)}
     ${buildDeliveryHtml(data)}
+    ${paymentNote}
 
     <p style="color: #888; font-size: 14px; margin-top: 24px;">
       Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: data.customerEmail,
     subject: `Заказ ${data.orderNumber} оформлен — Millor Coffee`,
     html,
   })
+  return extractResult(info)
 }
 
 // ── Customer: Payment Success ──
 
-export async function sendPaymentSuccessEmail(data: OrderEmailData) {
-  if (!data.customerEmail) return
+export async function sendPaymentSuccessEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
 
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата прошла успешно</h2>
@@ -299,17 +338,18 @@ export async function sendPaymentSuccessEmail(data: OrderEmailData) {
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: data.customerEmail,
     subject: `Оплата заказа ${data.orderNumber} подтверждена — Millor Coffee`,
     html,
   })
+  return extractResult(info)
 }
 
 // ── Admin: New Order Notification ──
 
-export async function sendAdminNewOrderEmail(data: OrderEmailData) {
+export async function sendAdminNewOrderEmail(data: OrderEmailData, to: string): Promise<SendResult> {
   const paymentLabel = data.paymentMethod === "online" ? "Онлайн (YooKassa)" : "При получении"
 
   const html = wrapEmail(`
@@ -336,12 +376,13 @@ export async function sendAdminNewOrderEmail(data: OrderEmailData) {
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
-    to: ADMIN_NOTIFICATION_EMAIL,
+    to,
     subject: `Новый заказ ${data.orderNumber} — ${data.customerName}, ${formatPrice(data.total)}₽`,
     html,
   })
+  return extractResult(info)
 }
 
 // ── Customer: Order Shipped (передан в доставку) ──
@@ -363,8 +404,8 @@ export interface ShippedEmailData extends OrderEmailData {
   trackingNumber?: string
 }
 
-export async function sendOrderShippedEmail(data: ShippedEmailData) {
-  if (!data.customerEmail) return
+export async function sendOrderShippedEmail(data: ShippedEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
 
   const track = data.trackingNumber
   const url = trackingUrl(data.deliveryMethod, track)
@@ -392,18 +433,19 @@ export async function sendOrderShippedEmail(data: ShippedEmailData) {
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: data.customerEmail,
     subject: `Заказ ${data.orderNumber} передан в доставку${track ? ` — трек ${track}` : ""}`,
     html,
   })
+  return extractResult(info)
 }
 
 // ── Customer: Order Delivered ──
 
-export async function sendOrderDeliveredEmail(data: OrderEmailData) {
-  if (!data.customerEmail) return
+export async function sendOrderDeliveredEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
 
   const isPvz = data.deliveryType === "pvz"
   const pickupLine = isPvz && data.pickupPointName
@@ -425,17 +467,18 @@ export async function sendOrderDeliveredEmail(data: OrderEmailData) {
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
     to: data.customerEmail,
     subject: `Заказ ${data.orderNumber} доставлен — Millor Coffee`,
     html,
   })
+  return extractResult(info)
 }
 
 // ── Admin: Payment Success Notification ──
 
-export async function sendAdminPaymentSuccessEmail(data: OrderEmailData) {
+export async function sendAdminPaymentSuccessEmail(data: OrderEmailData, to: string): Promise<SendResult> {
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата получена: ${data.orderNumber}</h2>
 
@@ -459,10 +502,11 @@ export async function sendAdminPaymentSuccessEmail(data: OrderEmailData) {
     </p>
   `)
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"Millor Coffee" <${fromEmail}>`,
-    to: ADMIN_NOTIFICATION_EMAIL,
+    to,
     subject: `Оплата ${data.orderNumber} — ${formatPrice(data.total)}₽ от ${data.customerName}`,
     html,
   })
+  return extractResult(info)
 }

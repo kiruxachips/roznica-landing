@@ -10,6 +10,8 @@ if (process.env.NODE_ENV === "production" && !isBuildPhase) {
     "DATABASE_URL",
     "NEXTAUTH_SECRET",
     "NEXTAUTH_URL",
+    "SMTP_USER",
+    "SMTP_PASSWORD",
   ]
 
   const missing = required.filter((key) => !process.env[key])
