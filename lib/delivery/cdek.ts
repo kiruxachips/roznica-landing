@@ -8,9 +8,118 @@ import type {
   TrackingStatus,
 } from "./types"
 import { fetchWithTimeout } from "./utils"
+import { distributeItemsToPackages } from "./packaging"
 
 const PROD_API = "https://api.cdek.ru"
 const TEST_API = "https://api.edu.cdek.ru"
+
+/**
+ * Тип доставки по коду тарифа СДЭК (из официального справочника).
+ * Мы смотрим ТОЛЬКО на конечную точку (куда приходит посылка получателю):
+ * - "дверь" или "постамат" → door (курьер на адрес)
+ * - "склад" → pvz (самовывоз из ПВЗ)
+ *
+ * Маппинг через `delivery_mode` из ответа API ненадёжен: для некоторых
+ * тарифов CDEK возвращает противоречивые значения. Код тарифа — истина.
+ */
+const CDEK_TARIFF_TYPE: Record<number, "door" | "pvz"> = {
+  // Обычная посылка
+  136: "pvz",  // склад-склад
+  137: "door", // склад-дверь
+  138: "pvz",  // дверь-склад
+  139: "door", // дверь-дверь
+  366: "door", // дверь-постамат
+  368: "pvz",  // склад-постамат → формально постамат, трактуем как pvz
+  // Экономичная посылка
+  231: "door", // дверь-дверь
+  232: "pvz",  // дверь-склад
+  233: "door", // склад-дверь
+  234: "pvz",  // склад-склад
+  376: "door", // дверь-постамат
+  378: "pvz",  // склад-постамат
+  // Экспресс
+  480: "door", 481: "pvz", 482: "door", 483: "pvz",
+  485: "door", 486: "door",
+  605: "door", 606: "pvz", 607: "door",
+  // Магистральный экспресс
+  121: "door", 123: "pvz", 122: "door", 62: "pvz",
+  522: "door", 523: "pvz",
+  // Супер-экспресс
+  706: "door", 707: "pvz", 708: "door", 709: "pvz", 711: "door", 712: "pvz",
+  716: "door", 717: "pvz", 718: "door", 719: "pvz", 721: "door", 722: "pvz",
+  // Возврат
+  140: "pvz", 141: "door",
+  // Старые коды
+  291: "pvz", 293: "door", 294: "pvz", 295: "door",
+}
+
+/**
+ * Человекочитаемые имена тарифов для карточки в checkout.
+ * Формат: «СДЭК [вариант] — [как получает клиент]».
+ */
+const CDEK_TARIFF_NAMES: Record<number, string> = {
+  136: "СДЭК — в пункт выдачи",
+  137: "СДЭК — до двери",
+  138: "СДЭК — в пункт выдачи",
+  139: "СДЭК — до двери",
+  366: "СДЭК — до двери",
+  368: "СДЭК — в постамат",
+  231: "СДЭК Эконом — до двери",
+  232: "СДЭК Эконом — в пункт выдачи",
+  233: "СДЭК Эконом — до двери",
+  234: "СДЭК Эконом — в пункт выдачи",
+  376: "СДЭК Эконом — до двери",
+  378: "СДЭК Эконом — в постамат",
+  480: "СДЭК Экспресс — до двери",
+  481: "СДЭК Экспресс — в пункт выдачи",
+  482: "СДЭК Экспресс — до двери",
+  483: "СДЭК Экспресс — в пункт выдачи",
+  706: "СДЭК Супер-экспресс до 16:00 — до двери",
+  707: "СДЭК Супер-экспресс до 16:00 — в пункт выдачи",
+  708: "СДЭК Супер-экспресс до 16:00 — до двери",
+  709: "СДЭК Супер-экспресс до 16:00 — в пункт выдачи",
+  716: "СДЭК Супер-экспресс до 18:00 — до двери",
+  717: "СДЭК Супер-экспресс до 18:00 — в пункт выдачи",
+  718: "СДЭК Супер-экспресс до 18:00 — до двери",
+  719: "СДЭК Супер-экспресс до 18:00 — в пункт выдачи",
+  121: "СДЭК Магистральный экспресс — до двери",
+  122: "СДЭК Магистральный экспресс — до двери",
+  123: "СДЭК Магистральный экспресс — в пункт выдачи",
+  62: "СДЭК Магистральный экспресс — в пункт выдачи",
+  291: "СДЭК — в пункт выдачи",
+  293: "СДЭК — до двери",
+  294: "СДЭК — в пункт выдачи",
+  295: "СДЭК — до двери",
+}
+
+/**
+ * Определение типа доставки: сначала наша таблица по коду,
+ * потом парсинг имени тарифа из ответа API (на случай новых кодов),
+ * в крайнем случае — delivery_mode (ненадёжный fallback).
+ */
+function deliveryTypeFor(
+  tariffCode: number,
+  tariffName: string | undefined,
+  deliveryMode: number | undefined
+): "door" | "pvz" {
+  const mapped = CDEK_TARIFF_TYPE[tariffCode]
+  if (mapped) return mapped
+
+  if (tariffName) {
+    const name = tariffName.toLowerCase()
+    // Ключевые слова — для конечного сегмента (последняя часть после дефиса)
+    const lastSegment = name.split("-").pop() || name
+    if (lastSegment.includes("дверь") || lastSegment.includes("постамат")) return "door"
+    if (lastSegment.includes("склад")) return "pvz"
+  }
+
+  // CDEK delivery_mode: 1=дверь-дверь, 2=дверь-склад, 3=склад-дверь, 4=склад-склад,
+  // 6=дверь-постамат, 7=склад-постамат, 8=постамат-дверь, 9=постамат-склад, 10=постамат-постамат
+  if (deliveryMode === 1 || deliveryMode === 3 || deliveryMode === 6 || deliveryMode === 7 || deliveryMode === 8) {
+    return "door"
+  }
+  return "pvz"
+}
 
 // Token cache keyed by credentials, so changing creds in admin invalidates it
 let tokenCache: { key: string; token: string; expiresAt: number } | null = null
@@ -131,37 +240,17 @@ export function createCdekProvider(config: {
 
       if (!data.tariff_codes) return []
 
-      // delivery_mode from CDEK API: 1=door-door, 2=door-pvz, 3=pvz-door, 4=pvz-pvz
-      // We care about the destination part: modes 1,3 → door, modes 2,4 → pvz
-      function deliveryTypeFromMode(mode?: number): "pvz" | "door" {
-        if (mode === 1 || mode === 3) return "door"
-        return "pvz" // modes 2, 4, or unknown default to pvz
-      }
-
-      // Human-readable names for well-known tariffs
-      const tariffNames: Record<number, string> = {
-        136: "СДЭК — забрать из пункта выдачи",
-        137: "СДЭК — доставка до двери",
-        138: "СДЭК — забрать из пункта выдачи",
-        139: "СДЭК — доставка до двери",
-        233: "СДЭК Эконом — забрать из пункта выдачи",
-        234: "СДЭК Эконом — доставка до двери",
-        291: "СДЭК — забрать из пункта выдачи",
-        293: "СДЭК — доставка до двери",
-        294: "СДЭК — забрать из пункта выдачи",
-        295: "СДЭК — доставка до двери",
-      }
-
       return data.tariff_codes
         .filter((t: { tariff_code: number }) => config.tariffs.includes(t.tariff_code))
         .map((t: { tariff_code: number; tariff_name?: string; delivery_mode: number; delivery_sum: number; period_min: number; period_max: number }) => {
           const price = Math.ceil(t.delivery_sum)
+          const deliveryType = deliveryTypeFor(t.tariff_code, t.tariff_name, t.delivery_mode)
           return {
             carrier: "cdek" as const,
             carrierName: "СДЭК",
             tariffCode: t.tariff_code,
-            tariffName: tariffNames[t.tariff_code] || t.tariff_name || `СДЭК Тариф ${t.tariff_code}`,
-            deliveryType: deliveryTypeFromMode(t.delivery_mode),
+            tariffName: CDEK_TARIFF_NAMES[t.tariff_code] || t.tariff_name || `СДЭК Тариф ${t.tariff_code}`,
+            deliveryType,
             price,
             priceWithMarkup: price,
             minDays: t.period_min,
@@ -203,20 +292,12 @@ export function createCdekProvider(config: {
         throw new Error("CDEK createShipment: пустой план упаковки")
       }
 
-      // В CDEK один заказ может содержать несколько физических коробок. API требует
-      // items[] в каждой коробке. Мы не знаем реального распределения позиций
-      // по коробкам (bin-packing по конкретным пачкам), поэтому кладём все
-      // декларируемые позиции в первую коробку; остальные получают один
-      // placeholder-элемент с нулевой ценой — CDEK примет, а на цену и на трекинг
-      // это не влияет (цена считается по тарифу, а не по items).
-      const cdekItems = req.items.map((item, i) => ({
-        name: item.name,
-        ware_key: `item_${i}`,
-        payment: { value: 0 },
-        cost: item.price,
-        weight: item.weight,
-        amount: item.quantity,
-      }))
+      // Распределяем позиции заказа по физическим коробкам плана упаковки.
+      // Для одиночной коробки все позиции в неё; для мультикоробки — bin-packing по весу.
+      const perBoxItems = distributeItemsToPackages(req.items, req.packages)
+
+      // ware_key должен быть уникален в рамках всего заказа, не только коробки
+      let wareCounter = 0
 
       const body: Record<string, unknown> = {
         tariff_code: req.tariffCode,
@@ -225,26 +306,36 @@ export function createCdekProvider(config: {
           name: req.recipientName,
           phones: [{ number: req.recipientPhone }],
         },
-        packages: req.packages.map((p, idx) => ({
-          number: String(idx + 1),
-          weight: p.weight,
-          length: p.length,
-          width: p.width,
-          height: p.height,
-          items:
-            idx === 0
-              ? cdekItems
-              : [
-                  {
-                    name: "Дополнительное грузовое место",
-                    ware_key: `extra_${idx}`,
-                    payment: { value: 0 },
-                    cost: 0,
-                    weight: p.weight,
-                    amount: 1,
-                  },
-                ],
-        })),
+        packages: req.packages.map((p, idx) => {
+          const items = (perBoxItems[idx] || []).map((item) => ({
+            name: item.name,
+            ware_key: `item_${wareCounter++}`,
+            payment: { value: 0 },
+            cost: item.price,
+            weight: item.weight,
+            amount: item.quantity,
+          }))
+          // На случай, если коробка пустая (не должно случаться, но защищаемся):
+          // CDEK требует минимум один item per package.
+          if (items.length === 0) {
+            items.push({
+              name: "Дополнительное грузовое место",
+              ware_key: `extra_${wareCounter++}`,
+              payment: { value: 0 },
+              cost: 0,
+              weight: p.weight,
+              amount: 1,
+            })
+          }
+          return {
+            number: String(idx + 1),
+            weight: p.weight,
+            length: p.length,
+            width: p.width,
+            height: p.height,
+            items,
+          }
+        }),
       }
 
       if (req.deliveryType === "pvz" && req.pickupPointCode) {

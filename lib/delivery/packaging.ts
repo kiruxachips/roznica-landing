@@ -136,31 +136,37 @@ export function planPackages(items: ItemToPack[], presets: BoxPreset[] = DEFAULT
     return [packageFromPreset(singleFit, totalW)]
   }
 
-  // Нужно несколько коробок. Заполняем «самыми большими» до тех пор, пока остаток не влезет
-  // в одну коробку. Вес остатка — это totalW минус вес всех «заполненных до максимума» L-коробок.
+  // Нужно несколько коробок. Средний вес пачки (в граммах на 1 юнит) — используем
+  // для пропорционального распределения, чтобы не получалось «пустых» коробок
+  // в конце: вес и юниты отнимаются согласованно, как физическая пачка.
+  const avgWeightPerUnit = totalW / totalU
   const boxes: Package[] = []
   let remainingW = totalW
   let remainingU = totalU
 
-  // Защита от бесконечного цикла: каждая итерация обязана что-то отнять от остатка.
   const maxIterations = 100
   let iter = 0
 
   while (remainingW > largest.maxWeightGrams || remainingU > largest.maxUnits) {
     if (++iter > maxIterations) break
-    // Забиваем L под лимит: либо по весу, либо по юнитам — что исчерпается первым.
-    // На практике заполняем до maxWeightGrams, а юниты считаем пропорционально.
-    const filledW = Math.min(remainingW, largest.maxWeightGrams)
-    const filledU = Math.min(remainingU, largest.maxUnits)
+
+    // Сколько юнитов можно положить в коробку: ограничение либо по юнитам, либо по весу
+    const unitsByUnitCap = Math.min(remainingU, largest.maxUnits)
+    const unitsByWeightCap = Math.floor(largest.maxWeightGrams / avgWeightPerUnit)
+    const filledU = Math.max(1, Math.min(unitsByUnitCap, unitsByWeightCap))
+
+    // Вес заполненной части — ровно соответствует числу юнитов
+    const filledW = Math.min(remainingW, Math.round(filledU * avgWeightPerUnit))
+
     boxes.push(packageFromPreset(largest, filledW))
     remainingW -= filledW
     remainingU -= filledU
   }
 
-  // Остаток: наименьшая коробка, куда он влезает
+  // Остаток: наименьшая коробка, куда он влезает. Пустую (U=0, W=0) коробку не добавляем.
   if (remainingW > 0 || remainingU > 0) {
     const fit = sorted.find((p) => remainingW <= p.maxWeightGrams && remainingU <= p.maxUnits) || largest
-    boxes.push(packageFromPreset(fit, remainingW))
+    boxes.push(packageFromPreset(fit, Math.max(0, remainingW)))
   }
 
   return boxes
@@ -187,4 +193,74 @@ export function mergeToVirtualPackage(packages: Package[]): Package {
 /** Итоговый брутто-вес плана (сумма всех коробок с учётом тары) */
 export function totalPlanWeight(packages: Package[]): number {
   return packages.reduce((s, p) => s + p.weight, 0)
+}
+
+/**
+ * Распределяет товарные позиции по физическим коробкам плана упаковки.
+ * Используется при формировании отгрузки (CDEK shipment requires items per package).
+ *
+ * Алгоритм: разворачиваем позиции в отдельные пачки, сортируем по убыванию веса,
+ * раскладываем жадно в первую подходящую коробку по её оставшемуся весу. После —
+ * сворачиваем обратно в агрегированные позиции по (name, weight, price).
+ *
+ * Для одной коробки: все позиции попадают в неё (fast path).
+ */
+export interface ShipmentItem {
+  name: string
+  weight: number // grams per unit (НЕТТО одной пачки)
+  price: number
+  quantity: number
+}
+
+export function distributeItemsToPackages(
+  items: ShipmentItem[],
+  packages: Package[]
+): ShipmentItem[][] {
+  if (packages.length === 0) return []
+  if (packages.length === 1) return [items.map((i) => ({ ...i }))]
+
+  type Unit = { name: string; weight: number; price: number }
+  const units: Unit[] = []
+  for (const item of items) {
+    for (let k = 0; k < Math.max(0, item.quantity); k++) {
+      units.push({ name: item.name, weight: item.weight, price: item.price })
+    }
+  }
+  units.sort((a, b) => b.weight - a.weight) // тяжёлые первыми
+
+  const assigned: Unit[][] = packages.map(() => [])
+  const remaining = packages.map((p) => p.weight) // допустимый вес на коробку (с тарой, но close enough)
+
+  for (const u of units) {
+    let placed = false
+    for (let bIdx = 0; bIdx < packages.length; bIdx++) {
+      if (remaining[bIdx] >= u.weight) {
+        assigned[bIdx].push(u)
+        remaining[bIdx] -= u.weight
+        placed = true
+        break
+      }
+    }
+    if (!placed) {
+      // Фолбэк: в коробку с наибольшим остатком
+      let bestIdx = 0
+      for (let bIdx = 1; bIdx < packages.length; bIdx++) {
+        if (remaining[bIdx] > remaining[bestIdx]) bestIdx = bIdx
+      }
+      assigned[bestIdx].push(u)
+      remaining[bestIdx] -= u.weight
+    }
+  }
+
+  // Сворачиваем обратно
+  return assigned.map((boxUnits) => {
+    const byKey = new Map<string, ShipmentItem>()
+    for (const u of boxUnits) {
+      const key = `${u.name}|${u.weight}|${u.price}`
+      const existing = byKey.get(key)
+      if (existing) existing.quantity++
+      else byKey.set(key, { name: u.name, weight: u.weight, price: u.price, quantity: 1 })
+    }
+    return Array.from(byKey.values())
+  })
 }
