@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function createPromoCode(data: {
   name: string
@@ -14,6 +15,7 @@ export async function createPromoCode(data: {
   maxUsage?: number | null
   minOrderSum?: number | null
 }) {
+  const admin = await requireAdmin("promos.edit")
   const code = data.code.toUpperCase().trim()
 
   const existing = await prisma.promoCode.findUnique({ where: { code } })
@@ -35,6 +37,7 @@ export async function createPromoCode(data: {
     },
   })
 
+  void logAdminAction({ admin, action: "promo.created", entityType: "promo_code", entityId: promoCode.id, payload: { code, type: data.type, value: data.value } })
   revalidatePath("/admin/promo-codes")
   return promoCode
 }
@@ -54,6 +57,7 @@ export async function updatePromoCode(
     isActive?: boolean
   }
 ) {
+  const admin = await requireAdmin("promos.edit")
   const updateData: Record<string, unknown> = {}
 
   if (data.name !== undefined) updateData.name = data.name
@@ -79,21 +83,25 @@ export async function updatePromoCode(
     data: updateData,
   })
 
+  void logAdminAction({ admin, action: "promo.updated", entityType: "promo_code", entityId: id, payload: { fields: Object.keys(updateData) } })
   revalidatePath("/admin/promo-codes")
   return promoCode
 }
 
 export async function deletePromoCode(id: string) {
+  const admin = await requireAdmin("promos.delete")
   const ordersCount = await prisma.order.count({ where: { promoCodeId: id } })
   if (ordersCount > 0) {
     throw new Error("Нельзя удалить промокод, привязанный к заказам")
   }
 
   await prisma.promoCode.delete({ where: { id } })
+  void logAdminAction({ admin, action: "promo.deleted", entityType: "promo_code", entityId: id })
   revalidatePath("/admin/promo-codes")
 }
 
 export async function togglePromoCodeActive(id: string) {
+  const admin = await requireAdmin("promos.edit")
   const promo = await prisma.promoCode.findUnique({ where: { id } })
   if (!promo) throw new Error("Промокод не найден")
 
@@ -102,5 +110,6 @@ export async function togglePromoCodeActive(id: string) {
     data: { isActive: !promo.isActive },
   })
 
+  void logAdminAction({ admin, action: "promo.toggle_active", entityType: "promo_code", entityId: id, payload: { wasActive: promo.isActive } })
   revalidatePath("/admin/promo-codes")
 }

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import Image from "next/image"
 
 export default function AdminLoginPage() {
@@ -26,7 +27,12 @@ export default function AdminLoginPage() {
     setLoading(false)
 
     if (result?.error) {
-      setError("Неверный email или пароль")
+      // NextAuth v5 возвращает code=CredentialsSignin даже для конкретных ошибок из authorize.
+      // Сопоставляем распространённые причины вручную.
+      const msg = String(result.error)
+      if (msg.includes("одобр")) setError("Аккаунт ожидает одобрения администратором")
+      else if (msg.includes("блок")) setError("Аккаунт заблокирован. Обратитесь к администратору")
+      else setError("Неверный email или пароль")
     } else {
       router.push("/admin")
       router.refresh()
@@ -81,6 +87,13 @@ export default function AdminLoginPage() {
             >
               {loading ? "Вход..." : "Войти"}
             </button>
+
+            <div className="text-center text-xs text-muted-foreground pt-2 border-t border-border">
+              Новый менеджер?{" "}
+              <Link href="/admin/register" className="text-primary hover:underline font-medium">
+                Запросить доступ
+              </Link>
+            </div>
           </form>
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getStorage } from "@/lib/storage"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function createArticle(data: {
   title: string
@@ -16,6 +17,7 @@ export async function createArticle(data: {
   metaTitle?: string
   metaDescription?: string
 }) {
+  const admin = await requireAdmin("blog.edit")
   const article = await prisma.article.create({
     data: {
       title: data.title,
@@ -31,6 +33,7 @@ export async function createArticle(data: {
     },
   })
 
+  void logAdminAction({ admin, action: "article.created", entityType: "article", entityId: article.id, payload: { title: article.title, slug: article.slug } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
   return article
@@ -51,6 +54,7 @@ export async function updateArticle(
     metaDescription?: string
   }
 ) {
+  const admin = await requireAdmin("blog.edit")
   const existing = await prisma.article.findUnique({ where: { id } })
   if (!existing) throw new Error("Статья не найдена")
 
@@ -73,6 +77,7 @@ export async function updateArticle(
     data: updateData,
   })
 
+  void logAdminAction({ admin, action: "article.updated", entityType: "article", entityId: id, payload: { fields: Object.keys(data) } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
   revalidatePath(`/blog/${article.slug}`)
@@ -80,6 +85,7 @@ export async function updateArticle(
 }
 
 export async function deleteArticle(id: string) {
+  const admin = await requireAdmin("blog.delete")
   const article = await prisma.article.findUnique({ where: { id } })
   if (!article) throw new Error("Статья не найдена")
 
@@ -91,11 +97,13 @@ export async function deleteArticle(id: string) {
 
   await prisma.article.delete({ where: { id } })
 
+  void logAdminAction({ admin, action: "article.deleted", entityType: "article", entityId: id, payload: { title: article.title } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
 }
 
 export async function toggleArticlePublished(id: string) {
+  const admin = await requireAdmin("blog.edit")
   const article = await prisma.article.findUnique({ where: { id } })
   if (!article) throw new Error("Статья не найдена")
 
@@ -108,12 +116,14 @@ export async function toggleArticlePublished(id: string) {
     },
   })
 
+  void logAdminAction({ admin, action: "article.toggle_published", entityType: "article", entityId: id, payload: { wasPublished: article.isPublished } })
   revalidatePath("/admin/blog")
   revalidatePath("/blog")
   revalidatePath(`/blog/${article.slug}`)
 }
 
 export async function uploadArticleCoverImage(formData: FormData) {
+  await requireAdmin("blog.edit")
   const file = formData.get("file") as File
   const articleId = formData.get("articleId") as string
   if (!file || !articleId) throw new Error("Файл и ID статьи обязательны")
@@ -141,6 +151,7 @@ export async function uploadArticleCoverImage(formData: FormData) {
 }
 
 export async function deleteArticleCoverImage(articleId: string) {
+  await requireAdmin("blog.edit")
   const article = await prisma.article.findUnique({ where: { id: articleId } })
   if (!article?.coverImage) return
 
@@ -157,6 +168,7 @@ export async function deleteArticleCoverImage(articleId: string) {
 }
 
 export async function uploadArticleContentImage(formData: FormData) {
+  await requireAdmin("blog.edit")
   const file = formData.get("file") as File
   const articleId = formData.get("articleId") as string
   if (!file || !articleId) throw new Error("Файл и ID статьи обязательны")

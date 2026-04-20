@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function createCollection(data: {
   name: string
@@ -9,7 +10,9 @@ export async function createCollection(data: {
   description?: string
   emoji?: string
 }) {
-  await prisma.productCollection.create({ data })
+  const admin = await requireAdmin("collections.edit")
+  const col = await prisma.productCollection.create({ data })
+  void logAdminAction({ admin, action: "collection.created", entityType: "collection", entityId: col.id, payload: data })
   revalidatePath("/admin/collections")
   revalidatePath("/catalog")
 }
@@ -25,19 +28,24 @@ export async function updateCollection(
     isActive?: boolean
   }
 ) {
+  const admin = await requireAdmin("collections.edit")
   await prisma.productCollection.update({ where: { id }, data })
+  void logAdminAction({ admin, action: "collection.updated", entityType: "collection", entityId: id, payload: { fields: Object.keys(data) } })
   revalidatePath("/admin/collections")
   revalidatePath(`/admin/collections/${id}`)
   revalidatePath("/catalog")
 }
 
 export async function deleteCollection(id: string) {
+  const admin = await requireAdmin("collections.delete")
   await prisma.productCollection.delete({ where: { id } })
+  void logAdminAction({ admin, action: "collection.deleted", entityType: "collection", entityId: id })
   revalidatePath("/admin/collections")
   revalidatePath("/catalog")
 }
 
 export async function addProductToCollection(collectionId: string, productId: string) {
+  await requireAdmin("collections.edit")
   const maxSort = await prisma.productCollectionItem.findFirst({
     where: { collectionId },
     orderBy: { sortOrder: "desc" },
@@ -51,6 +59,7 @@ export async function addProductToCollection(collectionId: string, productId: st
 }
 
 export async function removeProductFromCollection(collectionId: string, productId: string) {
+  await requireAdmin("collections.edit")
   await prisma.productCollectionItem.deleteMany({
     where: { collectionId, productId },
   })
@@ -59,6 +68,7 @@ export async function removeProductFromCollection(collectionId: string, productI
 }
 
 export async function syncProductCollections(productId: string, collectionIds: string[]) {
+  await requireAdmin("collections.edit")
   await prisma.$transaction([
     prisma.productCollectionItem.deleteMany({ where: { productId } }),
     ...collectionIds.map((collectionId, i) =>

@@ -13,6 +13,7 @@ import { headers } from "next/headers"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 async function rollbackOrder(
   orderId: string,
@@ -186,11 +187,19 @@ export async function createOrder(data: OrderData) {
 }
 
 export async function updateOrderStatus(id: string, status: string) {
-  const session = await auth()
-  const userType = (session?.user as Record<string, unknown>)?.userType
-  if (!session?.user?.id || userType !== "admin") throw new Error("Нет доступа")
+  // Для отмены — требуется право orders.cancel, иначе — обычное обновление статуса.
+  const permission = status === "cancelled" ? "orders.cancel" : "orders.updateStatus"
+  const admin = await requireAdmin(permission)
 
-  await updateOrderStatusDAL(id, status)
+  const previous = await prisma.order.findUnique({ where: { id }, select: { status: true } })
+  await updateOrderStatusDAL(id, status, admin.userId)
+  void logAdminAction({
+    admin,
+    action: status === "cancelled" ? "order.cancelled" : "order.status_changed",
+    entityType: "order",
+    entityId: id,
+    payload: { from: previous?.status, to: status },
+  })
 
   // Send email notification + bonus logic
   try {
@@ -236,9 +245,13 @@ export async function updateOrderStatus(id: string, status: string) {
 }
 
 export async function updateOrderNotes(orderId: string, adminNotes: string) {
-  const session = await auth()
-  const userType = (session?.user as Record<string, unknown>)?.userType
-  if (!session?.user?.id || userType !== "admin") throw new Error("Нет доступа")
+  const admin = await requireAdmin("orders.editNotes")
+  void logAdminAction({
+    admin,
+    action: "order.notes_updated",
+    entityType: "order",
+    entityId: orderId,
+  })
 
   await prisma.order.update({
     where: { id: orderId },

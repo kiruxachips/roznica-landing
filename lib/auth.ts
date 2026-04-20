@@ -23,18 +23,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (!credentials?.email || !credentials?.password) return null
 
         const user = await prisma.adminUser.findUnique({
-          where: { email: credentials.email as string },
+          where: { email: (credentials.email as string).toLowerCase().trim() },
         })
         if (!user) return null
 
         const isValid = await bcrypt.compare(credentials.password as string, user.passwordHash)
         if (!isValid) return null
 
+        // Блокируем pending (не одобрен) и blocked (заблокирован админом).
+        // Активный статус — единственный, при котором можно войти.
+        if (user.status !== "active") {
+          throw new Error(
+            user.status === "pending"
+              ? "Аккаунт ожидает одобрения администратором"
+              : "Аккаунт заблокирован"
+          )
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
+          status: user.status,
           userType: "admin" as const,
         }
       },
@@ -144,6 +155,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if ((user as Record<string, unknown>).role) {
           token.role = (user as Record<string, unknown>).role as string
         }
+        if ((user as Record<string, unknown>).status) {
+          token.status = (user as Record<string, unknown>).status as string
+        }
       }
       // For OAuth, always set customer
       if (account?.type === "oauth") {
@@ -158,6 +172,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         user.userType = token.userType
         if (token.role) {
           user.role = token.role
+        }
+        if (token.status) {
+          user.status = token.status
         }
       }
       return session

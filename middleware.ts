@@ -1,18 +1,32 @@
 import { auth } from "@/lib/auth"
 import { NextResponse } from "next/server"
 
+/**
+ * Маршруты, доступные только роли "admin" (менеджеру — 403 с редиректом на дашборд).
+ * Менеджер может заходить на остальные /admin/* — проверки на уровне actions по permission.
+ */
+const ADMIN_ONLY_PREFIXES = [
+  "/admin/delivery",
+  "/admin/integrations",
+  "/admin/users",
+  "/admin/activity",
+]
+
 export default auth((req) => {
   const { pathname } = req.nextUrl
   const isAuthenticated = !!req.auth
-  const userType = (req.auth?.user as Record<string, unknown>)?.userType as string | undefined
+  const user = req.auth?.user as Record<string, unknown> | undefined
+  const userType = user?.userType as string | undefined
+  const role = user?.role as string | undefined
 
   // Admin routes
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login"
+    const isRegisterPage = pathname === "/admin/register"
 
-    // Logged-in admin on login page → redirect to dashboard.
-    // Anonymous on login page → let the page render (no auth() overhead beyond what's already done).
-    if (isLoginPage) {
+    // Публичные страницы (логин + регистрация менеджера) — пускаем.
+    // Уже-авторизованный админ, попав на эти страницы, редиректится в дашборд.
+    if (isLoginPage || isRegisterPage) {
       if (isAuthenticated && userType === "admin") {
         return NextResponse.redirect(new URL("/admin", req.url))
       }
@@ -21,6 +35,16 @@ export default auth((req) => {
 
     if (!isAuthenticated || userType !== "admin") {
       return NextResponse.redirect(new URL("/admin/login", req.url))
+    }
+
+    // Запрет менеджеру на критичные разделы.
+    if (role !== "admin") {
+      const blocked = ADMIN_ONLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))
+      if (blocked) {
+        const url = new URL("/admin", req.url)
+        url.searchParams.set("denied", "1")
+        return NextResponse.redirect(url)
+      }
     }
   }
 

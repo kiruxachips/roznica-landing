@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { adjustStock } from "@/lib/dal/stock"
 import { notifyStockChange } from "@/lib/integrations/stock-alerts"
-import { auth } from "@/lib/auth"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function createProduct(data: {
   name: string
@@ -33,6 +33,7 @@ export async function createProduct(data: {
   metaDescription?: string
   variants?: { weight: string; price: number; oldPrice?: number | null; stock: number }[]
 }) {
+  const admin = await requireAdmin("products.create")
   const { variants, ...productData } = data
 
   const product = await prisma.product.create({
@@ -81,6 +82,13 @@ export async function createProduct(data: {
   revalidatePath("/catalog")
   revalidatePath("/")
 
+  void logAdminAction({
+    admin,
+    action: "product.created",
+    entityType: "product",
+    entityId: product.id,
+    payload: { name: product.name, slug: product.slug },
+  })
   return product
 }
 
@@ -114,6 +122,7 @@ export async function updateProduct(
     metaDescription?: string
   }
 ) {
+  const admin = await requireAdmin("products.edit")
   const product = await prisma.product.update({
     where: { id },
     data,
@@ -124,18 +133,36 @@ export async function updateProduct(
   revalidatePath("/catalog")
   revalidatePath("/")
 
+  void logAdminAction({
+    admin,
+    action: "product.updated",
+    entityType: "product",
+    entityId: product.id,
+    payload: { fields: Object.keys(data) },
+  })
   return product
 }
 
 export async function deleteProduct(id: string) {
+  const admin = await requireAdmin("products.delete")
+  const snapshot = await prisma.product.findUnique({ where: { id }, select: { name: true, slug: true } })
   await prisma.product.delete({ where: { id } })
 
   revalidatePath("/admin/products")
   revalidatePath("/catalog")
   revalidatePath("/")
+
+  void logAdminAction({
+    admin,
+    action: "product.deleted",
+    entityType: "product",
+    entityId: id,
+    payload: snapshot || undefined,
+  })
 }
 
 export async function toggleProductActive(id: string) {
+  const admin = await requireAdmin("products.toggleActive")
   const product = await prisma.product.findUnique({ where: { id } })
   if (!product) throw new Error("Product not found")
 
@@ -147,6 +174,14 @@ export async function toggleProductActive(id: string) {
   revalidatePath("/admin/products")
   revalidatePath("/catalog")
   revalidatePath("/")
+
+  void logAdminAction({
+    admin,
+    action: "product.toggleActive",
+    entityType: "product",
+    entityId: id,
+    payload: { wasActive: product.isActive, nowActive: !product.isActive },
+  })
 }
 
 // Variants
@@ -159,6 +194,7 @@ export async function createVariant(data: {
   stock?: number
   sortOrder?: number
 }) {
+  const admin = await requireAdmin("variants.create")
   // Вариант создаём с нулевым stock, потом отдельной записью adjustStock
   // фиксируем начальное количество как «приход» — чтобы StockHistory содержала
   // полную историю с момента создания.
@@ -167,19 +203,24 @@ export async function createVariant(data: {
     data: { ...data, stock: 0 },
   })
   if (initialStock > 0) {
-    const session = await auth()
-    const adminId = (session?.user as { id?: string } | undefined)?.id || "admin"
     await adjustStock({
       variantId: variant.id,
       delta: initialStock,
       reason: "supplier_received",
       notes: "Начальное количество при создании варианта",
-      changedBy: adminId,
+      changedBy: admin.userId,
     })
   }
   revalidatePath("/admin/products")
   revalidatePath("/admin/warehouse")
   revalidatePath("/catalog")
+  void logAdminAction({
+    admin,
+    action: "variant.created",
+    entityType: "variant",
+    entityId: variant.id,
+    payload: { weight: variant.weight, initialStock },
+  })
   return variant
 }
 
@@ -196,6 +237,7 @@ export async function updateVariant(
     sortOrder?: number
   }
 ) {
+  const admin = await requireAdmin("variants.edit")
   const { stock, ...rest } = data
 
   // Stock меняется через adjustStock — чтобы зафиксировать причину и историю
@@ -207,14 +249,12 @@ export async function updateVariant(
     if (!current) throw new Error("Вариант не найден")
     const delta = stock - current.stock
     if (delta !== 0) {
-      const session = await auth()
-      const adminId = (session?.user as { id?: string } | undefined)?.id || "admin"
       const result = await adjustStock({
         variantId: id,
         delta,
         reason: "inventory_correction",
         notes: "Inline-редактирование в админке",
-        changedBy: adminId,
+        changedBy: admin.userId,
       })
       void notifyStockChange(result)
     }
@@ -229,11 +269,30 @@ export async function updateVariant(
   revalidatePath("/admin/products")
   revalidatePath("/admin/warehouse")
   revalidatePath("/catalog")
+  void logAdminAction({
+    admin,
+    action: "variant.updated",
+    entityType: "variant",
+    entityId: id,
+    payload: { fields: Object.keys(data) },
+  })
   return variant
 }
 
 export async function deleteVariant(id: string) {
+  const admin = await requireAdmin("variants.delete")
+  const snapshot = await prisma.productVariant.findUnique({
+    where: { id },
+    select: { weight: true, productId: true },
+  })
   await prisma.productVariant.delete({ where: { id } })
+  void logAdminAction({
+    admin,
+    action: "variant.deleted",
+    entityType: "variant",
+    entityId: id,
+    payload: snapshot || undefined,
+  })
   revalidatePath("/admin/products")
   revalidatePath("/catalog")
 }

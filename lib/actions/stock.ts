@@ -2,18 +2,9 @@
 
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
-import { auth } from "@/lib/auth"
 import { adjustStock, adjustStockBatch, type StockReason } from "@/lib/dal/stock"
 import { notifyStockChange, notifyStockChanges } from "@/lib/integrations/stock-alerts"
-
-async function getAdminId(): Promise<string> {
-  const session = await auth()
-  const userType = (session?.user as { userType?: string } | undefined)?.userType
-  if (!session?.user?.id || userType !== "admin") {
-    throw new Error("Нет доступа")
-  }
-  return session.user.id
-}
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function adjustStockAction(input: {
   variantId: string
@@ -21,15 +12,22 @@ export async function adjustStockAction(input: {
   reason: StockReason
   notes?: string
 }) {
-  const adminId = await getAdminId()
+  const admin = await requireAdmin("stock.adjust")
   const result = await adjustStock({
     variantId: input.variantId,
     delta: input.delta,
     reason: input.reason,
     notes: input.notes,
-    changedBy: adminId,
+    changedBy: admin.userId,
   })
   void notifyStockChange(result)
+  void logAdminAction({
+    admin,
+    action: "stock.adjusted",
+    entityType: "variant",
+    entityId: input.variantId,
+    payload: { delta: input.delta, reason: input.reason, notes: input.notes },
+  })
 
   revalidatePath("/admin/warehouse")
   revalidatePath("/admin/products")
@@ -40,7 +38,7 @@ export async function adjustStockAction(input: {
 export async function bulkIntakeAction(
   items: Array<{ variantId: string; delta: number; notes?: string }>
 ) {
-  const adminId = await getAdminId()
+  const admin = await requireAdmin("stock.adjust")
   const filtered = items.filter((i) => i.delta !== 0)
   if (filtered.length === 0) return []
 
@@ -50,10 +48,15 @@ export async function bulkIntakeAction(
       delta: i.delta,
       reason: "supplier_received" as StockReason,
       notes: i.notes,
-      changedBy: adminId,
+      changedBy: admin.userId,
     }))
   )
   void notifyStockChanges(results)
+  void logAdminAction({
+    admin,
+    action: "stock.bulk_intake",
+    payload: { count: filtered.length, totalDelta: filtered.reduce((s, i) => s + i.delta, 0) },
+  })
 
   revalidatePath("/admin/warehouse")
   revalidatePath("/admin/products")
@@ -62,10 +65,17 @@ export async function bulkIntakeAction(
 }
 
 export async function setLowThresholdAction(variantId: string, threshold: number | null) {
-  await getAdminId()
+  const admin = await requireAdmin("stock.setThreshold")
   await prisma.productVariant.update({
     where: { id: variantId },
     data: { lowStockThreshold: threshold },
+  })
+  void logAdminAction({
+    admin,
+    action: "stock.threshold_set",
+    entityType: "variant",
+    entityId: variantId,
+    payload: { threshold },
   })
   revalidatePath("/admin/warehouse")
   revalidatePath("/admin/products")

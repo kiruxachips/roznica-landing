@@ -130,9 +130,30 @@ model AdminUser {
   email        String @unique
   passwordHash String
   name         String
-  role         String @default("admin") // "admin" | "superadmin"
+  role         String @default("manager") // "admin" | "manager"
+  status       String @default("active")  // "active" | "pending" | "blocked"
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  activityLogs AdminActivityLog[]
+}
+
+model AdminActivityLog {
+  id          String   @id @default(cuid())
+  adminUserId String?
+  admin       AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  adminName   String?   // snapshot — чтобы лог выжил при удалении пользователя
+  adminRole   String?   // "admin" | "manager" в момент действия
+  action      String    // "order.status_changed", "stock.adjusted", "product.updated", "user.approved" и т.д.
+  entityType  String?   // "order" | "variant" | "product" | "review" | "admin_user" ...
+  entityId    String?
+  payload     Json?     // произвольные детали: до/после, причина, старый/новый статус
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }
 
 model User {

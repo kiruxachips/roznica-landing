@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { invalidateSettingsCache } from "@/lib/dal/delivery-settings"
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 
 export async function createDeliveryRule(data: {
   name: string
@@ -14,7 +15,8 @@ export async function createDeliveryRule(data: {
   action: string
   discountAmount?: number
 }) {
-  await prisma.deliveryRule.create({
+  const admin = await requireAdmin("delivery.deliveryRules")
+  const rule = await prisma.deliveryRule.create({
     data: {
       name: data.name,
       carrier: data.carrier,
@@ -29,6 +31,13 @@ export async function createDeliveryRule(data: {
   })
   invalidateSettingsCache()
   revalidatePath("/admin/delivery")
+  void logAdminAction({
+    admin,
+    action: "delivery.rule_created",
+    entityType: "delivery_rule",
+    entityId: rule.id,
+    payload: data,
+  })
 }
 
 export async function updateDeliveryRule(
@@ -46,25 +55,48 @@ export async function updateDeliveryRule(
     sortOrder?: number
   }
 ) {
+  const admin = await requireAdmin("delivery.deliveryRules")
   await prisma.deliveryRule.update({
     where: { id },
     data,
   })
   invalidateSettingsCache()
   revalidatePath("/admin/delivery")
+  void logAdminAction({
+    admin,
+    action: "delivery.rule_updated",
+    entityType: "delivery_rule",
+    entityId: id,
+    payload: { fields: Object.keys(data) },
+  })
 }
 
 export async function deleteDeliveryRule(id: string) {
+  const admin = await requireAdmin("delivery.deliveryRules")
   await prisma.deliveryRule.delete({ where: { id } })
   invalidateSettingsCache()
   revalidatePath("/admin/delivery")
+  void logAdminAction({
+    admin,
+    action: "delivery.rule_deleted",
+    entityType: "delivery_rule",
+    entityId: id,
+  })
 }
 
 export async function toggleDeliveryRule(id: string, isActive: boolean) {
+  const admin = await requireAdmin("delivery.deliveryRules")
   await prisma.deliveryRule.update({
     where: { id },
     data: { isActive },
   })
   invalidateSettingsCache()
   revalidatePath("/admin/delivery")
+  void logAdminAction({
+    admin,
+    action: "delivery.rule_toggled",
+    entityType: "delivery_rule",
+    entityId: id,
+    payload: { isActive },
+  })
 }
