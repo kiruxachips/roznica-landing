@@ -1,18 +1,19 @@
 import { prisma } from "@/lib/prisma"
 
 /**
- * Единая точка исходящей отправки писем — audit + idempotency.
+ * Единая точка исходящей отправки писем — audit + idempotency + durable queue.
  *
- * Каждый вызов `send*` из `lib/email.ts` должен идти через эту обёртку.
- * Гарантии:
- *  - Идемпотентность: если для `(orderId, kind, recipient)` уже есть запись со `status="sent"`,
- *    повторная отправка пропускается. Это защищает от дублей при ретраях YooKassa-webhook'а,
- *    повторных millorbot-событиях и race-conditions.
- *  - Audit: каждая попытка (успех или ошибка) фиксируется строкой в `EmailDispatch`. Админ
- *    всегда может посмотреть, ушло ли письмо (messageId из SMTP-ответа) или упало (error).
- *  - Не throws: обёртка молча глотает ошибки SMTP, пишет `status="failed"` и лог. Это
- *    исключает падение основного хэндлера (создание заказа, webhook). Для критичных мест,
- *    где нужно знать результат — смотри `dispatchEmailOrThrow`.
+ * Архитектура:
+ *  1. dispatchEmail вызывается с уже отрендеренным письмом {to, subject, html}.
+ *  2. Сначала INSERT EmailDispatch со status="pending" и snapshot'ом письма.
+ *     Это даёт durability: если после этого процесс убьют, письмо всё равно в БД.
+ *  3. После успеха коммита — попытка SMTP.
+ *  4. На результат обновляем status=sent | failed, attempts++, nextAttemptAt.
+ *  5. Фоновый воркер (scripts/outbox-worker.mjs) сканит pending/failed + nextAttemptAt<=now
+ *     и ретраит с экспоненциальным backoff до MAX_ATTEMPTS.
+ *
+ * Idempotency: если для (orderId, kind, recipient) уже есть status="sent", новый
+ * pending не создаётся (skip). Защищает от YooKassa-webhook ретраев и race'ов.
  */
 
 export type EmailDispatchKind =
@@ -25,6 +26,12 @@ export type EmailDispatchKind =
   | "admin.new_order"
   | "admin.payment_success"
 
+export interface RenderedEmail {
+  subject: string
+  html: string
+  fromEmail?: string
+}
+
 export interface SendEmailResult {
   messageId?: string
   response?: string
@@ -34,109 +41,156 @@ export interface DispatchOpts {
   orderId: string | null
   kind: EmailDispatchKind
   recipient: string
-  send: () => Promise<SendEmailResult | void>
+  render: () => RenderedEmail | Promise<RenderedEmail>
+  send: (email: RenderedEmail & { to: string }) => Promise<SendEmailResult>
 }
 
+const MAX_ATTEMPTS = 5
+
 /**
- * Отправляет письмо с записью в EmailDispatch. Не пробрасывает ошибки наружу —
- * всегда резолвится, callers могут не wrap-ить в try/catch.
+ * Создаёт EmailDispatch-запись и пытается отправить письмо через SMTP.
+ * Не throws наружу. Callers безопасно вызывают в `after()`.
+ *
+ * При SMTP-ошибке письмо остаётся в таблице со status="failed", воркер подхватит.
+ * При успехе — status="sent", messageId заполнен.
  */
 export async function dispatchEmail(opts: DispatchOpts): Promise<void> {
-  const { orderId, kind, recipient, send } = opts
+  const { orderId, kind, recipient } = opts
 
   if (!recipient) {
-    // Писать абсолютно пустому получателю бессмысленно. Фиксируем как failed,
-    // чтобы в admin-панели было видно, что попытка была и она отфильтрована.
-    await safeRecord({ orderId, kind, recipient: "", status: "failed", error: "empty recipient" })
+    // Фиксируем неудачный attempt чтобы было видно, что была попытка без адресата.
+    await safeCreate({
+      orderId,
+      kind,
+      recipient: "",
+      status: "dead",
+      attempts: 1,
+      error: "empty recipient",
+    })
     return
   }
 
-  // Idempotency: уже уходило?
-  const already = await prisma.emailDispatch.findFirst({
+  // Idempotency: если уже sent — skip.
+  const alreadySent = await prisma.emailDispatch.findFirst({
     where: { orderId, kind, recipient, status: "sent" },
     select: { id: true },
   })
-  if (already) return
+  if (alreadySent) return
 
+  // Render + insert pending (snapshot на случай рестарта).
+  let rendered: RenderedEmail
   try {
-    const res = (await send()) as SendEmailResult | void
-    await safeRecord({
-      orderId,
-      kind,
-      recipient,
-      status: "sent",
-      messageId: res?.messageId,
-      response: res?.response?.slice(0, 500),
-    })
+    rendered = await opts.render()
   } catch (e) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-    await safeRecord({
+    await safeCreate({
       orderId,
       kind,
       recipient,
-      status: "failed",
-      error: msg.slice(0, 500),
+      status: "dead",
+      attempts: 1,
+      error: `render failed: ${msg}`,
     })
-    // stdout — на случай если БД недоступна, хоть что-то видно в логах контейнера.
-    console.error(`[email] ${kind} → ${recipient} failed:`, msg)
+    return
   }
+
+  const row = await safeCreate({
+    orderId,
+    kind,
+    recipient,
+    status: "pending",
+    attempts: 0,
+    subject: rendered.subject,
+    html: rendered.html,
+    fromEmail: rendered.fromEmail ?? null,
+  })
+  if (!row) return // БД недоступна — ничего не поделать
+
+  // Сразу пытаемся отправить. Если воркер подхватит до — dispatchEmail попытается повторно,
+  // но idempotency по status="sent" защитит от дубля.
+  await attemptSend(row.id, opts.send, { ...rendered, to: recipient })
 }
 
 /**
- * Вариант, пробрасывающий ошибку наружу. Нужен там, где вызывающий код принимает решения
- * на основе результата (напр. не продолжать flow, если письмо не ушло).
- * Обычно не нужен — предпочитайте `dispatchEmail`.
+ * Попытка отправить pending/failed запись. Используется dispatchEmail и воркером.
  */
-export async function dispatchEmailOrThrow(opts: DispatchOpts): Promise<void> {
-  const { orderId, kind, recipient, send } = opts
-  if (!recipient) throw new Error("empty recipient")
-  const already = await prisma.emailDispatch.findFirst({
-    where: { orderId, kind, recipient, status: "sent" },
-    select: { id: true },
-  })
-  if (already) return
+export async function attemptSend(
+  dispatchId: string,
+  send: (email: { to: string; subject: string; html: string; fromEmail?: string }) => Promise<SendEmailResult>,
+  email: { to: string; subject: string; html: string; fromEmail?: string }
+): Promise<void> {
   try {
-    const res = (await send()) as SendEmailResult | void
-    await safeRecord({
-      orderId,
-      kind,
-      recipient,
-      status: "sent",
-      messageId: res?.messageId,
-      response: res?.response?.slice(0, 500),
+    const res = await send(email)
+    await prisma.emailDispatch.update({
+      where: { id: dispatchId },
+      data: {
+        status: "sent",
+        messageId: res.messageId ?? null,
+        response: res.response?.slice(0, 500) ?? null,
+        sentAt: new Date(),
+        attempts: { increment: 1 },
+        error: null,
+      },
     })
   } catch (e) {
     const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e)
-    await safeRecord({ orderId, kind, recipient, status: "failed", error: msg.slice(0, 500) })
-    throw e
+    const current = await prisma.emailDispatch.findUnique({
+      where: { id: dispatchId },
+      select: { attempts: true },
+    })
+    const nextAttempts = (current?.attempts ?? 0) + 1
+    const isDead = nextAttempts >= MAX_ATTEMPTS
+    await prisma.emailDispatch.update({
+      where: { id: dispatchId },
+      data: {
+        status: isDead ? "dead" : "failed",
+        attempts: nextAttempts,
+        error: msg.slice(0, 500),
+        nextAttemptAt: isDead ? new Date() : new Date(Date.now() + backoffMs(nextAttempts)),
+      },
+    })
+    console.error(`[email] dispatch ${dispatchId} ${isDead ? "DEAD" : "failed"}:`, msg)
   }
 }
 
-interface RecordArgs {
+// Экспоненциальный backoff: 10s, 60s, 5min, 30min, 3h (MAX_ATTEMPTS=5).
+function backoffMs(attempts: number): number {
+  const table = [10_000, 60_000, 300_000, 1_800_000, 10_800_000]
+  return table[Math.min(attempts - 1, table.length - 1)]
+}
+
+interface CreateArgs {
   orderId: string | null
   kind: string
   recipient: string
-  status: "sent" | "failed"
-  messageId?: string
-  response?: string
+  status: "pending" | "sent" | "failed" | "dead"
+  attempts: number
+  subject?: string
+  html?: string
+  fromEmail?: string | null
   error?: string
+  nextAttemptAt?: Date
 }
 
-async function safeRecord(args: RecordArgs) {
+async function safeCreate(args: CreateArgs): Promise<{ id: string } | null> {
   try {
-    await prisma.emailDispatch.create({
+    return await prisma.emailDispatch.create({
       data: {
         orderId: args.orderId,
         kind: args.kind,
         recipient: args.recipient,
         status: args.status,
-        messageId: args.messageId ?? null,
-        response: args.response ?? null,
+        attempts: args.attempts,
+        subject: args.subject ?? null,
+        html: args.html ?? null,
+        fromEmail: args.fromEmail ?? null,
         error: args.error ?? null,
+        nextAttemptAt: args.nextAttemptAt ?? new Date(),
       },
+      select: { id: true },
     })
   } catch (e) {
-    // Если БД недоступна — максимум что можем, это stdout.
-    console.error("[email-dispatch] failed to record row:", e)
+    console.error("[email-dispatch] failed to create row:", e)
+    return null
   }
 }

@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { after } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail, sendPaymentSuccessEmail, sendAdminPaymentSuccessEmail, getAdminNotificationEmails, type OrderEmailData } from "@/lib/email"
+import {
+  renderPaymentSuccessEmail,
+  renderAdminPaymentSuccessEmail,
+  renderOrderStatusEmail,
+  sendRenderedEmail,
+  getAdminNotificationEmails,
+  type OrderEmailData,
+} from "@/lib/email"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { createShipmentForOrder } from "@/lib/delivery/shipment"
 import { getPayment } from "@/lib/yookassa"
@@ -134,8 +141,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Send payment success emails AFTER response to YooKassa.
-    // dispatchEmail гарантирует, что повторный webhook (YooKassa может ретраить до 5 раз)
-    // не вызовет дублирующую отправку — EmailDispatch хранит по (orderId, kind, recipient).
+    // dispatchEmail кладёт snapshot в EmailDispatch (status=pending) → durability при рестарте.
+    // Повторный webhook с тем же orderId не создаст дубль: idempotency по status="sent".
     const orderIdForEmail = order.id
     const adminEmails = getAdminNotificationEmails()
     after(async () => {
@@ -146,7 +153,8 @@ export async function POST(request: NextRequest) {
             orderId: orderIdForEmail,
             kind: "order.payment_success",
             recipient: emailData.customerEmail,
-            send: () => sendPaymentSuccessEmail(emailData),
+            render: () => renderPaymentSuccessEmail(emailData),
+            send: sendRenderedEmail,
           })
         )
       }
@@ -156,7 +164,8 @@ export async function POST(request: NextRequest) {
             orderId: orderIdForEmail,
             kind: "admin.payment_success",
             recipient: admin,
-            send: () => sendAdminPaymentSuccessEmail(emailData, admin),
+            render: () => renderAdminPaymentSuccessEmail(emailData),
+            send: sendRenderedEmail,
           })
         )
       }
@@ -254,8 +263,7 @@ export async function POST(request: NextRequest) {
     const recipient = order.customerEmail
     const mayNotify = order.user ? order.user.notifyOrderStatus : true
     if (recipient && mayNotify) {
-      const emailArgs = {
-        to: recipient,
+      const renderArgs = {
         customerName: order.customerName || order.user?.name || "Клиент",
         orderNumber: order.orderNumber,
         newStatus: "payment_failed",
@@ -266,7 +274,8 @@ export async function POST(request: NextRequest) {
           orderId: orderIdForEmail,
           kind: "order.payment_failed",
           recipient,
-          send: () => sendOrderStatusEmail(emailArgs),
+          render: () => renderOrderStatusEmail(renderArgs),
+          send: sendRenderedEmail,
         })
       })
     }

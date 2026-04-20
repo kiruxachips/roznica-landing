@@ -8,7 +8,14 @@ import { revalidatePath } from "next/cache"
 import { after } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import { sendOrderStatusEmail, sendOrderConfirmationEmail, sendAdminNewOrderEmail, getAdminNotificationEmails, type OrderEmailData } from "@/lib/email"
+import {
+  renderOrderConfirmationEmail,
+  renderAdminNewOrderEmail,
+  renderOrderStatusEmail,
+  sendRenderedEmail,
+  getAdminNotificationEmails,
+  type OrderEmailData,
+} from "@/lib/email"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { createPayment, createRefund } from "@/lib/yookassa"
 import { headers } from "next/headers"
@@ -155,8 +162,9 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
   }
 
   // Send customer confirmation + admin notification after the response is flushed.
-  // Каждое письмо идёт через dispatchEmail → запись в EmailDispatch (audit + idempotency).
-  // Если createOrder вызван повторно для того же orderId (ретрай из UI), письмо не дублируется.
+  // dispatchEmail сохраняет EmailDispatch со status="pending" + snapshot(subject,html)
+  // ДО отправки. Если процесс упадёт посередине — воркер подхватит и отправит.
+  // При успехе status → "sent"; при SMTP-ошибке → "failed" с retry-backoff.
   const orderIdForEmail = order.id
   const adminEmails = getAdminNotificationEmails()
   after(async () => {
@@ -167,7 +175,8 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
           orderId: orderIdForEmail,
           kind: "order.confirmation",
           recipient: emailData.customerEmail,
-          send: () => sendOrderConfirmationEmail(emailData),
+          render: () => renderOrderConfirmationEmail(emailData),
+          send: sendRenderedEmail,
         })
       )
     }
@@ -177,7 +186,8 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
           orderId: orderIdForEmail,
           kind: "admin.new_order",
           recipient: admin,
-          send: () => sendAdminNewOrderEmail(emailData, admin),
+          render: () => renderAdminNewOrderEmail(emailData),
+          send: sendRenderedEmail,
         })
       )
     }
@@ -273,8 +283,7 @@ export async function updateOrderStatus(id: string, status: string) {
       const recipient = order.customerEmail
       const mayNotify = user ? user.notifyOrderStatus : true
       if (recipient && mayNotify && customerVisibleStatuses.includes(status)) {
-        const emailArgs = {
-          to: recipient,
+        const renderArgs = {
           customerName: order.customerName || user?.name || "Клиент",
           orderNumber: order.orderNumber,
           newStatus: status,
@@ -285,7 +294,8 @@ export async function updateOrderStatus(id: string, status: string) {
             orderId: orderIdForEmail,
             kind: `order.status:${status}` as const,
             recipient,
-            send: () => sendOrderStatusEmail(emailArgs),
+            render: () => renderOrderStatusEmail(renderArgs),
+            send: sendRenderedEmail,
           })
         })
       }

@@ -19,6 +19,13 @@ const MAX_ATTEMPTS = Number(process.env.OUTBOX_MAX_ATTEMPTS || 10)
 const BATCH = 20
 const REQUEST_TIMEOUT_MS = 10_000
 
+// Email retry: воркер дёргает app-контейнер (где живёт nodemailer и sendRenderedEmail).
+// App endpoint /api/cron/retry-emails защищён через CRON_SECRET.
+// APP_INTERNAL_URL — имя сервиса в docker network, без выхода наружу.
+const APP_INTERNAL_URL = process.env.APP_INTERNAL_URL || "http://app:3000"
+const CRON_SECRET = process.env.CRON_SECRET || ""
+const EMAIL_TICK_EVERY_MS = Number(process.env.EMAIL_TICK_EVERY_MS || 30_000)
+
 function log(level, message, extra) {
   const line = { ts: new Date().toISOString(), level, message, ...(extra || {}) }
   console.log(JSON.stringify(line))
@@ -166,6 +173,42 @@ async function tick() {
   }
 }
 
+// ── Email retry tick: периодически пинает app-endpoint, который забирает
+// EmailDispatch записи (pending|failed) и отправляет их через SMTP.
+// Вся логика ретрая и backoff на стороне endpoint'а — воркер только тригерит.
+let lastEmailTickAt = 0
+async function emailTick() {
+  const now = Date.now()
+  if (now - lastEmailTickAt < EMAIL_TICK_EVERY_MS) return
+  lastEmailTickAt = now
+
+  if (!CRON_SECRET) return // без секрета endpoint защищён, тихо не дёргаем
+
+  const url = `${APP_INTERNAL_URL.replace(/\/$/, "")}/api/cron/retry-emails`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "X-Cron-Secret": CRON_SECRET },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      log("warn", "email_tick_http_error", { status: res.status })
+      return
+    }
+    const body = await res.json().catch(() => ({}))
+    if (body && (body.processed > 0 || body.dead > 0)) {
+      log("info", "email_tick_done", body)
+    }
+  } catch (e) {
+    const msg = e.name === "AbortError" ? "timeout" : e.message || "network_error"
+    log("warn", "email_tick_failed", { err: msg })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 let running = true
 async function loop() {
   while (running) {
@@ -173,6 +216,11 @@ async function loop() {
       await tick()
     } catch (e) {
       log("error", "tick_failed", { err: e.message })
+    }
+    try {
+      await emailTick()
+    } catch (e) {
+      log("error", "email_tick_failed", { err: e.message })
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL))
   }
@@ -195,6 +243,8 @@ log("info", "outbox_worker_started", {
   hasUrl: !!process.env.MILLORBOT_URL,
   pollIntervalMs: POLL_INTERVAL,
   maxAttempts: MAX_ATTEMPTS,
+  emailRetryEnabled: !!CRON_SECRET,
+  emailTickEveryMs: EMAIL_TICK_EVERY_MS,
 })
 
 loop()

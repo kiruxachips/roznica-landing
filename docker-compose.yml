@@ -48,6 +48,8 @@ services:
       - MILLORBOT_ENABLED=${MILLORBOT_ENABLED:-false}
       - MILLORBOT_URL=${MILLORBOT_URL:-}
       - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
+      - ADMIN_NOTIFICATION_EMAILS=${ADMIN_NOTIFICATION_EMAILS:-newrefining@yandex.ru}
+      - CRON_SECRET=${CRON_SECRET:-}
     depends_on:
       - db
     volumes:
@@ -77,6 +79,9 @@ services:
       - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
       - OUTBOX_POLL_INTERVAL_MS=${OUTBOX_POLL_INTERVAL_MS:-5000}
       - OUTBOX_MAX_ATTEMPTS=${OUTBOX_MAX_ATTEMPTS:-10}
+      - APP_INTERNAL_URL=http://app:3000
+      - CRON_SECRET=${CRON_SECRET:-}
+      - EMAIL_TICK_EVERY_MS=${EMAIL_TICK_EVERY_MS:-30000}
     depends_on:
       - db
     networks:

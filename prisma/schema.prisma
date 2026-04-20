@@ -507,23 +507,32 @@ model ProcessedInboundEvent {
   @@index([createdAt])
 }
 
-// Email dispatch registry — audit + idempotency для всех исходящих писем.
-// Одна запись на попытку отправки. status="sent" считается terminal — повторная
-// попытка с той же (orderId, kind, recipient) не выполняется (dispatchEmail проверяет).
-// status="failed" фиксирует ошибку для последующего ручного/автоматического retry.
+// Email dispatch — audit + idempotency + durable queue.
+// Жизненный цикл status: "pending" → "sent" | "failed" → (retry) → "sent" | "dead".
+// Snapshot (subject/html) сохраняется ДО вызова SMTP — при рестарте контейнера
+// письмо не теряется, воркер продолжит отправку. Retry с экспоненциальным backoff
+// по nextAttemptAt. Idempotency по (orderId, kind, recipient, status="sent").
 model EmailDispatch {
-  id        String   @id @default(cuid())
-  orderId   String? // null для non-order писем (verif/reset)
-  kind      String // "order.confirmation" | "order.payment_success" | "admin.new_order" | "admin.payment_success" | "order.shipped" | "order.delivered" | "order.status:paid" | "order.status:cancelled" | ...
-  recipient String // email получателя
-  status    String // "sent" | "failed"
-  messageId String? // SMTP message-id из ответа nodemailer
-  response  String?  @db.Text // raw SMTP response ("250 OK id=...")
-  error     String?  @db.Text // при status="failed"
-  createdAt DateTime @default(now())
+  id            String    @id @default(cuid())
+  orderId       String? // null для non-order писем (verify/reset)
+  kind          String // "order.confirmation" | "admin.new_order" | "order.payment_success" | ...
+  recipient     String // email получателя
+  status        String // "pending" | "sent" | "failed" | "dead"
+  attempts      Int       @default(0) // число выполненных попыток SMTP
+  nextAttemptAt DateTime  @default(now()) // worker забирает где status in (pending,failed) AND nextAttemptAt <= now
+  subject       String? // snapshot темы для ретрая
+  html          String?   @db.Text // snapshot HTML-тела для ретрая
+  fromEmail     String? // from-override, null = SMTP_USER
+  messageId     String? // SMTP message-id из ответа nodemailer
+  response      String?   @db.Text // raw SMTP response ("250 OK id=...")
+  error         String?   @db.Text // последняя ошибка отправки
+  sentAt        DateTime? // timestamp успешной доставки
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([orderId, kind, recipient, status])
   @@index([orderId, createdAt])
+  @@index([status, nextAttemptAt])
   @@index([status, createdAt])
   @@index([kind, createdAt])
 }

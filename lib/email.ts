@@ -42,12 +42,32 @@ export function getAdminNotificationEmails(): string[] {
  * Извлекает messageId + response из результата nodemailer.sendMail.
  * Нормализует shape для EmailDispatch.
  */
-interface SendResult {
+export interface SendResult {
   messageId?: string
   response?: string
 }
 function extractResult(info: { messageId?: string; response?: string }): SendResult {
   return { messageId: info.messageId, response: info.response }
+}
+
+/**
+ * Универсальная точка отправки предварительно отрендеренного письма.
+ * Вызывается из dispatchEmail (как send-callback). Принимает готовые subject+html.
+ * Возвращает {messageId, response} для записи в EmailDispatch.
+ */
+export async function sendRenderedEmail(email: {
+  to: string
+  subject: string
+  html: string
+  fromEmail?: string
+}): Promise<SendResult> {
+  const info = await transporter.sendMail({
+    from: `"Millor Coffee" <${email.fromEmail || fromEmail}>`,
+    to: email.to,
+    subject: email.subject,
+    html: email.html,
+  })
+  return extractResult(info)
 }
 
 // ── Helpers ──
@@ -245,22 +265,17 @@ export async function sendPasswordResetCode(email: string, code: string): Promis
 
 // ── Order Status Email (for customer) ──
 
-export async function sendOrderStatusEmail({
-  to,
+export function renderOrderStatusEmail({
   customerName,
   orderNumber,
   newStatus,
 }: {
-  to: string
   customerName: string
   orderNumber: string
   newStatus: string
-}): Promise<SendResult> {
+}): { subject: string; html: string } {
   const statusText = statusLabels[newStatus] || newStatus
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to,
+  return {
     subject: `Заказ ${orderNumber} — ${statusText}`,
     html: wrapEmail(`
       <h2 style="color: #7c4a1e; margin-bottom: 16px;">Статус заказа обновлён</h2>
@@ -274,17 +289,22 @@ export async function sendOrderStatusEmail({
         Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
       </p>
     `),
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendOrderStatusEmail(args: {
+  to: string
+  customerName: string
+  orderNumber: string
+  newStatus: string
+}): Promise<SendResult> {
+  const { subject, html } = renderOrderStatusEmail(args)
+  return sendRenderedEmail({ to: args.to, subject, html })
 }
 
 // ── Customer: Order Confirmation ──
 
-export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<SendResult> {
-  if (!data.customerEmail) return {}
-
-  // Для COD-заказов добавляем уточнение про оплату при получении — чтобы клиент
-  // не перепутал письмо "оформлен" с "оплачен".
+export function renderOrderConfirmationEmail(data: OrderEmailData): { subject: string; html: string } {
   const paymentNote =
     data.paymentMethod === "online"
       ? `<p style="color: #888; font-size: 14px; margin-top: 16px;">Мы пришлём отдельное письмо после подтверждения оплаты.</p>`
@@ -306,20 +326,21 @@ export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<
     </p>
   `)
 
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to: data.customerEmail,
+  return {
     subject: `Заказ ${data.orderNumber} оформлен — Millor Coffee`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendOrderConfirmationEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
+  const { subject, html } = renderOrderConfirmationEmail(data)
+  return sendRenderedEmail({ to: data.customerEmail, subject, html })
 }
 
 // ── Customer: Payment Success ──
 
-export async function sendPaymentSuccessEmail(data: OrderEmailData): Promise<SendResult> {
-  if (!data.customerEmail) return {}
-
+export function renderPaymentSuccessEmail(data: OrderEmailData): { subject: string; html: string } {
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата прошла успешно</h2>
     <p style="color: #555; font-size: 16px; line-height: 1.5;">
@@ -337,21 +358,22 @@ export async function sendPaymentSuccessEmail(data: OrderEmailData): Promise<Sen
       Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
     </p>
   `)
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to: data.customerEmail,
+  return {
     subject: `Оплата заказа ${data.orderNumber} подтверждена — Millor Coffee`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendPaymentSuccessEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
+  const { subject, html } = renderPaymentSuccessEmail(data)
+  return sendRenderedEmail({ to: data.customerEmail, subject, html })
 }
 
 // ── Admin: New Order Notification ──
 
-export async function sendAdminNewOrderEmail(data: OrderEmailData, to: string): Promise<SendResult> {
+export function renderAdminNewOrderEmail(data: OrderEmailData): { subject: string; html: string } {
   const paymentLabel = data.paymentMethod === "online" ? "Онлайн (YooKassa)" : "При получении"
-
   const html = wrapEmail(`
     <h2 style="color: #7c4a1e; margin-bottom: 16px;">Новый заказ ${data.orderNumber}</h2>
 
@@ -375,14 +397,15 @@ export async function sendAdminNewOrderEmail(data: OrderEmailData, to: string): 
       <a href="${siteUrl}/admin/orders" style="display: inline-block; background: #7c4a1e; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Открыть в админке</a>
     </p>
   `)
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to,
+  return {
     subject: `Новый заказ ${data.orderNumber} — ${data.customerName}, ${formatPrice(data.total)}₽`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendAdminNewOrderEmail(data: OrderEmailData, to: string): Promise<SendResult> {
+  const { subject, html } = renderAdminNewOrderEmail(data)
+  return sendRenderedEmail({ to, subject, html })
 }
 
 // ── Customer: Order Shipped (передан в доставку) ──
@@ -404,9 +427,7 @@ export interface ShippedEmailData extends OrderEmailData {
   trackingNumber?: string
 }
 
-export async function sendOrderShippedEmail(data: ShippedEmailData): Promise<SendResult> {
-  if (!data.customerEmail) return {}
-
+export function renderOrderShippedEmail(data: ShippedEmailData): { subject: string; html: string } {
   const track = data.trackingNumber
   const url = trackingUrl(data.deliveryMethod, track)
   const carrierLabel = data.deliveryMethod ? deliveryMethodLabels[data.deliveryMethod] || data.deliveryMethod : ""
@@ -432,21 +453,21 @@ export async function sendOrderShippedEmail(data: ShippedEmailData): Promise<Sen
       Статус доставки обновится автоматически — следить можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
     </p>
   `)
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to: data.customerEmail,
+  return {
     subject: `Заказ ${data.orderNumber} передан в доставку${track ? ` — трек ${track}` : ""}`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendOrderShippedEmail(data: ShippedEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
+  const { subject, html } = renderOrderShippedEmail(data)
+  return sendRenderedEmail({ to: data.customerEmail, subject, html })
 }
 
 // ── Customer: Order Delivered ──
 
-export async function sendOrderDeliveredEmail(data: OrderEmailData): Promise<SendResult> {
-  if (!data.customerEmail) return {}
-
+export function renderOrderDeliveredEmail(data: OrderEmailData): { subject: string; html: string } {
   const isPvz = data.deliveryType === "pvz"
   const pickupLine = isPvz && data.pickupPointName
     ? `Заберите его в пункте выдачи: <strong>${data.pickupPointName}</strong>.`
@@ -466,19 +487,21 @@ export async function sendOrderDeliveredEmail(data: OrderEmailData): Promise<Sen
       Оставить отзыв или повторить заказ можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
     </p>
   `)
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to: data.customerEmail,
+  return {
     subject: `Заказ ${data.orderNumber} доставлен — Millor Coffee`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendOrderDeliveredEmail(data: OrderEmailData): Promise<SendResult> {
+  if (!data.customerEmail) return {}
+  const { subject, html } = renderOrderDeliveredEmail(data)
+  return sendRenderedEmail({ to: data.customerEmail, subject, html })
 }
 
 // ── Admin: Payment Success Notification ──
 
-export async function sendAdminPaymentSuccessEmail(data: OrderEmailData, to: string): Promise<SendResult> {
+export function renderAdminPaymentSuccessEmail(data: OrderEmailData): { subject: string; html: string } {
   const html = wrapEmail(`
     <h2 style="color: #2d6b4a; margin-bottom: 16px;">Оплата получена: ${data.orderNumber}</h2>
 
@@ -501,12 +524,13 @@ export async function sendAdminPaymentSuccessEmail(data: OrderEmailData, to: str
       <a href="${siteUrl}/admin/orders" style="display: inline-block; background: #2d6b4a; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Открыть в админке</a>
     </p>
   `)
-
-  const info = await transporter.sendMail({
-    from: `"Millor Coffee" <${fromEmail}>`,
-    to,
+  return {
     subject: `Оплата ${data.orderNumber} — ${formatPrice(data.total)}₽ от ${data.customerName}`,
     html,
-  })
-  return extractResult(info)
+  }
+}
+
+export async function sendAdminPaymentSuccessEmail(data: OrderEmailData, to: string): Promise<SendResult> {
+  const { subject, html } = renderAdminPaymentSuccessEmail(data)
+  return sendRenderedEmail({ to, subject, html })
 }

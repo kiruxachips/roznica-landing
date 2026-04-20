@@ -3,7 +3,13 @@ import { after } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { verifySignature } from "@/lib/integrations/hmac"
 import { logIntegration } from "@/lib/dal/integration-log"
-import { sendOrderShippedEmail, sendOrderDeliveredEmail, type ShippedEmailData, type OrderEmailData } from "@/lib/email"
+import {
+  renderOrderShippedEmail,
+  renderOrderDeliveredEmail,
+  sendRenderedEmail,
+  type ShippedEmailData,
+  type OrderEmailData,
+} from "@/lib/email"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { ALLOWED_TRANSITIONS } from "@/lib/dal/orders"
 import type { MillorbotTrackingPayload, NormalizedTrackingStatus } from "@/lib/integrations/millorbot/types"
@@ -223,7 +229,8 @@ export async function POST(request: NextRequest) {
             orderId: orderIdForEmail,
             kind: "order.shipped",
             recipient,
-            send: () => sendOrderShippedEmail(shippedData),
+            render: () => renderOrderShippedEmail(shippedData),
+            send: sendRenderedEmail,
           })
         })
       } else if (statusChanged.to === "delivered") {
@@ -232,7 +239,8 @@ export async function POST(request: NextRequest) {
             orderId: orderIdForEmail,
             kind: "order.delivered",
             recipient,
-            send: () => sendOrderDeliveredEmail(emailData),
+            render: () => renderOrderDeliveredEmail(emailData),
+            send: sendRenderedEmail,
           })
         })
       }
