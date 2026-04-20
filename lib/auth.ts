@@ -153,7 +153,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               return data.response?.[0] ?? {}
             },
           },
-          checks: ["pkce", "state"] as ("pkce" | "state" | "none")[],
+          checks: ["pkce"] as ("pkce" | "state" | "none")[],
           client: { token_endpoint_auth_method: "client_secret_post" },
           clientId: process.env.VK_CLIENT_ID!,
           clientSecret: process.env.VK_CLIENT_SECRET!,
