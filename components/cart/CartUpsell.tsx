@@ -8,14 +8,15 @@ import { useCartStore } from "@/lib/store/cart"
 import { useCartUIStore } from "@/lib/store/cart-ui"
 import type { ProductCard } from "@/lib/types"
 
+let upsellCache: ProductCard[] | null = null
+
 interface CartUpsellProps {
   cartProductIds: string[]
   onClose: () => void
+  variant?: "drawer" | "page"
 }
 
-let upsellCache: ProductCard[] | null = null
-
-export function CartUpsell({ cartProductIds, onClose }: CartUpsellProps) {
+export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: CartUpsellProps) {
   const [products, setProducts] = useState<ProductCard[]>(upsellCache ?? [])
   const addItem = useCartStore((s) => s.addItem)
   const openDrawer = useCartUIStore((s) => s.openDrawer)
@@ -26,12 +27,12 @@ export function CartUpsell({ cartProductIds, onClose }: CartUpsellProps) {
       setProducts(upsellCache)
       return
     }
-    fetch("/api/catalog/products?sort=popular&limit=6")
+    fetch("/api/catalog/products?sort=popular&limit=9&type=all")
       .then((r) => r.json())
       .then((data) => {
         const filtered: ProductCard[] = (data.products ?? [])
           .filter((p: ProductCard) => !cartProductIds.includes(p.id))
-          .slice(0, 3)
+          .slice(0, variant === "page" ? 4 : 3)
         upsellCache = filtered
         setProducts(filtered)
       })
@@ -58,15 +59,15 @@ export function CartUpsell({ cartProductIds, onClose }: CartUpsellProps) {
   }
 
   return (
-    <div className="border-t border-border pt-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Попробуйте также</p>
-      <div className="space-y-2">
+    <div className="mt-1 rounded-2xl border border-border/60 bg-secondary/30 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5">Попробуйте также</p>
+      <div className="space-y-1.5">
         {products.map((product) => {
-          const variant = product.firstVariant
+          const v = product.firstVariant
           const inCart = cartProductIds.includes(product.id)
-          const justAdded = addedId === variant?.id
+          const justAdded = addedId === v?.id
           return (
-            <div key={product.id} className="flex items-center gap-3 bg-secondary/30 rounded-xl p-2.5">
+            <div key={product.id} className="flex items-center gap-3 bg-white rounded-xl p-2.5">
               <Link href={`/catalog/${product.slug}`} onClick={onClose} className="shrink-0">
                 {product.primaryImage ? (
                   <Image
@@ -88,13 +89,13 @@ export function CartUpsell({ cartProductIds, onClose }: CartUpsellProps) {
                     {product.name}
                   </p>
                 </Link>
-                {variant && (
-                  <p className="text-xs text-muted-foreground">{variant.weight} · {variant.price}₽</p>
+                {v && (
+                  <p className="text-xs text-muted-foreground">{v.weight} · {v.price}₽</p>
                 )}
               </div>
               <button
                 onClick={() => handleAdd(product)}
-                disabled={!variant || variant.stock <= 0 || inCart}
+                disabled={!v || v.stock <= 0 || inCart}
                 className={`shrink-0 h-8 w-8 rounded-lg flex items-center justify-center transition-colors ${
                   justAdded
                     ? "bg-green-500 text-white"

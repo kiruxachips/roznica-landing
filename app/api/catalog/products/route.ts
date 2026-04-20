@@ -17,12 +17,16 @@ export async function GET(request: Request) {
 
   // Default to coffee when no ?type param — matches the catalog page default
   // so infinite-scroll load-more doesn't start pulling in tea/instant products.
+  // Pass ?type=all to skip the productType filter (used by cart upsell).
   const rawType = url.searchParams.get("type")
-  const productType: ProductType =
-    rawType === "tea" || rawType === "instant" ? rawType : "coffee"
+  const productType: ProductType | undefined =
+    rawType === "tea" ? "tea"
+    : rawType === "instant" ? "instant"
+    : rawType === "all" ? undefined
+    : "coffee"
 
   const filters = {
-    productType,
+    ...(productType !== undefined ? { productType } : {}),
     roastLevel: url.searchParams.get("roast") || undefined,
     origin: url.searchParams.get("origin") || undefined,
     brewingMethod: url.searchParams.get("brewing") || undefined,

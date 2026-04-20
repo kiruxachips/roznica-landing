@@ -73,32 +73,31 @@ export function CartGiftProgress({ total }: CartGiftProgressProps) {
         />
       </div>
 
-      {/* Milestone hint */}
-      <div className="flex items-center justify-between text-xs">
+      {/* Milestone hints — stacked to avoid overflow on narrow drawers */}
+      <div className="space-y-0.5 text-xs">
         {!hasFreeDelivery && freeDelivery > 0 ? (
-          <span className="flex items-center gap-1 text-muted-foreground">
-            <Package className="w-3 h-3" />
-            До бесплатной доставки (Почта России) — <span className="font-semibold text-foreground">{remaining}₽</span>
-          </span>
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Package className="w-3 h-3 shrink-0" />
+            <span>До бесплатной доставки — <span className="font-semibold text-foreground">{remaining}₽</span></span>
+          </div>
         ) : (
-          <span className="flex items-center gap-1 text-green-600 font-medium">
-            <Package className="w-3 h-3" />
-            Бесплатная доставка Почтой России
-          </span>
+          <div className="flex items-center gap-1 text-green-600 font-medium">
+            <Package className="w-3 h-3 shrink-0" />
+            <span>Бесплатная доставка Почтой России</span>
+          </div>
         )}
 
-        {gift > 0 && (
-          !hasGift ? (
-            <span className="flex items-center gap-1 text-muted-foreground">
-              <Gift className="w-3 h-3" />
-              {!hasFreeDelivery ? `+${gift - freeDelivery}₽ → подарок` : `До подарка — ${gift - total}₽`}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-amber-600 font-medium">
-              <Gift className="w-3 h-3" />
-              Подарок
-            </span>
-          )
+        {gift > 0 && !hasGift && (
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Gift className="w-3 h-3 shrink-0" />
+            <span>До подарка — <span className="font-semibold text-foreground">{gift - total}₽</span></span>
+          </div>
+        )}
+        {gift > 0 && hasGift && (
+          <div className="flex items-center gap-1 text-amber-600 font-medium">
+            <Gift className="w-3 h-3 shrink-0" />
+            <span>Подарок включён</span>
+          </div>
         )}
       </div>
     </div>

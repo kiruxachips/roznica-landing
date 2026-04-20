@@ -80,6 +80,7 @@ export function CartPage() {
   }
 
   return (
+    <div className="space-y-8">
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
       {/* Items list */}
       <div className="lg:col-span-2 space-y-3 sm:space-y-4">
@@ -134,7 +135,6 @@ export function CartPage() {
           </div>
         ))}
 
-        <CartUpsell cartProductIds={items.map((i) => i.productId)} onClose={() => {}} />
       </div>
 
       {/* Summary */}
@@ -214,6 +214,10 @@ export function CartPage() {
           </Link>
         </div>
       </div>
+    </div>
+
+    {/* Upsell — below the main grid, clearly separated */}
+    <CartUpsell cartProductIds={items.map((i) => i.productId)} onClose={() => {}} variant="page" />
     </div>
   )
 }
