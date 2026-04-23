@@ -41,43 +41,56 @@ export function CitySearch() {
     .map((i) => `${i.variantId}:${i.quantity}:${i.weight}`)
     .join("|")
 
-  // Fetch rates when city changes
+  // Fetch rates when city or cart changes. Debounce 500ms, чтобы быстрые
+  // +/- по количеству в корзине не спамили backend — пересчёт произойдёт
+  // после того как юзер перестанет кликать.
   useEffect(() => {
     if (!cityCode && !postalCode) return
 
     setRatesLoading(true)
-    fetch("/api/delivery/rates", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        cityCode: cityCode || undefined,
-        postalCode: postalCode || undefined,
-        city: city || undefined,
-        region: region || undefined,
-        cartTotal,
-        items: itemsForPacking,
-      }),
-    })
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((rates) => {
-        setRates(rates)
-        setRatesLoading(false)
-        if (rates.length === 0) return
-        // Preserve current selection if same carrier+tariff is still offered,
-        // otherwise auto-select the cheapest option.
-        const current = selectedRate
-        const match =
-          current &&
-          rates.find(
-            (r: { carrier: string; tariffCode: number }) =>
-              r.carrier === current.carrier && r.tariffCode === current.tariffCode
-          )
-        selectRate(match || rates[0])
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      fetch("/api/delivery/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cityCode: cityCode || undefined,
+          postalCode: postalCode || undefined,
+          city: city || undefined,
+          region: region || undefined,
+          cartTotal,
+          items: itemsForPacking,
+        }),
+        signal: controller.signal,
       })
-      .catch(() => {
-        setRatesError("Не удалось рассчитать стоимость доставки")
-        setRatesLoading(false)
-      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((rates) => {
+          setRates(rates)
+          setRatesLoading(false)
+          if (rates.length === 0) return
+          // Preserve current selection if same carrier+tariff is still offered,
+          // otherwise auto-select the cheapest option. Если вес вырос и тариф
+          // выпал — селектор сбросится, юзер увидит обновлённую цену.
+          const current = selectedRate
+          const match =
+            current &&
+            rates.find(
+              (r: { carrier: string; tariffCode: number }) =>
+                r.carrier === current.carrier && r.tariffCode === current.tariffCode
+            )
+          selectRate(match || rates[0])
+        })
+        .catch((e) => {
+          if (e?.name === "AbortError") return
+          setRatesError("Не удалось рассчитать стоимость доставки")
+          setRatesLoading(false)
+        })
+    }, 500)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
     // city is intentionally excluded — cityCode is the unique identifier;
     // city name is sent in the body but shouldn't trigger re-fetch.
     // itemsForPacking опущен — используем itemsKey как стабильный маркер содержимого корзины.

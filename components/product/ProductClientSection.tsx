@@ -54,7 +54,7 @@ export function ProductClientSection({
         </span>
         <span className="flex items-center gap-1.5">
           <Truck className="w-3.5 h-3.5 text-primary" />
-          Бесплатная доставка от 3000₽
+          Доставка по всей России
         </span>
       </div>
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Truck, Package, MapPin, Clock, ChevronDown } from "lucide-react"
+import { Truck, Package, Clock, ChevronDown } from "lucide-react"
 import { useDeliveryStore } from "@/lib/store/delivery"
 
 interface CarrierInfo {
@@ -12,6 +12,10 @@ interface CarrierInfo {
   badgeClass: string
 }
 
+// DPD скрыт до реализации интеграции (P1-3). Статическое обещание
+// "Бесплатно от 3000₽" для Почты убрано (P1-1) — это правда только
+// для близких регионов с тарифом Почты ≤ 750₽; для дальних порог 5-10k.
+// Реальная цена видна ниже в секции тарифов — там она точная.
 const CARRIERS: CarrierInfo[] = [
   {
     id: "cdek",
@@ -24,15 +28,8 @@ const CARRIERS: CarrierInfo[] = [
     id: "pochta",
     name: "Почта России",
     icon: <Package className="w-5 h-5" />,
-    badge: "Бесплатно от 3000₽",
-    badgeClass: "bg-green-50 text-green-700",
-  },
-  {
-    id: "dpd",
-    name: "DPD",
-    icon: <MapPin className="w-5 h-5" />,
-    badge: "Скоро",
-    badgeClass: "bg-muted text-muted-foreground",
+    badge: null,
+    badgeClass: "",
   },
 ]
 
@@ -160,11 +157,10 @@ export function DeliveryOptions() {
       )}
 
       {/* Carrier cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {CARRIERS.map((carrier) => {
           const carrierRates = grouped[carrier.id]
           const isAvailable = carrierRates && carrierRates.length > 0
-          const isDpd = carrier.id === "dpd"
           const isExpanded = expandedCarrier === carrier.id
           const isActiveCarrier = selectedRate?.carrier === carrier.id
 
@@ -186,16 +182,14 @@ export function DeliveryOptions() {
             <div key={carrier.id} className="flex flex-col">
               <button
                 type="button"
-                disabled={!isAvailable && !isDpd}
-                onClick={() => !isDpd && handleCarrierClick(carrier.id)}
+                disabled={!isAvailable}
+                onClick={() => handleCarrierClick(carrier.id)}
                 className={`relative flex flex-col items-center text-center p-4 rounded-xl border-2 transition-all h-full ${
-                  isDpd
-                    ? "border-dashed border-border opacity-60 cursor-default"
-                    : !isAvailable
-                      ? "border-border opacity-50 cursor-not-allowed"
-                      : isActiveCarrier
-                        ? "border-primary bg-primary/5 shadow-sm"
-                        : "border-border hover:border-primary/40 hover:shadow-sm cursor-pointer"
+                  !isAvailable
+                    ? "border-border opacity-50 cursor-not-allowed"
+                    : isActiveCarrier
+                      ? "border-primary bg-primary/5 shadow-sm"
+                      : "border-border hover:border-primary/40 hover:shadow-sm cursor-pointer"
                 }`}
               >
                 {/* Icon */}
@@ -231,14 +225,14 @@ export function DeliveryOptions() {
                 )}
 
                 {/* Unavailable message */}
-                {!isAvailable && !isDpd && (
+                {!isAvailable && (
                   <p className="text-[11px] text-muted-foreground mt-2">
                     Нет доставки в этот город
                   </p>
                 )}
 
                 {/* Expand indicator */}
-                {isAvailable && !isDpd && (
+                {isAvailable && (
                   <ChevronDown className={`w-4 h-4 mt-2 text-muted-foreground transition-transform ${
                     isExpanded ? "rotate-180" : ""
                   }`} />

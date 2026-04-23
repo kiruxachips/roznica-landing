@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { searchCities } from "@/lib/delivery/city-search"
+import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   const q = request.nextUrl.searchParams.get("q")
   if (!q || q.length < 2) {
     return NextResponse.json([])
@@ -15,4 +16,4 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json([], { status: 500 })
   }
-}
+}, { ...DELIVERY_RATE_LIMIT, tag: "delivery-cities" })

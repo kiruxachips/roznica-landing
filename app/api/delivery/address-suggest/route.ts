@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getDeliverySettings } from "@/lib/dal/delivery-settings"
 import { suggestAddress } from "@/lib/delivery/dadata"
+import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
 
 interface SuggestionDTO {
   value: string
@@ -9,7 +10,7 @@ interface SuggestionDTO {
   lng?: number | null
 }
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   const q = request.nextUrl.searchParams.get("q")?.trim()
   const city = request.nextUrl.searchParams.get("city")?.trim()
 
@@ -90,4 +91,4 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json([])
-}
+}, { ...DELIVERY_RATE_LIMIT, tag: "delivery-address-suggest" })

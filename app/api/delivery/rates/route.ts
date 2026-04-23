@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { calculateDeliveryRates } from "@/lib/delivery"
 import type { ItemToPack } from "@/lib/delivery/packaging"
+import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
 
 function sanitizeItems(input: unknown): ItemToPack[] {
   if (!Array.isArray(input)) return []
@@ -17,7 +18,9 @@ function sanitizeItems(input: unknown): ItemToPack[] {
   return out
 }
 
-export async function POST(request: NextRequest) {
+// Обёрнут в rate-limit: endpoint публичный и дергает внешний СДЭК / Почта API.
+// Без throttling burst-запросами можно исчерпать квоту у провайдеров.
+export const POST = withRateLimit(async (request: NextRequest) => {
   try {
     const body = await request.json()
     const { cityCode, postalCode, city, region, items, cartTotal } = body
@@ -35,4 +38,4 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Failed to calculate rates" }, { status: 500 })
   }
-}
+}, { ...DELIVERY_RATE_LIMIT, tag: "delivery-rates" })

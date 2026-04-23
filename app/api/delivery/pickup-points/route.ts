@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { getDeliverySettings, getDefaultSenderLocation } from "@/lib/dal/delivery-settings"
 import { createCdekProvider } from "@/lib/delivery/cdek"
 import { createPochtaProvider } from "@/lib/delivery/pochta"
+import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
 
-export async function GET(request: NextRequest) {
+export const GET = withRateLimit(async (request: NextRequest) => {
   const cityCode = request.nextUrl.searchParams.get("city_code")
   const carrier = request.nextUrl.searchParams.get("carrier") || "cdek"
   const city = request.nextUrl.searchParams.get("city") || ""
@@ -57,4 +58,4 @@ export async function GET(request: NextRequest) {
     console.error("[pickup-points] Error fetching pickup points:", error)
     return NextResponse.json([], { status: 500 })
   }
-}
+}, { ...DELIVERY_RATE_LIMIT, tag: "delivery-pickup-points" })
