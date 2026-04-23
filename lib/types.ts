@@ -114,6 +114,9 @@ export interface OrderData {
   estimatedDelivery?: string
   tariffCode?: number
   postalCode?: string
+  /** G5: выбранный юзером подарок (если доступен при cartTotal). Опциональный;
+   *  валидация и привязка происходят на сервере в createOrder. */
+  selectedGiftId?: string | null
   items: {
     productId: string
     variantId: string

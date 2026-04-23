@@ -141,6 +141,9 @@ export interface OrderEmailData {
    * legacy-заказы (до миграции) могут не иметь токена — в этом случае
    * шаблон упадёт на fallback /account/orders. */
   trackingToken?: string
+  /** G6: выбранный клиентом подарок (если есть) — упоминается в письме,
+   * чтобы клиент знал, что получит его в коробке. */
+  giftName?: string
 }
 
 /**
@@ -244,6 +247,24 @@ function buildDeliveryHtml(data: Pick<OrderEmailData, "deliveryMethod" | "delive
     <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
       <p style="margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #333;">Доставка</p>
       ${parts.map((p) => `<p style="margin: 4px 0; font-size: 14px; color: #555;">${p}</p>`).join("")}
+    </div>
+  `
+}
+
+/**
+ * G6: блок "В заказе будет подарок" — отдельный акцентный box с подарочной
+ * иконкой-эмодзи, чтобы клиент сразу увидел свой бонус в письме.
+ */
+function buildGiftHtml(giftName?: string): string {
+  if (!giftName) return ""
+  return `
+    <div style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="margin: 0 0 4px; font-size: 14px; font-weight: 600; color: #c2410c;">
+        🎁 Подарок в заказе
+      </p>
+      <p style="margin: 0; font-size: 14px; color: #7c2d12;">
+        ${e(giftName)}
+      </p>
     </div>
   `
 }
@@ -360,6 +381,7 @@ export function renderOrderConfirmationEmail(data: OrderEmailData): { subject: s
 
     ${buildItemsTableHtml(data.items)}
     ${buildTotalsHtml(data)}
+    ${buildGiftHtml(data.giftName)}
     ${buildDeliveryHtml(data)}
     ${paymentNote}
 
@@ -389,6 +411,7 @@ export function renderPaymentSuccessEmail(data: OrderEmailData): { subject: stri
 
     ${buildItemsTableHtml(data.items)}
     ${buildTotalsHtml(data)}
+    ${buildGiftHtml(data.giftName)}
     ${buildDeliveryHtml(data)}
 
     <p style="color: #555; font-size: 14px; margin-top: 24px;">
@@ -425,6 +448,7 @@ export function renderAdminNewOrderEmail(data: OrderEmailData): { subject: strin
 
     ${buildItemsTableHtml(data.items)}
     ${buildTotalsHtml(data)}
+    ${buildGiftHtml(data.giftName)}
     ${buildDeliveryHtml(data)}
 
     <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
@@ -552,6 +576,7 @@ export function renderAdminPaymentSuccessEmail(data: OrderEmailData): { subject:
 
     ${buildItemsTableHtml(data.items)}
     ${buildTotalsHtml(data)}
+    ${buildGiftHtml(data.giftName)}
     ${buildDeliveryHtml(data)}
 
     <p style="margin-top: 24px;">

@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
       estimatedDelivery: order.estimatedDelivery || undefined,
       paymentMethod: order.paymentMethod || undefined,
       trackingToken: order.trackingToken ?? undefined,
+      giftName: order.giftNameSnapshot ?? undefined,
     }
 
     // Send payment success emails AFTER response to YooKassa.

@@ -51,6 +51,7 @@ function buildEmailData(order: {
   paymentMethod: string | null
   notes: string | null
   trackingToken: string | null
+  giftNameSnapshot: string | null
 }): OrderEmailData {
   return {
     orderNumber: order.orderNumber,
@@ -73,6 +74,7 @@ function buildEmailData(order: {
     paymentMethod: order.paymentMethod || undefined,
     notes: order.notes || undefined,
     trackingToken: order.trackingToken ?? undefined,
+    giftName: order.giftNameSnapshot ?? undefined,
   }
 }
 

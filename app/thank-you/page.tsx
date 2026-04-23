@@ -61,6 +61,7 @@ export default async function ThankYouPage({
               deliveryPrice: order.deliveryPrice,
               total: order.total,
               promoCode: order.promoCode?.code ?? null,
+              giftName: order.giftNameSnapshot,
               items: order.items.map((item) => ({
                 name: item.name,
                 weight: item.weight,

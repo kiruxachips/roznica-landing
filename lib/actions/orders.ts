@@ -170,6 +170,7 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     paymentMethod: data.paymentMethod,
     notes: data.notes,
     trackingToken: order.trackingToken ?? undefined,
+    giftName: order.giftNameSnapshot ?? undefined,
   }
 
   // Send customer confirmation + admin notification after the response is flushed.

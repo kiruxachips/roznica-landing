@@ -302,6 +302,14 @@ model Order {
   postalCode          String? // почтовый индекс получателя
   adminNotes          String? @db.Text
 
+  // Gift-интеграция: выбранный клиентом подарок (nullable; заполняется только
+  // если cartTotal >= Gift.minCartTotal на момент оформления).
+  // onDelete: SetNull — удаление подарка из каталога не роняет исторические заказы.
+  selectedGiftId String?
+  selectedGift   Gift?   @relation(fields: [selectedGiftId], references: [id], onDelete: SetNull)
+  // Снапшот имени — чтобы даже при удалении Gift клиент/админ видели что клали.
+  giftNameSnapshot String?
+
   statusLogs OrderStatusLog[]
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
@@ -314,6 +322,32 @@ model Order {
   @@index([customerPhone])
   @@index([customerEmail])
   @@index([status, createdAt])
+  @@index([selectedGiftId])
+}
+
+// Подарок, который кладётся в заказ бесплатно когда сумма заказа достигла
+// порога minCartTotal. Пул подарков управляется через /admin/gifts.
+// Клиент на checkout видит все активные подарки со своим cartTotal >= minCartTotal
+// и выбирает один (radio).
+model Gift {
+  id           String   @id @default(cuid())
+  name         String   // "Кружка Millor", "Образец Эфиопия 50г"
+  description  String?  @db.Text
+  imageUrl     String?  // /uploads/gifts/{id}/xxx.webp
+  imageAlt     String?
+  // Порог cartTotal (после скидки, до бонусов) — от какой суммы подарок доступен.
+  // Если несколько gifts с разными порогами — клиент видит все, которые подошли,
+  // и выбирает ОДИН. Минимальный порог среди active задаёт "До подарка" в UI.
+  minCartTotal Int      @default(0)
+  // Stock: если > 0 — декрементим при оформлении заказа, если NULL — unlimited.
+  stock        Int?
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive, minCartTotal])
 }
 
 model OrderStatusLog {

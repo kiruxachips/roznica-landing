@@ -179,6 +179,12 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
             {order.bonusEarned > 0 && (
               <p className="text-green-600 text-xs">+{order.bonusEarned} бонусов начислено</p>
             )}
+            {order.giftNameSnapshot && (
+              <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <p className="text-sm font-semibold text-amber-900">🎁 Вложить подарок</p>
+                <p className="text-sm text-amber-800">{order.giftNameSnapshot}</p>
+              </div>
+            )}
           </div>
         </div>
 

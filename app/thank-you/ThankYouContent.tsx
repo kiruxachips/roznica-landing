@@ -14,6 +14,7 @@ interface OrderSummary {
   deliveryPrice: number
   total: number
   promoCode: string | null
+  giftName?: string | null
   items: {
     name: string
     weight: string
@@ -164,6 +165,15 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           </div>
         </div>
       </div>
+
+      {/* G6: gift in order */}
+      {order.giftName && (
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 sm:p-5 mb-5 sm:mb-6">
+          <p className="font-semibold text-amber-900 mb-1">🎁 Подарок в заказе</p>
+          <p className="text-sm text-amber-800">{order.giftName}</p>
+          <p className="text-xs text-amber-700 mt-1">Положим в коробку к вашему кофе</p>
+        </div>
+      )}
 
       {/* Contact info */}
       <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-sm mb-6 sm:mb-8">

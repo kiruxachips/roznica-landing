@@ -66,6 +66,11 @@ export const ALL_PERMISSIONS = [
   "collections.edit",
   "collections.delete",
 
+  // Gifts — управление пулом подарков
+  "gifts.view",
+  "gifts.edit",
+  "gifts.delete",
+
   // Customers
   "customers.view",
   "customers.edit",
@@ -149,6 +154,11 @@ const ROLES_FOR_PERMISSION: Record<Permission, AdminRole[]> = {
   "collections.edit": ["admin", "manager"],
   "collections.delete": ["admin"],
 
+  // --- Gifts ---
+  "gifts.view": ["admin", "manager"],
+  "gifts.edit": ["admin", "manager"],
+  "gifts.delete": ["admin"],
+
   // --- Customers (read-only for manager) ---
   "customers.view": ["admin", "manager"],
   "customers.edit": ["admin"],
@@ -195,6 +205,7 @@ export const NAV_PERMISSIONS = {
   warehouse: "stock.view" as Permission,
   categories: "categories.view" as Permission,
   collections: "collections.view" as Permission,
+  gifts: "gifts.view" as Permission,
   orders: "orders.view" as Permission,
   delivery: "delivery.settings" as Permission,
   reviews: "reviews.view" as Permission,

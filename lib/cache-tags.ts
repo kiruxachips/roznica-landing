@@ -14,4 +14,5 @@ export const CACHE_TAGS = {
   article: (slug: string) => `article:${slug}`,
   collections: "collections",
   sitemap: "sitemap",
+  gifts: "gifts",
 } as const

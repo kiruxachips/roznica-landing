@@ -78,6 +78,7 @@ export default async function TrackOrderPage({
               destinationCity: order.destinationCity,
               estimatedDelivery: order.estimatedDelivery,
               trackingNumber: order.trackingNumber,
+              giftName: order.giftNameSnapshot,
               items: order.items.map((item) => ({
                 name: item.name,
                 weight: item.weight,

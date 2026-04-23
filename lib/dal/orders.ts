@@ -164,6 +164,34 @@ export async function createOrder(data: OrderData) {
   }
   const total = afterDiscount - bonusUsed + deliveryPrice
 
+  // G5: валидация выбранного подарка. cartTotal для проверки доступности =
+  // afterDiscount (после скидки) — это согласовано с фронтом и с DAL
+  // getAvailableGifts. Bonus не вычитаем чтобы не "лишать" подарка при оплате
+  // бонусами.
+  // Подарок оставляем опциональным: если клиент не выбрал — нет подарка.
+  // Если он выбрал не-существующий/недоступный/закончившийся — выбрасываем
+  // ошибку, требующую обновить страницу.
+  const cartTotalForGift = afterDiscount
+  let giftToAttach: { id: string; name: string; stock: number | null } | null = null
+  if (data.selectedGiftId) {
+    const gift = await prisma.gift.findUnique({
+      where: { id: data.selectedGiftId },
+      select: { id: true, name: true, isActive: true, minCartTotal: true, stock: true },
+    })
+    if (!gift || !gift.isActive) {
+      throw new Error("Выбранный подарок больше недоступен. Обновите страницу и выберите заново")
+    }
+    if (cartTotalForGift < gift.minCartTotal) {
+      throw new Error(
+        `Подарок "${gift.name}" доступен от ${gift.minCartTotal}₽. Добавьте товаров или выберите другой`
+      )
+    }
+    if (gift.stock !== null && gift.stock <= 0) {
+      throw new Error(`Подарок "${gift.name}" закончился. Выберите другой`)
+    }
+    giftToAttach = { id: gift.id, name: gift.name, stock: gift.stock }
+  }
+
   const order = await prisma.$transaction(async (tx) => {
     // Atomically verify and increment promo usage inside the transaction.
     // Pre-validation (above) is advisory; this is the real guard against race conditions.
@@ -211,6 +239,14 @@ export async function createOrder(data: OrderData) {
         postalCode: data.postalCode,
         packagePlan: (packagePlan ?? undefined) as Prisma.InputJsonValue | undefined,
         packageWeight: totalPackageWeight ?? undefined,
+        selectedGiftId: giftToAttach?.id ?? null,
+        giftNameSnapshot: giftToAttach?.name ?? null,
+        // Пометка для склада в adminNotes — чтобы упаковщик увидел когда
+        // раскроет заказ в админке. Если юзер также оставил комментарий — не
+        // затираем, а добавляем сверху.
+        adminNotes: giftToAttach
+          ? `🎁 Вложить подарок: ${giftToAttach.name}`
+          : undefined,
         items: {
           create: data.items.map((item) => ({
             productId: item.productId,
@@ -224,6 +260,20 @@ export async function createOrder(data: OrderData) {
       },
       include: { items: true },
     })
+
+    // G5: декремент stock подарка, если задан. Unlimited (stock=null) пропускаем.
+    // Используем condition-based UPDATE чтобы защититься от race (одновременные
+    // заказы на последний экземпляр): WHERE stock > 0. Если affected=0 —
+    // подарок закончился между валидацией выше и commit'ом, откатываем tx.
+    if (giftToAttach && giftToAttach.stock !== null) {
+      const affected = await tx.$executeRaw`
+        UPDATE "Gift" SET stock = stock - 1
+        WHERE id = ${giftToAttach.id} AND stock > 0
+      `
+      if (affected === 0) {
+        throw new Error(`Подарок "${giftToAttach.name}" закончился. Выберите другой`)
+      }
+    }
 
     // Декремент остатков через adjustStock — атомарно, с историей и пересечением порогов.
     const stockResults: StockAdjustResult[] = []

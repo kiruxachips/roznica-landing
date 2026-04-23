@@ -12,6 +12,7 @@ import { CitySearch } from "./CitySearch"
 import { AddressInput } from "./AddressInput"
 import { DeliveryOptions } from "./DeliveryOptions"
 import { PickupPointMap } from "./PickupPointMap"
+import { GiftPicker } from "./GiftPicker"
 import { PhoneInput } from "@/components/ui/phone-input"
 
 interface UserProfile {
@@ -61,6 +62,9 @@ export function CheckoutForm() {
   >([])
   const removeItem = useCartStore((s) => s.removeItem)
   const updatePrice = useCartStore((s) => s.updatePrice)
+  // G4: выбранный юзером подарок. Автоматически сбрасывается в GiftPicker
+  // если cartTotal изменился и выбранный подарок перестал быть доступен.
+  const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
   const paymentMethod = "online" as const
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
@@ -188,6 +192,7 @@ export function CheckoutForm() {
           : undefined,
         tariffCode: selectedRate?.tariffCode,
         postalCode: deliveryPostalCode || undefined,
+        selectedGiftId: selectedGiftId,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -358,6 +363,15 @@ export function CheckoutForm() {
               placeholder="Пожелания к заказу"
             />
           </div>
+
+          {/* G4: секция выбора подарка. Автоматически не показывается если нет
+              доступных на текущий cartTotal подарков. Использует afterDiscount
+              (после скидки и бонусов) — тот же cartTotal, что идёт в backend. */}
+          <GiftPicker
+            cartTotal={afterDiscount}
+            value={selectedGiftId}
+            onChange={setSelectedGiftId}
+          />
 
           <h2 className="text-lg font-semibold pt-2">Оплата</h2>
 
