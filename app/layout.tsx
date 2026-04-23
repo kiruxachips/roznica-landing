@@ -1,5 +1,5 @@
 import "@/lib/env" // Validate critical env vars on startup
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"
@@ -43,6 +43,16 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+}
+
+// UX1: явный viewport — Next 15 требует отдельный export. maximum-scale=5
+// разрешает pinch-zoom (a11y), viewport-fit=cover — корректная работа с
+// safe-area-inset на iPhone X+.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Minus, Plus, Trash2, Tag, X, Loader2 } from "lucide-react"
+import { Minus, Plus, Trash2, Tag, X, Loader2, ShoppingBag } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { CartGiftProgress } from "./CartGiftProgress"
 import { CartUpsell } from "./CartUpsell"
@@ -34,11 +34,28 @@ export function CartPage() {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-xl text-muted-foreground mb-4">Корзина пуста</p>
-        <Link href="/catalog" className="text-primary hover:underline">
-          Перейти в каталог
-        </Link>
+      <div className="bg-white rounded-2xl shadow-sm p-8 sm:p-16 text-center">
+        <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mx-auto mb-6">
+          <ShoppingBag className="w-10 h-10 text-primary/60" />
+        </div>
+        <h2 className="font-sans text-xl sm:text-2xl font-bold mb-3">Корзина пуста</h2>
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+          Самое время выбрать кофе — обжарим специально под вас и отправим в ближайший рабочий день.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/catalog"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+          >
+            Перейти в каталог
+          </Link>
+          <Link
+            href="/"
+            className="px-6 py-3 border border-border rounded-xl font-medium hover:bg-muted transition-colors"
+          >
+            На главную
+          </Link>
+        </div>
       </div>
     )
   }

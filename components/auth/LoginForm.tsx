@@ -32,6 +32,7 @@ export function LoginForm() {
     : null
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -82,6 +83,8 @@ export function LoginForm() {
             name="email"
             type="email"
             required
+            autoComplete="email"
+            autoFocus
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="email@example.com"
           />
@@ -96,8 +99,16 @@ export function LoginForm() {
             name="password"
             type="password"
             required
+            autoComplete="current-password"
+            onKeyUp={(e) => setCapsLock(e.getModifierState?.("CapsLock") ?? false)}
+            onBlur={() => setCapsLock(false)}
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
+          {capsLock && (
+            <p className="mt-1 text-xs text-amber-700 flex items-center gap-1">
+              <span aria-hidden>⚠</span> Включён Caps Lock
+            </p>
+          )}
         </div>
 
         {error && (

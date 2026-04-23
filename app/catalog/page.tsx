@@ -6,6 +6,7 @@ import { getFavoriteProductIds } from "@/lib/dal/favorites"
 import { auth } from "@/lib/auth"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
+import { BackToTop } from "@/components/ui/back-to-top"
 import { FilterBar } from "@/components/catalog/FilterBar"
 import { ProductGrid } from "@/components/catalog/ProductGrid"
 import { EmptyState } from "@/components/catalog/EmptyState"
@@ -171,6 +172,7 @@ export default async function CatalogPage({
         </section>
       </main>
       <Footer />
+      <BackToTop />
     </>
   )
 }

@@ -248,6 +248,8 @@ export function CheckoutForm() {
               <input
                 name="lastName"
                 required
+                autoComplete="family-name"
+                autoCapitalize="words"
                 defaultValue={profile?.name?.split(" ").slice(1).join(" ") || ""}
                 onChange={() => setFieldErrors((e) => ({ ...e, lastName: "" }))}
                 className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.lastName ? "border-red-400" : "border-input"}`}
@@ -260,6 +262,8 @@ export function CheckoutForm() {
               <input
                 name="name"
                 required
+                autoComplete="given-name"
+                autoCapitalize="words"
                 defaultValue={profile?.name?.split(" ")[0] || ""}
                 onChange={() => setFieldErrors((e) => ({ ...e, name: "" }))}
                 className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${fieldErrors.name ? "border-red-400" : "border-input"}`}
@@ -286,6 +290,8 @@ export function CheckoutForm() {
               <input
                 name="email"
                 type="email"
+                autoComplete="email"
+                inputMode="email"
                 defaultValue={profile?.email || ""}
                 className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="email@example.com"

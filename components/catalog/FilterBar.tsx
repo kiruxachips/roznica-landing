@@ -165,6 +165,7 @@ export function FilterBar({
               value={searchValue}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Поиск…"
+              aria-label="Поиск по каталогу"
               className="w-full h-9 pl-9 pr-8 rounded-lg border border-input bg-background text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {searchValue && (

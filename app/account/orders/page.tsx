@@ -65,12 +65,14 @@ export default async function OrdersPage({
       </div>
 
       {totalPages > 1 && (
-        <div className="flex flex-wrap justify-center gap-2 mt-8">
+        <nav aria-label="Пагинация заказов" className="flex flex-wrap justify-center gap-2 mt-8">
           {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
             <Link
               key={p}
               href={`/account/orders?page=${p}`}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-colors ${
+              aria-label={`Страница ${p}`}
+              aria-current={p === page ? "page" : undefined}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                 p === page
                   ? "bg-primary text-primary-foreground"
                   : "bg-white text-muted-foreground hover:bg-muted"
@@ -79,7 +81,7 @@ export default async function OrdersPage({
               {p}
             </Link>
           ))}
-        </div>
+        </nav>
       )}
     </div>
   )

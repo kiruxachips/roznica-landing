@@ -12,6 +12,12 @@
   }
 }
 
+/* UX1: anchor-jump (#products, #about) попадал под sticky header (h-16 = 64px).
+ * Padding 80px компенсирует header + воздух сверху. */
+html {
+  scroll-padding-top: 80px;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

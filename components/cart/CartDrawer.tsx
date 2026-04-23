@@ -20,6 +20,28 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
   useEffect(() => setMounted(true), [])
 
+  // UX2: ESC закрывает drawer. Стандартный UX для модалок — без этого
+  // клавиатурным юзерам приходится искать X глазами.
+  useEffect(() => {
+    if (!isOpen) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [isOpen, onClose])
+
+  // UX2: body scroll-lock пока drawer открыт. Без него фон скроллится
+  // под drawer'ом на мобиле — выглядит дёшево.
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [isOpen])
+
   if (!mounted) return null
 
   const total = totalPrice()
