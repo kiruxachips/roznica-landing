@@ -217,6 +217,7 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
 
   // 1) Pochta API-записи — каноничные отделения с индексом и адресом. Это
   //    источник правды. Координаты берём: OSM (по ref) → API (lat/lng) → 0.
+  //    Адрес: OSM (если полный — улица+дом) → Pochta API → город-строка.
   for (const o of pochtaOffices) {
     const code = String(o["postal-code"] || o.postalCode || "").trim()
     if (!code || seen.has(code)) continue
@@ -230,7 +231,18 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     const lat = matchedOsm ? matchedOsm.lat : hasCoords ? latRaw : 0
     const lng = matchedOsm ? matchedOsm.lon : hasCoords ? lngRaw : 0
 
-    const address = String(o["address-source"] || o.addressSource || o.address || city)
+    // Приоритет адреса: детальный OSM (улица+дом) → Pochta API → OSM-частичный → город.
+    // Публичный API часто возвращает просто "Гурьевск" без улицы — если у нас есть
+    // более точный адрес из OSM, используем его.
+    const osmFullAddr = matchedOsm ? buildOsmAddress(matchedOsm.tags, city) : ""
+    const osmHasStreet =
+      !!matchedOsm?.tags?.["addr:street"] && !!matchedOsm?.tags?.["addr:housenumber"]
+    const pochtaAddr = String(o["address-source"] || o.addressSource || o.address || "").trim()
+    const address =
+      (osmHasStreet ? osmFullAddr : "") ||
+      pochtaAddr ||
+      osmFullAddr ||
+      city
     points.push({
       code,
       name: `Почтовое отделение ${code}`,
@@ -252,25 +264,27 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     })
   }
 
-  // 2) OSM-узлы, которых нет в Pochta API (по ref). Отбрасываем «пустышки»
-  //    (без ref И без уличного адреса) — иначе получаем строки «Почтовое
-  //    отделение» без данных. Делаем гео-дедуп: если OSM-узел ближе 150м
-  //    к уже добавленному отделению — это тот же физический объект (просто
-  //    OSM-картограф не проставил ref).
+  // 2) OSM-узлы, которых нет в Pochta API (по ref). Ужесточённый фильтр:
+  //    - должен быть ЛИБО ref (индекс), ЛИБО полноценный адрес (улица + дом).
+  //      Просто «amenity=post_office + name=Почта» без локализации — мусор.
+  //    - гео-дедуп: если OSM-узел ближе 150м к уже добавленному (как из
+  //      Pochta API, так и из предыдущего OSM-узла) — один физический
+  //      объект, где картограф не проставил ref.
   for (const el of filteredOsm) {
     const tags = el.tags || {}
     const ref = (tags.ref || "").trim()
     if (ref && seen.has(ref)) continue
 
     const osmAddr = buildOsmAddress(tags, city)
-    const hasUsefulAddress = !!osmAddr
-    const nameRaw = (tags.name || "").trim()
-    const nameLooksReal = /почт|\bpost|\d{5,6}/i.test(nameRaw) // упоминание "почт" или индекс в name
+    const hasStreetAddress =
+      !!tags["addr:street"] && !!tags["addr:housenumber"]
 
-    // Узел без ref и без адреса и без информативного name — спам, пропускаем
-    if (!ref && !hasUsefulAddress && !nameLooksReal) continue
+    // Требуем явный источник идентификации: индекс ИЛИ улица+дом.
+    // Без этого в списке клиент видит «Почта / Гурьевск» без адреса — бесполезно.
+    if (!ref && !hasStreetAddress) continue
 
-    // Гео-дедуп относительно уже добавленных Pochta-точек с координатами
+    // Гео-дедуп относительно ВСЕХ уже добавленных точек (включая OSM из этого
+    // же цикла), не только Pochta API-записей с координатами.
     const isDuplicate = points.some(
       (p) =>
         p.lat !== 0 &&
@@ -283,16 +297,15 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     if (seen.has(code)) continue
     seen.add(code)
 
+    const nameRaw = (tags.name || "").trim()
     points.push({
       code,
       name: ref
         ? `Почтовое отделение ${ref}`
-        : nameRaw && nameRaw.includes("Почт")
+        : nameRaw && nameRaw.toLowerCase().includes("почт")
           ? nameRaw
-          : nameRaw
-            ? `Почтовое отделение ${nameRaw}`
-            : "Почтовое отделение",
-      address: osmAddr || city,
+          : "Почтовое отделение",
+      address: osmAddr,
       lat: el.lat,
       lng: el.lon,
       workTime: tags.opening_hours || undefined,
