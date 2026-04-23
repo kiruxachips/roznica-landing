@@ -8,6 +8,8 @@ export const GET = withRateLimit(async (request: NextRequest) => {
   const cityCode = request.nextUrl.searchParams.get("city_code")
   const carrier = request.nextUrl.searchParams.get("carrier") || "cdek"
   const city = request.nextUrl.searchParams.get("city") || ""
+  const region = request.nextUrl.searchParams.get("region") || ""
+  const postalCode = request.nextUrl.searchParams.get("postal_code") || ""
 
   if (!cityCode && !city) {
     return NextResponse.json([])
@@ -47,7 +49,13 @@ export const GET = withRateLimit(async (request: NextRequest) => {
         dadataApiKey: settings.dadata_api_key || undefined,
       })
 
-      const points = await provider.getPickupPoints(city)
+      // Передаём region + postalCode для disambiguation городов-тёзок
+      // (Гурьевск Калининградский vs Кемеровский и т.п.). Без этого
+      // Overpass возвращает OSM-узлы из всех одноимённых городов.
+      const points = await provider.getPickupPoints(city, {
+        region: region || undefined,
+        postalCode: postalCode || undefined,
+      })
       return NextResponse.json(points, {
         headers: { "Cache-Control": "public, max-age=600, s-maxage=3600, stale-while-revalidate=3600" },
       })

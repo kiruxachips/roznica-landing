@@ -80,11 +80,21 @@ export interface CitySearchResult {
   postalCodes?: string[]
 }
 
+export interface PickupPointsOptions {
+  /** Для Pochta — помогает отличить Гурьевск Калининградский от Кемеровского. */
+  region?: string
+  /** Первые 3 цифры индекса определяют регион Почты России (238xxx = Калининград). */
+  postalCode?: string
+}
+
 export interface DeliveryProvider {
   carrier: "cdek" | "pochta" | "courier"
   calculateRates(req: DeliveryRateRequest): Promise<DeliveryRate[]>
-  /** CDEK: pass city code. Pochta: pass city name. Route handler picks the right value. */
-  getPickupPoints(cityOrCode: string): Promise<PickupPoint[]>
+  /** CDEK: pass city code. Pochta: pass city name + optional region/postalCode. */
+  getPickupPoints(
+    cityOrCode: string,
+    options?: PickupPointsOptions
+  ): Promise<PickupPoint[]>
   createShipment(req: CreateShipmentRequest): Promise<CreateShipmentResult>
   getTrackingStatus(carrierOrderId: string): Promise<TrackingStatus[]>
 }

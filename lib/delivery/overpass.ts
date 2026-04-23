@@ -77,20 +77,69 @@ function buildOsmAddress(tags: OverpassNode["tags"], city: string): string {
   return parts.join(", ")
 }
 
-async function fetchOverpassPoints(city: string): Promise<OverpassNode[]> {
+function escapeOverpass(s: string): string {
+  return s.replace(/"/g, '\\"')
+}
+
+/** Нормализация имени региона из DaData → название как в OSM.
+ * DaData отдаёт "Калининградская" (без " область"), OSM хранит
+ * "Калининградская область". Добавляем суффикс, если короткое. */
+function osmRegionName(region: string): string[] {
+  const trimmed = region.trim()
+  if (!trimmed) return []
+  // Частые суффиксы: "область", "край", "республика", "АО", "округ"
+  // Если уже содержит — возвращаем как есть; иначе предлагаем варианты.
+  const lower = trimmed.toLowerCase()
+  if (/(область|край|республика|автономн|округ|г\.)/.test(lower)) {
+    return [trimmed]
+  }
+  // Для типовых "Калининградская" / "Московская" / "Кемеровская" — область
+  if (/(ская|цкая|ская$|ая|зская)$/.test(lower)) {
+    return [`${trimmed} область`, trimmed]
+  }
+  return [trimmed]
+}
+
+async function fetchOverpassPoints(city: string, region?: string): Promise<OverpassNode[]> {
   // Расширенный запрос: ищем area по нескольким подходящим admin_level и
   // вариантам place-tag — для малых городов Подмосковья area может быть
   // оформлена как city/town/village/suburb, а не только admin_level 4/6/8.
-  const escaped = city.replace(/"/g, '\\"')
-  const query = `[out:json][timeout:25];
+  const escapedCity = escapeOverpass(city)
+
+  // Если регион задан — сужаем поиск в его area (разрешает однофамильные города:
+  // Гурьевск Калининградский vs Кемеровский).
+  let query: string
+  if (region && region.trim()) {
+    const regionCandidates = osmRegionName(region).map(escapeOverpass)
+    const regionUnion = regionCandidates
+      .flatMap((r) => [
+        `  area["name"="${r}"]["admin_level"~"^[234]$"];`,
+        `  area["name:ru"="${r}"]["admin_level"~"^[234]$"];`,
+      ])
+      .join("\n")
+    query = `[out:json][timeout:25];
 (
-  area["name"="${escaped}"]["admin_level"~"^[468]$"];
-  area["name:ru"="${escaped}"]["admin_level"~"^[468]$"];
-  area["name"="${escaped}"]["place"~"city|town|village|suburb"];
-  area["name:ru"="${escaped}"]["place"~"city|town|village|suburb"];
+${regionUnion}
+)->.region;
+(
+  area["name"="${escapedCity}"](area.region)["admin_level"~"^[468]$"];
+  area["name:ru"="${escapedCity}"](area.region)["admin_level"~"^[468]$"];
+  area["name"="${escapedCity}"](area.region)["place"~"city|town|village|suburb"];
+  area["name:ru"="${escapedCity}"](area.region)["place"~"city|town|village|suburb"];
 )->.a;
 node(area.a)["amenity"="post_office"];
 out body 500;`
+  } else {
+    query = `[out:json][timeout:25];
+(
+  area["name"="${escapedCity}"]["admin_level"~"^[468]$"];
+  area["name:ru"="${escapedCity}"]["admin_level"~"^[468]$"];
+  area["name"="${escapedCity}"]["place"~"city|town|village|suburb"];
+  area["name:ru"="${escapedCity}"]["place"~"city|town|village|suburb"];
+)->.a;
+node(area.a)["amenity"="post_office"];
+out body 500;`
+  }
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
@@ -122,47 +171,101 @@ out body 500;`
   return []
 }
 
-async function fetchPochtaApiOffices(city: string): Promise<PochtaOffice[]> {
-  try {
-    const url = `${POCHTA_BY_ADDRESS}?${new URLSearchParams({ address: city })}`
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8_000),
-    })
-    if (!res.ok) {
-      console.warn(`[pochta-api] by-address returned ${res.status} for "${city}"`)
-      return []
-    }
-    const data = await res.json()
-    const list = Array.isArray(data) ? data : []
-    if (list.length === 0) {
-      console.warn(`[pochta-api] by-address returned 0 offices for "${city}"`)
-    }
-    return list
-  } catch (err) {
-    console.error(`[pochta-api] by-address failed for "${city}":`, err instanceof Error ? err.message : err)
-    return []
+async function fetchPochtaApiOffices(city: string, region?: string): Promise<PochtaOffice[]> {
+  // Собираем "регион, город" — публичный API лучше разрешает одноимённые
+  // города когда передан контекст региона. Fallback: просто город.
+  const addressQueries: string[] = []
+  if (region && region.trim()) {
+    addressQueries.push(`${region.trim()}, ${city}`)
   }
+  addressQueries.push(city)
+
+  for (const address of addressQueries) {
+    try {
+      const url = `${POCHTA_BY_ADDRESS}?${new URLSearchParams({ address })}`
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(8_000),
+      })
+      if (!res.ok) {
+        console.warn(`[pochta-api] by-address returned ${res.status} for "${address}"`)
+        continue
+      }
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : []
+      if (list.length > 0) return list
+      console.warn(`[pochta-api] by-address returned 0 offices for "${address}"`)
+    } catch (err) {
+      console.error(`[pochta-api] by-address failed for "${address}":`, err instanceof Error ? err.message : err)
+    }
+  }
+  return []
 }
 
 /**
  * Fetches Russian Post offices for a city.
  * Параллельно тянет Overpass + публичный Pochta API, merge по postal-code.
+ *
+ * @param options.region — нужен для disambiguation одноимённых городов
+ *   (Гурьевск Калининградский vs Кемеровский). Используется и в Overpass
+ *   (узкая area), и в Pochta API (address=«Регион, Город»).
+ * @param options.postalCode — индекс. Первые 3 цифры = региональный сорт-центр
+ *   Почты. Используется как префиксный фильтр для отсечения офисов «чужого»
+ *   одноимённого города, если region не найдён в OSM.
  */
-export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[]> {
+export async function getPochtaOfficesByCity(
+  city: string,
+  options?: { region?: string; postalCode?: string }
+): Promise<PickupPoint[]> {
   if (!city) return []
 
-  const cacheKey = city.toLowerCase().trim()
+  const region = (options?.region || "").trim()
+  const postalCode = (options?.postalCode || "").trim()
+  // Первые 3 цифры индекса однозначно определяют регион Почты (238xxx =
+  // Калининград, 652xxx = Кемерово, 141xxx = Подмосковье-север и т.д.).
+  const postalPrefix = /^\d{3}/.test(postalCode) ? postalCode.slice(0, 3) : ""
+
+  // Cache key включает disambiguating-параметры — иначе один "Гурьевск"
+  // бы забивал кэш и для Калининградского, и для Кемеровского.
+  const cacheKey = [
+    city.toLowerCase().trim(),
+    region.toLowerCase(),
+    postalPrefix,
+  ].join("|")
   const now = Date.now()
   const cached = cache.get(cacheKey)
   if (cached && cached.expiresAt > now) {
     return cached.points
   }
 
-  const [osmNodes, pochtaOffices] = await Promise.all([
-    fetchOverpassPoints(city),
-    fetchPochtaApiOffices(city),
+  const [osmNodesRaw, pochtaOfficesRaw] = await Promise.all([
+    fetchOverpassPoints(city, region || undefined),
+    fetchPochtaApiOffices(city, region || undefined),
   ])
+
+  // Пост-фильтрация по префиксу индекса: отсекает "чужие" одноимённые города,
+  // даже если Overpass/PochtaAPI игнорировали region-контекст.
+  const pochtaOffices = postalPrefix
+    ? pochtaOfficesRaw.filter((o) => {
+        const code = String(o["postal-code"] || o.postalCode || "").trim()
+        return code.startsWith(postalPrefix)
+      })
+    : pochtaOfficesRaw
+
+  const osmNodes = postalPrefix
+    ? osmNodesRaw.filter((el) => {
+        const ref = (el.tags?.ref || "").trim()
+        const postcode = String((el.tags as any)?.["addr:postcode"] || "").trim()
+        // Если у узла есть ref — он должен совпасть с префиксом региона.
+        if (ref) return ref.startsWith(postalPrefix)
+        // Если есть addr:postcode — аналогично.
+        if (postcode) return postcode.startsWith(postalPrefix)
+        // Иначе — не можем определить. Если region был задан, Overpass уже
+        // ограничил выдачу; пропускаем. Если нет — строгий отказ (иначе
+        // появляются узлы из чужого города без ref).
+        return region.length > 0
+      })
+    : osmNodesRaw
 
   // Build lookup maps from Pochta API data keyed by postal code
   const pochtaByCode = new Map<string, PochtaOffice>()
@@ -318,7 +421,9 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
   cache.set(cacheKey, { expiresAt: now + ttl, points })
   if (points.length === 0) {
     console.warn(
-      `[pochta-merge] 0 offices for "${city}" (overpass=${osmNodes.length}, pochta-api=${pochtaOffices.length})`
+      `[pochta-merge] 0 offices for "${city}" (region="${region}", prefix="${postalPrefix}", ` +
+      `overpass-raw=${osmNodesRaw.length}, overpass-filt=${osmNodes.length}, ` +
+      `pochta-raw=${pochtaOfficesRaw.length}, pochta-filt=${pochtaOffices.length})`
     )
   }
   return points

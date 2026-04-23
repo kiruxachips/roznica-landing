@@ -200,14 +200,18 @@ export function createPochtaProvider(config: {
       ]
     },
 
-    async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
+    async getPickupPoints(
+      cityName: string,
+      options?: { region?: string; postalCode?: string }
+    ): Promise<PickupPoint[]> {
       if (!cityName) return []
 
       // Primary: OSM Overpass + публичный Pochta API параллельно, merged по индексу.
-      // См. overpass.ts — там вся оркестрация источников и кэш.
+      // region/postalCode помогают disambiguation одноимённых городов
+      // (Гурьевск Калининградский vs Кемеровский).
       try {
         const { getPochtaOfficesByCity } = await import("./overpass")
-        const points = await getPochtaOfficesByCity(cityName)
+        const points = await getPochtaOfficesByCity(cityName, options)
         if (points.length > 0) return points
       } catch (e) {
         console.error("Pochta getPickupPoints (Overpass+PublicAPI) failed:", e)

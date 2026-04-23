@@ -57,6 +57,8 @@ type ClustererModule = {
 export function PickupPointMap() {
   const city = useDeliveryStore((s) => s.city)
   const cityCode = useDeliveryStore((s) => s.cityCode)
+  const region = useDeliveryStore((s) => s.region)
+  const postalCode = useDeliveryStore((s) => s.postalCode)
   const selectedRate = useDeliveryStore((s) => s.selectedRate)
   const pickupPoints = useDeliveryStore((s) => s.pickupPoints)
   const pickupPointsLoading = useDeliveryStore((s) => s.pickupPointsLoading)
@@ -99,6 +101,10 @@ export function PickupPointMap() {
     setPickupPointsLoading(true)
     const params = new URLSearchParams({ city_code: cityCode, carrier: selectedRate.carrier })
     if (city) params.set("city", city)
+    // Для Почты важно передавать регион + индекс — disambiguation городов
+    // с одинаковыми названиями (Гурьевск Калининградский vs Кемеровский).
+    if (region) params.set("region", region)
+    if (postalCode) params.set("postal_code", postalCode)
     fetch(`/api/delivery/pickup-points?${params}`)
       .then((r) => r.ok ? r.json() : [])
       .then((points) => {
@@ -107,7 +113,7 @@ export function PickupPointMap() {
       })
       .catch(() => setPickupPointsLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityCode, selectedRate?.carrier, selectedRate?.deliveryType])
+  }, [cityCode, selectedRate?.carrier, selectedRate?.deliveryType, region, postalCode])
 
   // Reset search when city/carrier changes
   useEffect(() => {
