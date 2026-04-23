@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { ProductCard } from "./ProductCard"
+import { useDragScroll } from "@/lib/hooks/use-drag-scroll"
 import type { ProductCard as ProductCardType } from "@/lib/types"
 
 interface Props {
@@ -14,6 +15,8 @@ interface Props {
 }
 
 export function CollectionSection({ name, slug, emoji, products, favoritedIds }: Props) {
+  const scrollRef = useDragScroll<HTMLDivElement>()
+
   if (products.length === 0) return null
 
   return (
@@ -31,15 +34,25 @@ export function CollectionSection({ name, slug, emoji, products, favoritedIds }:
           <ChevronRight className="w-4 h-4" />
         </Link>
       </div>
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory -mx-4 px-4 sm:-mx-6 sm:px-6">
-        {products.map((product) => (
-          <div key={product.id} className="snap-start shrink-0 w-[260px] sm:w-[280px]">
-            <ProductCard
-              product={product}
-              favorited={favoritedIds ? favoritedIds.has(product.id) : undefined}
-            />
-          </div>
-        ))}
+      {/* Relative wrapper для fade-градиентов по краям, намекающих на прокрутку.
+          Градиенты видны только на десктопе — на мобиле нативный свайп делает
+          подсказку лишней. */}
+      <div className="relative -mx-4 sm:-mx-6">
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 hidden w-6 bg-gradient-to-r from-background to-transparent sm:block" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 hidden w-6 bg-gradient-to-l from-background to-transparent sm:block" />
+        <div
+          ref={scrollRef}
+          className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory px-4 sm:px-6 sm:cursor-grab"
+        >
+          {products.map((product) => (
+            <div key={product.id} className="snap-start shrink-0 w-[260px] sm:w-[280px]">
+              <ProductCard
+                product={product}
+                favorited={favoritedIds ? favoritedIds.has(product.id) : undefined}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
