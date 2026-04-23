@@ -188,18 +188,19 @@ export function createPochtaProvider(config: {
     async getPickupPoints(cityName: string): Promise<PickupPoint[]> {
       if (!cityName) return []
 
-      // Primary: OpenStreetMap via Overpass API (no auth, 6h in-memory cache).
-      // Much more complete than the legacy Pochta endpoint which only returns
-      // offices matching the exact address string.
+      // Primary: OSM Overpass + публичный Pochta API параллельно, merged по индексу.
+      // См. overpass.ts — там вся оркестрация источников и кэш.
       try {
         const { getPochtaOfficesByCity } = await import("./overpass")
         const points = await getPochtaOfficesByCity(cityName)
         if (points.length > 0) return points
       } catch (e) {
-        console.error("Pochta getPickupPoints (Overpass) failed:", e)
+        console.error("Pochta getPickupPoints (Overpass+PublicAPI) failed:", e)
       }
 
-      // Fallback: authenticated Otpravka API if tokens are configured.
+      // Fallback: authenticated Otpravka API if tokens are configured. Вступает в
+      // игру только если primary вернул пусто И токены настроены (обычно только
+      // для заведённой интеграции).
       if (config.accessToken && config.userAuth) {
         try {
           const res = await fetchWithTimeout(

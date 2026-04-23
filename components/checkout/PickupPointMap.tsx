@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { Search, X, MapPin } from "lucide-react"
 import { useDeliveryStore } from "@/lib/store/delivery"
+import type { PickupPoint } from "@/lib/delivery/types"
 
 interface SuggestionDTO {
   value: string
@@ -28,6 +29,31 @@ function distanceKm(
   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
+/** Медиана массива чисел — устойчивая к выбросам координата «центра города». */
+function median(values: number[]): number {
+  if (values.length === 0) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
+/** Точки без координат (Почта API иногда отдаёт такие) нельзя поставить на карту,
+ * но в списке они полезны — пользователь видит индекс и адрес. */
+function hasCoords(p: Pick<PickupPoint, "lat" | "lng">): boolean {
+  return Number.isFinite(p.lat) && Number.isFinite(p.lng) && (p.lat !== 0 || p.lng !== 0)
+}
+
+// Типы модуля кластеризатора (динамически импортируется из ymaps3).
+type ClustererModule = {
+  YMapClusterer: new (props: {
+    method: unknown
+    features: YMapClustererFeature[]
+    marker: (feature: YMapClustererFeature) => YMapMarkerInstance
+    cluster: (coordinates: number[], features: YMapClustererFeature[]) => YMapMarkerInstance
+  }) => YMapClustererInstance
+  clusterByGrid: (opts: { gridSize: number }) => unknown
+}
+
 export function PickupPointMap() {
   const city = useDeliveryStore((s) => s.city)
   const cityCode = useDeliveryStore((s) => s.cityCode)
@@ -43,7 +69,8 @@ export function PickupPointMap() {
   const [scriptLoaded, setScriptLoaded] = useState(false)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<YMapInstance | null>(null)
-  const markersRef = useRef<YMapMarkerInstance[]>([])
+  const clustererRef = useRef<YMapClustererInstance | null>(null)
+  const clustererModuleRef = useRef<ClustererModule | null>(null)
   const [listView, setListView] = useState(true)
   const [mapError, setMapError] = useState(false)
 
@@ -127,7 +154,20 @@ export function PickupPointMap() {
     }, 300)
   }, [searchQuery, city])
 
-  // Filtered + sorted pickup points
+  // Центр города считаем как медиану координат точек — устойчиво к редким ПВЗ
+  // в соседних регионах, которые API иногда возвращает.
+  const cityCenter = useMemo(() => {
+    const coords = pickupPoints.filter(hasCoords)
+    if (coords.length === 0) return null
+    return {
+      lat: median(coords.map((p) => p.lat)),
+      lng: median(coords.map((p) => p.lng)),
+    }
+  }, [pickupPoints])
+
+  // Filtered + sorted pickup points. По умолчанию сортируем по расстоянию от
+  // центра города, чтобы ближайшие ПВЗ были сверху списка. При поиске адреса
+  // центр переносится в эту точку.
   const visiblePoints = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     let points = pickupPoints
@@ -140,25 +180,37 @@ export function PickupPointMap() {
       )
     }
 
-    // Distance sort: if user picked a suggestion, sort by distance
-    if (searchCenter) {
-      points = [...points]
-        .map((p) => ({
-          point: p,
-          distance: distanceKm(searchCenter.lat, searchCenter.lng, p.lat, p.lng),
-        }))
-        .sort((a, b) => a.distance - b.distance)
-        .map(({ point }) => point)
+    const sortCenter = searchCenter || cityCenter
+    if (sortCenter) {
+      points = [...points].sort((a, b) => {
+        const aHas = hasCoords(a)
+        const bHas = hasCoords(b)
+        // Точки без координат — в конец списка
+        if (!aHas && !bHas) return 0
+        if (!aHas) return 1
+        if (!bHas) return -1
+        return (
+          distanceKm(sortCenter.lat, sortCenter.lng, a.lat, a.lng) -
+          distanceKm(sortCenter.lat, sortCenter.lng, b.lat, b.lng)
+        )
+      })
     }
 
     return points
-  }, [pickupPoints, searchQuery, searchCenter])
+  }, [pickupPoints, searchQuery, searchCenter, cityCenter])
+
+  // Точки, которые можно положить на карту (с валидными координатами)
+  const mappablePoints = useMemo(
+    () => visiblePoints.filter(hasCoords),
+    [visiblePoints]
+  )
 
   // Compute distances for display when searchCenter exists
   const distances = useMemo(() => {
     if (!searchCenter) return new Map<string, number>()
     const map = new Map<string, number>()
     for (const p of pickupPoints) {
+      if (!hasCoords(p)) continue
       map.set(
         p.code,
         distanceKm(searchCenter.lat, searchCenter.lng, p.lat, p.lng)
@@ -188,9 +240,12 @@ export function PickupPointMap() {
     return () => clearTimeout(timeout)
   }, [apiKey, scriptLoaded])
 
-  // Init map with visible points
+  // Init map with clusterer. Все точки (включая 500+ ПВЗ в крупном городе)
+  // показываются через кластеризатор — он сам группирует маркеры по зуму,
+  // чтобы карта не превращалась в визуальную кашу. Лимит .slice(0, 120)
+  // снят — был искусственным.
   const initMap = useCallback(async () => {
-    if (!scriptLoaded || !mapRef.current || visiblePoints.length === 0) return
+    if (!scriptLoaded || !mapRef.current || mappablePoints.length === 0) return
     if (!window.ymaps3) {
       setMapError(true)
       return
@@ -199,20 +254,37 @@ export function PickupPointMap() {
     try {
       await window.ymaps3.ready
 
-      // Destroy prev
+      // Lazy-load clusterer module one time per session
+      if (!clustererModuleRef.current) {
+        try {
+          const mod = (await window.ymaps3.import(
+            "@yandex/ymaps3-clusterer@0.0.1"
+          )) as ClustererModule
+          clustererModuleRef.current = mod
+        } catch (err) {
+          console.error("Failed to load YMapClusterer module:", err)
+          setMapError(true)
+          return
+        }
+      }
+      const { YMapClusterer, clusterByGrid } = clustererModuleRef.current
+
+      // Destroy prev map (clusterer живёт внутри — удалится вместе с картой)
       if (mapInstanceRef.current) {
         mapInstanceRef.current.destroy()
         mapInstanceRef.current = null
+        clustererRef.current = null
       }
-      markersRef.current = []
 
-      const focus = searchCenter || {
-        lat: visiblePoints[0].lat,
-        lng: visiblePoints[0].lng,
-      }
+      const focus =
+        searchCenter ||
+        cityCenter || {
+          lat: mappablePoints[0].lat,
+          lng: mappablePoints[0].lng,
+        }
       const center = [focus.lng, focus.lat]
       const map = new window.ymaps3.YMap(mapRef.current, {
-        location: { center, zoom: searchCenter ? 14 : 12 },
+        location: { center, zoom: searchCenter ? 14 : 11 },
       })
 
       map.addChild(new window.ymaps3.YMapDefaultSchemeLayer())
@@ -230,23 +302,57 @@ export function PickupPointMap() {
         map.addChild(marker)
       }
 
-      // Add pickup markers (cap for performance)
-      const capped = visiblePoints.slice(0, 120)
-      for (const point of capped) {
+      const features: YMapClustererFeature[] = mappablePoints.map((p) => ({
+        type: "Feature",
+        id: p.code,
+        geometry: { type: "Point", coordinates: [p.lng, p.lat] },
+      }))
+
+      const markerElementFor = (pointCode: string) => {
+        const point = mappablePoints.find((p) => p.code === pointCode)
         const el = document.createElement("div")
         el.className = "ymaps-marker"
         el.style.cssText =
           "width:24px;height:24px;background:#2d6b4a;border-radius:50%;border:2px solid white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.3);"
-        el.title = point.name
-
-        const marker = new window.ymaps3.YMapMarker({
-          coordinates: [point.lng, point.lat],
-          onClick: () => selectPickupPoint(point),
-        })
-        marker.element.appendChild(el)
-        map.addChild(marker)
-        markersRef.current.push(marker)
+        el.title = point?.name || ""
+        return el
       }
+
+      const clusterElementFor = (count: number) => {
+        const el = document.createElement("div")
+        const size = count < 10 ? 32 : count < 50 ? 40 : count < 200 ? 48 : 56
+        el.style.cssText = `
+          width:${size}px;height:${size}px;background:#7c4a1e;color:white;
+          border-radius:50%;border:3px solid white;cursor:pointer;
+          box-shadow:0 2px 6px rgba(0,0,0,0.35);
+          display:flex;align-items:center;justify-content:center;
+          font-weight:700;font-size:${count < 100 ? 13 : 12}px;`
+        el.textContent = String(count)
+        return el
+      }
+
+      const clusterer = new YMapClusterer({
+        method: clusterByGrid({ gridSize: 64 }),
+        features,
+        marker: (feature) => {
+          const el = markerElementFor(feature.id)
+          const point = mappablePoints.find((p) => p.code === feature.id)
+          const marker = new window.ymaps3!.YMapMarker(
+            {
+              coordinates: feature.geometry.coordinates,
+              onClick: () => point && selectPickupPoint(point),
+            },
+            el
+          )
+          return marker
+        },
+        cluster: (coordinates, featuresInCluster) => {
+          const el = clusterElementFor(featuresInCluster.length)
+          return new window.ymaps3!.YMapMarker({ coordinates }, el)
+        },
+      })
+      map.addChild(clusterer)
+      clustererRef.current = clusterer
 
       mapInstanceRef.current = map
       setMapError(false)
@@ -254,11 +360,19 @@ export function PickupPointMap() {
       if (process.env.NODE_ENV !== "production") console.error("Yandex Maps init error:", err)
       setMapError(true)
     }
-  }, [scriptLoaded, visiblePoints, searchCenter, selectPickupPoint])
+  }, [scriptLoaded, mappablePoints, searchCenter, cityCenter, selectPickupPoint])
 
   useEffect(() => {
     if (!listView) initMap()
   }, [listView, initMap])
+
+  // Если все точки пришли без координат (редкий случай: полностью Pochta API
+  // без Overpass-обогащения), карты показать нечего — переключаемся в список
+  // и не даём пользователю открыть пустую карту.
+  const noMappablePoints = visiblePoints.length > 0 && mappablePoints.length === 0
+  useEffect(() => {
+    if (noMappablePoints && !listView) setListView(true)
+  }, [noMappablePoints, listView])
 
   function handleSuggestionSelect(s: SuggestionDTO) {
     setSearchQuery(s.value)
@@ -353,13 +467,15 @@ export function PickupPointMap() {
               ? `Найдено ${visiblePoints.length} из ${pickupPoints.length}`
               : `Всего ${pickupPoints.length} ПВЗ`}
         </span>
-        <button
-          type="button"
-          onClick={() => setListView(!listView)}
-          className="text-xs text-primary hover:underline px-3 py-1.5 rounded-lg border border-primary/20"
-        >
-          {listView ? "Карта" : "Список"}
-        </button>
+        {!noMappablePoints && (
+          <button
+            type="button"
+            onClick={() => setListView(!listView)}
+            className="text-xs text-primary hover:underline px-3 py-1.5 rounded-lg border border-primary/20"
+          >
+            {listView ? "Карта" : "Список"}
+          </button>
+        )}
       </div>
 
       {selectedPickupPoint && (
@@ -408,10 +524,11 @@ export function PickupPointMap() {
           </button>
         </div>
       ) : (
-        <div className="max-h-60 overflow-y-auto border border-border rounded-xl divide-y divide-border">
-          {visiblePoints.slice(0, 60).map((point) => {
+        <div className="max-h-80 overflow-y-auto border border-border rounded-xl divide-y divide-border">
+          {visiblePoints.map((point) => {
             const dist = distances.get(point.code)
             const isSelected = selectedPickupPoint?.code === point.code
+            const noCoords = !hasCoords(point)
             return (
               <button
                 key={point.code}
@@ -427,6 +544,11 @@ export function PickupPointMap() {
                     <p className="text-xs text-muted-foreground">{point.address}</p>
                     {point.workTime && (
                       <p className="text-xs text-muted-foreground">{point.workTime}</p>
+                    )}
+                    {noCoords && (
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        Координаты не уточнены — отметки на карте нет
+                      </p>
                     )}
                   </div>
                   {dist != null && (

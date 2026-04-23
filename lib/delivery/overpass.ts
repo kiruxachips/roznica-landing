@@ -1,10 +1,21 @@
 // Pickup-point resolver for Russian Post offices.
 //
-// Strategy: Overpass/OSM gives us comprehensive lat/lng coverage but OSM nodes
-// rarely have full street addresses. The public Pochta API (no auth) returns
-// proper "address-source" strings but has incomplete coordinate data.
-// We run both in parallel and merge by postal code so every point gets both
-// a real address and accurate coordinates.
+// Strategy: Overpass/OSM gives us comprehensive lat/lng coverage for nodes
+// tagged amenity=post_office. Public Pochta API (no auth) returns proper
+// `address-source` strings + phone/work-time + postal-code but often without
+// coordinates.  Мы делаем **оба запроса параллельно всегда** (раньше было
+// «Overpass → если пусто, Pochta API»; это пропускало малые города где
+// Overpass ничего не находит из-за нестандартной OSM-area).
+//
+// Merge keys:
+//   - Если отделение есть и в OSM, и в Pochta API (по postal-code) — берём
+//     координаты OSM, адрес/телефон/часы из Pochta API (обычно точнее).
+//   - Если только в Pochta API — сохраняем с lat/lng 0,0 (frontend отфильтрует
+//     из карты, но покажет в списке).
+//   - Если только в OSM — используем как есть.
+//
+// Cache: успешный непустой результат — 6 часов; пустой/ошибка — 60 секунд
+// (чтобы временный сбой Overpass не обескровил checkout на полдня).
 
 import type { PickupPoint } from "./types"
 
@@ -15,7 +26,8 @@ const OVERPASS_ENDPOINTS = [
 ]
 const POCHTA_BY_ADDRESS = "https://api.pochta.ru/postoffice/1.0/by-address"
 
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6 hours
+const CACHE_TTL_OK = 6 * 60 * 60 * 1000 // 6 часов — когда данные есть
+const CACHE_TTL_EMPTY = 60 * 1000 // 1 минута — когда пусто (быстрый retry)
 const cache = new Map<string, { expiresAt: number; points: PickupPoint[] }>()
 
 interface OverpassNode {
@@ -64,10 +76,16 @@ function buildOsmAddress(tags: OverpassNode["tags"], city: string): string {
 }
 
 async function fetchOverpassPoints(city: string): Promise<OverpassNode[]> {
+  // Расширенный запрос: ищем area по нескольким подходящим admin_level и
+  // вариантам place-tag — для малых городов Подмосковья area может быть
+  // оформлена как city/town/village/suburb, а не только admin_level 4/6/8.
+  const escaped = city.replace(/"/g, '\\"')
   const query = `[out:json][timeout:25];
 (
-  area["name"="${city}"]["admin_level"~"^[468]$"];
-  area["name:ru"="${city}"]["admin_level"~"^[468]$"];
+  area["name"="${escaped}"]["admin_level"~"^[468]$"];
+  area["name:ru"="${escaped}"]["admin_level"~"^[468]$"];
+  area["name"="${escaped}"]["place"~"city|town|village|suburb"];
+  area["name:ru"="${escaped}"]["place"~"city|town|village|suburb"];
 )->.a;
 node(area.a)["amenity"="post_office"];
 out body 500;`
@@ -82,15 +100,23 @@ out body 500;`
           Accept: "application/json",
         },
         body: "data=" + encodeURIComponent(query),
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(15_000),
       })
-      if (!res.ok) continue
+      if (!res.ok) {
+        console.warn(`[overpass] ${endpoint} returned ${res.status} for "${city}"`)
+        continue
+      }
       const data = await res.json()
-      return Array.isArray(data.elements) ? data.elements : []
-    } catch {
-      // try next endpoint
+      const elements = Array.isArray(data.elements) ? data.elements : []
+      if (elements.length === 0) {
+        console.warn(`[overpass] ${endpoint} returned 0 post_office nodes for "${city}"`)
+      }
+      return elements
+    } catch (err) {
+      console.warn(`[overpass] ${endpoint} failed for "${city}":`, err instanceof Error ? err.message : err)
     }
   }
+  console.error(`[overpass] all ${OVERPASS_ENDPOINTS.length} endpoints failed for "${city}"`)
   return []
 }
 
@@ -101,17 +127,25 @@ async function fetchPochtaApiOffices(city: string): Promise<PochtaOffice[]> {
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(8_000),
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.warn(`[pochta-api] by-address returned ${res.status} for "${city}"`)
+      return []
+    }
     const data = await res.json()
-    return Array.isArray(data) ? data : []
-  } catch {
+    const list = Array.isArray(data) ? data : []
+    if (list.length === 0) {
+      console.warn(`[pochta-api] by-address returned 0 offices for "${city}"`)
+    }
+    return list
+  } catch (err) {
+    console.error(`[pochta-api] by-address failed for "${city}":`, err instanceof Error ? err.message : err)
     return []
   }
 }
 
 /**
  * Fetches Russian Post offices for a city.
- * Merges Overpass (lat/lng) with Pochta public API (addresses) by postal code.
+ * Параллельно тянет Overpass + публичный Pochta API, merge по postal-code.
  */
 export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[]> {
   if (!city) return []
@@ -172,35 +206,47 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
       address,
       lat: el.lat,
       lng: el.lon,
-      workTime: tags.opening_hours || undefined,
-      phone: tags["contact:phone"] || tags.phone || undefined,
+      workTime: tags.opening_hours || pochtaData?.["work-time"] || pochtaData?.workTime || undefined,
+      phone:
+        tags["contact:phone"] ||
+        tags.phone ||
+        pochtaData?.["phone-list"]?.[0] ||
+        pochtaData?.phoneList?.[0] ||
+        undefined,
       carrier: "pochta" as const,
     })
   }
 
-  // Add Pochta API offices that have coordinates but aren't in OSM
+  // Add Pochta API offices that aren't in OSM. Сохраняем даже без координат —
+  // frontend покажет их в списке (без маркера на карте).
   for (const o of pochtaOffices) {
-    const lat = Number(o.latitude)
-    const lng = Number(o.longitude)
-    if (!lat || !lng) continue
-
     const code = String(o["postal-code"] || o.postalCode || "").trim()
     if (!code || seen.has(code)) continue
     seen.add(code)
+
+    const latRaw = Number(o.latitude)
+    const lngRaw = Number(o.longitude)
+    const hasCoords = Number.isFinite(latRaw) && Number.isFinite(lngRaw) && (latRaw !== 0 || lngRaw !== 0)
 
     const address = String(o["address-source"] || o.addressSource || o.address || city)
     points.push({
       code,
       name: `Почтовое отделение ${code}`,
       address,
-      lat,
-      lng,
+      lat: hasCoords ? latRaw : 0,
+      lng: hasCoords ? lngRaw : 0,
       workTime: o["work-time"] || o.workTime || undefined,
       phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
       carrier: "pochta" as const,
     })
   }
 
-  cache.set(cacheKey, { expiresAt: now + CACHE_TTL_MS, points })
+  const ttl = points.length > 0 ? CACHE_TTL_OK : CACHE_TTL_EMPTY
+  cache.set(cacheKey, { expiresAt: now + ttl, points })
+  if (points.length === 0) {
+    console.warn(
+      `[pochta-merge] 0 offices for "${city}" (overpass=${osmNodes.length}, pochta-api=${pochtaOffices.length})`
+    )
+  }
   return points
 }
