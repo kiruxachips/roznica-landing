@@ -137,6 +137,30 @@ export interface OrderEmailData {
   estimatedDelivery?: string
   paymentMethod?: string
   notes?: string
+  /** Permanent-токен для /track-ссылки. Обязателен для новых заказов;
+   * legacy-заказы (до миграции) могут не иметь токена — в этом случае
+   * шаблон упадёт на fallback /account/orders. */
+  trackingToken?: string
+}
+
+/**
+ * Строит ссылку на страницу отслеживания заказа.
+ * Работает одинаково для гостей и зарегистрированных: страница /track/[orderNumber]
+ * пускает авторизованного владельца без токена, а гостя — по токену из query.
+ */
+function buildTrackingLink(orderNumber: string, trackingToken?: string): string {
+  if (trackingToken) {
+    return `${siteUrl}/track/${encodeURIComponent(orderNumber)}?token=${encodeURIComponent(trackingToken)}`
+  }
+  // Fallback для legacy-заказов без trackingToken
+  return `${siteUrl}/account/orders`
+}
+
+function renderTrackingFooter(orderNumber: string, trackingToken?: string): string {
+  const url = buildTrackingLink(orderNumber, trackingToken)
+  return `<p style="color: #888; font-size: 14px; margin-top: 24px;">
+    Следить за заказом можно на <a href="${url}" style="color: #7c4a1e;">странице заказа</a>.
+  </p>`
 }
 
 function formatPrice(n: number): string {
@@ -286,10 +310,12 @@ export function renderOrderStatusEmail({
   customerName,
   orderNumber,
   newStatus,
+  trackingToken,
 }: {
   customerName: string
   orderNumber: string
   newStatus: string
+  trackingToken?: string
 }): { subject: string; html: string } {
   const statusText = statusLabels[newStatus] || newStatus
   return {
@@ -302,9 +328,7 @@ export function renderOrderStatusEmail({
       <div style="background: #f5f0eb; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
         <span style="font-size: 20px; font-weight: bold; color: #7c4a1e;">${e(statusText)}</span>
       </div>
-      <p style="color: #888; font-size: 14px;">
-        Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
-      </p>
+      ${renderTrackingFooter(orderNumber, trackingToken)}
     `),
   }
 }
@@ -314,6 +338,7 @@ export async function sendOrderStatusEmail(args: {
   customerName: string
   orderNumber: string
   newStatus: string
+  trackingToken?: string
 }): Promise<SendResult> {
   const { subject, html } = renderOrderStatusEmail(args)
   return sendRenderedEmail({ to: args.to, subject, html })
@@ -338,9 +363,7 @@ export function renderOrderConfirmationEmail(data: OrderEmailData): { subject: s
     ${buildDeliveryHtml(data)}
     ${paymentNote}
 
-    <p style="color: #888; font-size: 14px; margin-top: 24px;">
-      Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
-    </p>
+    ${renderTrackingFooter(data.orderNumber, data.trackingToken)}
   `)
 
   return {
@@ -371,9 +394,7 @@ export function renderPaymentSuccessEmail(data: OrderEmailData): { subject: stri
     <p style="color: #555; font-size: 14px; margin-top: 24px;">
       Мы начинаем готовить ваш заказ к отправке. Уведомим, когда передадим его в доставку.
     </p>
-    <p style="color: #888; font-size: 14px;">
-      Следить за заказом можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
-    </p>
+    ${renderTrackingFooter(data.orderNumber, data.trackingToken)}
   `)
   return {
     subject: `Оплата заказа ${data.orderNumber} подтверждена — Millor Coffee`,
@@ -466,9 +487,7 @@ export function renderOrderShippedEmail(data: ShippedEmailData): { subject: stri
     </p>
     ${trackBlock}
     ${buildDeliveryHtml(data)}
-    <p style="color: #888; font-size: 14px; margin-top: 24px;">
-      Статус доставки обновится автоматически — следить можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
-    </p>
+    ${renderTrackingFooter(data.orderNumber, data.trackingToken)}
   `)
   return {
     subject: `Заказ ${data.orderNumber} передан в доставку${track ? ` — трек ${track}` : ""}`,
@@ -500,9 +519,7 @@ export function renderOrderDeliveredEmail(data: OrderEmailData): { subject: stri
     <p style="color: #555; font-size: 14px; margin-top: 24px;">
       Спасибо, что выбрали Millor Coffee. Будем рады видеть вас снова!
     </p>
-    <p style="color: #888; font-size: 14px;">
-      Оставить отзыв или повторить заказ можно в <a href="${siteUrl}/account/orders" style="color: #7c4a1e;">личном кабинете</a>.
-    </p>
+    ${renderTrackingFooter(data.orderNumber, data.trackingToken)}
   `)
   return {
     subject: `Заказ ${data.orderNumber} доставлен — Millor Coffee`,

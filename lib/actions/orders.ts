@@ -159,6 +159,7 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     estimatedDelivery: data.estimatedDelivery,
     paymentMethod: data.paymentMethod,
     notes: data.notes,
+    trackingToken: order.trackingToken ?? undefined,
   }
 
   // Send customer confirmation + admin notification after the response is flushed.
@@ -288,6 +289,7 @@ export async function updateOrderStatus(id: string, status: string) {
           customerName: order.customerName || user?.name || "Клиент",
           orderNumber: order.orderNumber,
           newStatus: status,
+          trackingToken: order.trackingToken ?? undefined,
         }
         const orderIdForEmail = order.id
         after(async () => {

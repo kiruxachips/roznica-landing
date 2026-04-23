@@ -50,6 +50,7 @@ function buildEmailData(order: {
   estimatedDelivery: string | null
   paymentMethod: string | null
   notes: string | null
+  trackingToken: string | null
 }): OrderEmailData {
   return {
     orderNumber: order.orderNumber,
@@ -71,6 +72,7 @@ function buildEmailData(order: {
     estimatedDelivery: order.estimatedDelivery || undefined,
     paymentMethod: order.paymentMethod || undefined,
     notes: order.notes || undefined,
+    trackingToken: order.trackingToken ?? undefined,
   }
 }
 

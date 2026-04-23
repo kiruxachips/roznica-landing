@@ -273,6 +273,7 @@ model Order {
   paymentStatus   String? // "pending" | "succeeded" | "canceled"
   notes           String?     @db.Text
   thankYouToken   String?     @unique
+  trackingToken   String?     @unique
   userId          String?
   user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   promoCodeId     String?

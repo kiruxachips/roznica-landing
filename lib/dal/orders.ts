@@ -135,6 +135,7 @@ export async function createOrder(data: OrderData) {
       data: {
         orderNumber: generateOrderNumber(),
         thankYouToken: generateToken(),
+        trackingToken: generateToken(),
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,

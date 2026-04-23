@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
       destinationCity: order.destinationCity || undefined,
       estimatedDelivery: order.estimatedDelivery || undefined,
       paymentMethod: order.paymentMethod || undefined,
+      trackingToken: order.trackingToken ?? undefined,
     }
 
     // Send payment success emails AFTER response to YooKassa.
@@ -267,6 +268,7 @@ export async function POST(request: NextRequest) {
         customerName: order.customerName || order.user?.name || "Клиент",
         orderNumber: order.orderNumber,
         newStatus: "payment_failed",
+        trackingToken: order.trackingToken ?? undefined,
       }
       const orderIdForEmail = order.id
       after(async () => {
