@@ -1,20 +1,23 @@
 import { NextResponse } from "next/server"
 import { getDeliverySettings } from "@/lib/dal/delivery-settings"
-import { getMinGiftThreshold } from "@/lib/dal/gifts"
+import { areGiftsEnabled, getMinGiftThreshold } from "@/lib/dal/gifts"
 
 export async function GET() {
   try {
-    const [settings, minGiftThreshold] = await Promise.all([
+    const [settings, giftsEnabled, minGiftThreshold] = await Promise.all([
       getDeliverySettings(),
+      areGiftsEnabled(),
       getMinGiftThreshold(),
     ])
 
-    // G6: giftThreshold приоритетно берём из минимального порога активных
-    // Gift-записей — это источник правды после миграции на управляемый пул
-    // подарков. Legacy gift_threshold из DeliverySetting оставлен как fallback
-    // для старых деплоев без созданных Gift, чтобы UI-прогресс не сломался.
-    const giftThreshold =
-      minGiftThreshold > 0
+    // Если kill-switch выключен — возвращаем giftThreshold=0, чтобы UI
+    // (CartGiftProgress и др.) вообще не показывал прогресс до подарка.
+    // Иначе приоритет у минимального порога активных Gift (после миграции
+    // на пул); legacy settings.gift_threshold — fallback для старых деплоев
+    // без Gift-записей.
+    const giftThreshold = !giftsEnabled
+      ? 0
+      : minGiftThreshold > 0
         ? minGiftThreshold
         : parseInt(settings.gift_threshold) || 0
 
@@ -22,6 +25,7 @@ export async function GET() {
       freeDeliveryThreshold: parseInt(settings.free_delivery_threshold) || 0,
       giftThreshold,
       giftDescription: settings.gift_description || "Подарок от нас",
+      giftsEnabled,
       yandexMapsApiKey: settings.yandex_maps_api_key || "",
       cdekEnabled: settings.cdek_enabled === "true",
       pochtaEnabled: settings.pochta_enabled === "true",

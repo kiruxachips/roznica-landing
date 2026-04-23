@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth"
 import { scoreProducts } from "@/lib/recommendations"
 import { unstable_cache } from "next/cache"
 import { CACHE_TAGS } from "@/lib/cache-tags"
+import { areGiftsEnabled } from "@/lib/dal/gifts"
 import type { TasteProfile, ProductType } from "@/lib/types"
 
 export const runtime = "nodejs"
@@ -62,7 +63,7 @@ export async function POST(request: Request) {
       ? session.user.id
       : null
 
-  const [allProducts, settings, cartProductDetails, userData] = await Promise.all([
+  const [allProducts, settings, cartProductDetails, userData, giftsEnabled] = await Promise.all([
     getAllProductsForRecommendations(),
     prisma.deliverySetting.findMany({
       where: { key: { in: ["free_delivery_threshold", "gift_threshold"] } },
@@ -72,11 +73,14 @@ export async function POST(request: Request) {
     userId
       ? prisma.user.findUnique({ where: { id: userId }, select: { tasteProfile: true } })
       : Promise.resolve(null),
+    areGiftsEnabled(),
   ])
 
   const thresholdMap = Object.fromEntries(settings.map((s) => [s.key, Number(s.value) || 0]))
   const freeDeliveryThreshold = thresholdMap["free_delivery_threshold"] ?? 3000
-  const giftThreshold = thresholdMap["gift_threshold"] ?? 5000
+  // При выключенной программе giftThreshold=0 → scoreProducts не вернёт
+  // reason="milestone_gift", не будет рекомендаций типа "до подарка".
+  const giftThreshold = giftsEnabled ? thresholdMap["gift_threshold"] ?? 5000 : 0
 
   const cartFlavorNotes = [...new Set(cartProductDetails.flatMap((p) => p.flavorNotes))]
   const cartOrigins = [...new Set(cartProductDetails.map((p) => p.origin).filter(Boolean))] as string[]
