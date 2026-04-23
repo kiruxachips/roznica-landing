@@ -171,92 +171,132 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     if (code) pochtaByCode.set(code, o)
   }
 
-  // Convert OSM nodes → PickupPoints, enriching address from Pochta API
+  // Haversine в метрах — для гео-дедупа. Если OSM-узел без ref ближе 150м
+  // к уже добавленной точке с ref (из Pochta API через OSM-match), считаем
+  // это одним и тем же отделением.
+  const GEO_DEDUP_METERS = 150
+  function distMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371000
+    const toRad = (d: number) => (d * Math.PI) / 180
+    const dLat = toRad(lat2 - lat1)
+    const dLng = toRad(lng2 - lng1)
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2
+    return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
+  // Фильтр OSM-узлов: убираем чужие (СДЭК/Boxberry/DPD и прочие ПВЗ, которых
+  // картографы неверно пометили amenity=post_office) и нормализуем до списка
+  // "своих" Pochta-кандидатов с tags/координатами.
+  const filteredOsm = osmNodes
+    .filter((el) => el.type === "node" && el.lat && el.lon)
+    .filter((el) => {
+      const brand = (el.tags?.brand || el.tags?.operator || el.tags?.name || "").toLowerCase()
+      return !(
+        brand.includes("сдэк") ||
+        brand.includes("cdek") ||
+        brand.includes("boxberry") ||
+        brand.includes("pick") /* PickPoint */ ||
+        brand.includes("dpd") ||
+        brand.includes("wildberries") ||
+        brand.includes("ozon") ||
+        brand.includes("яндекс") /* Yandex.Dostavka */
+      )
+    })
+
+  // Индекс OSM-узлов по ref (почтовый индекс) — для merge с Pochta API.
+  const osmByRef = new Map<string, OverpassNode>()
+  for (const el of filteredOsm) {
+    const ref = (el.tags?.ref || "").trim()
+    if (ref && !osmByRef.has(ref)) osmByRef.set(ref, el)
+  }
+
   const seen = new Set<string>()
   const points: PickupPoint[] = []
 
-  for (const el of osmNodes) {
-    if (el.type !== "node" || !el.lat || !el.lon) continue
-
-    const tags = el.tags || {}
-
-    // Картографы иногда маркируют ПВЗ СДЭК как amenity=post_office (ошибочно),
-    // поэтому отфильтровываем по brand/operator/name. Без этого в списке
-    // "Почта России" на checkout попадают «Почтовое отделение СДЭК».
-    const brand = (tags.brand || tags.operator || tags.name || "").toLowerCase()
-    if (
-      brand.includes("сдэк") ||
-      brand.includes("cdek") ||
-      brand.includes("boxberry") ||
-      brand.includes("pick") /* PickPoint */ ||
-      brand.includes("dpd") ||
-      brand.includes("wildberries") ||
-      brand.includes("ozon") ||
-      brand.includes("яндекс") /* Yandex.Dostavka */
-    ) {
-      continue
-    }
-
-    const ref = (tags.ref || "").trim()
-    const pochtaData = ref ? pochtaByCode.get(ref) : undefined
-
-    // Address: prefer Pochta API (always has real address), fall back to OSM tags
-    const pochtaAddr = pochtaData
-      ? (pochtaData["address-source"] || pochtaData.addressSource || "")
-      : ""
-    const osmAddr = buildOsmAddress(tags, city)
-    const address = String(pochtaAddr || osmAddr || city)
-
-    const nameRaw = (tags.name || "").trim()
-    const name = ref
-      ? `Почтовое отделение ${ref}`
-      : nameRaw.includes("Почт")
-        ? nameRaw
-        : nameRaw
-          ? `Почтовое отделение ${nameRaw}`
-          : `Почтовое отделение`
-
-    const code = ref || String(el.id)
-    if (seen.has(code)) continue
-    seen.add(code)
-
-    points.push({
-      code,
-      name,
-      address,
-      lat: el.lat,
-      lng: el.lon,
-      workTime: tags.opening_hours || pochtaData?.["work-time"] || pochtaData?.workTime || undefined,
-      phone:
-        tags["contact:phone"] ||
-        tags.phone ||
-        pochtaData?.["phone-list"]?.[0] ||
-        pochtaData?.phoneList?.[0] ||
-        undefined,
-      carrier: "pochta" as const,
-    })
-  }
-
-  // Add Pochta API offices that aren't in OSM. Сохраняем даже без координат —
-  // frontend покажет их в списке (без маркера на карте).
+  // 1) Pochta API-записи — каноничные отделения с индексом и адресом. Это
+  //    источник правды. Координаты берём: OSM (по ref) → API (lat/lng) → 0.
   for (const o of pochtaOffices) {
     const code = String(o["postal-code"] || o.postalCode || "").trim()
     if (!code || seen.has(code)) continue
     seen.add(code)
 
+    const matchedOsm = osmByRef.get(code)
     const latRaw = Number(o.latitude)
     const lngRaw = Number(o.longitude)
     const hasCoords = Number.isFinite(latRaw) && Number.isFinite(lngRaw) && (latRaw !== 0 || lngRaw !== 0)
+
+    const lat = matchedOsm ? matchedOsm.lat : hasCoords ? latRaw : 0
+    const lng = matchedOsm ? matchedOsm.lon : hasCoords ? lngRaw : 0
 
     const address = String(o["address-source"] || o.addressSource || o.address || city)
     points.push({
       code,
       name: `Почтовое отделение ${code}`,
       address,
-      lat: hasCoords ? latRaw : 0,
-      lng: hasCoords ? lngRaw : 0,
-      workTime: o["work-time"] || o.workTime || undefined,
-      phone: o["phone-list"]?.[0] || o.phoneList?.[0] || undefined,
+      lat,
+      lng,
+      workTime:
+        matchedOsm?.tags?.opening_hours ||
+        o["work-time"] ||
+        o.workTime ||
+        undefined,
+      phone:
+        matchedOsm?.tags?.["contact:phone"] ||
+        matchedOsm?.tags?.phone ||
+        o["phone-list"]?.[0] ||
+        o.phoneList?.[0] ||
+        undefined,
+      carrier: "pochta" as const,
+    })
+  }
+
+  // 2) OSM-узлы, которых нет в Pochta API (по ref). Отбрасываем «пустышки»
+  //    (без ref И без уличного адреса) — иначе получаем строки «Почтовое
+  //    отделение» без данных. Делаем гео-дедуп: если OSM-узел ближе 150м
+  //    к уже добавленному отделению — это тот же физический объект (просто
+  //    OSM-картограф не проставил ref).
+  for (const el of filteredOsm) {
+    const tags = el.tags || {}
+    const ref = (tags.ref || "").trim()
+    if (ref && seen.has(ref)) continue
+
+    const osmAddr = buildOsmAddress(tags, city)
+    const hasUsefulAddress = !!osmAddr
+    const nameRaw = (tags.name || "").trim()
+    const nameLooksReal = /почт|\bpost|\d{5,6}/i.test(nameRaw) // упоминание "почт" или индекс в name
+
+    // Узел без ref и без адреса и без информативного name — спам, пропускаем
+    if (!ref && !hasUsefulAddress && !nameLooksReal) continue
+
+    // Гео-дедуп относительно уже добавленных Pochta-точек с координатами
+    const isDuplicate = points.some(
+      (p) =>
+        p.lat !== 0 &&
+        p.lng !== 0 &&
+        distMeters(p.lat, p.lng, el.lat, el.lon) < GEO_DEDUP_METERS
+    )
+    if (isDuplicate) continue
+
+    const code = ref || `osm-${el.id}`
+    if (seen.has(code)) continue
+    seen.add(code)
+
+    points.push({
+      code,
+      name: ref
+        ? `Почтовое отделение ${ref}`
+        : nameRaw && nameRaw.includes("Почт")
+          ? nameRaw
+          : nameRaw
+            ? `Почтовое отделение ${nameRaw}`
+            : "Почтовое отделение",
+      address: osmAddr || city,
+      lat: el.lat,
+      lng: el.lon,
+      workTime: tags.opening_hours || undefined,
+      phone: tags["contact:phone"] || tags.phone || undefined,
       carrier: "pochta" as const,
     })
   }
