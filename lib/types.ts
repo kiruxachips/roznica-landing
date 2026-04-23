@@ -217,5 +217,5 @@ export interface RecommendedProduct {
     stock: number
   }
   score: number
-  reason: "milestone" | "affinity" | "popular" | "cross-sell"
+  reason: "milestone_free_delivery" | "milestone_gift" | "affinity" | "popular" | "cross-sell"
 }

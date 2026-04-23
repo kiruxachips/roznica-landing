@@ -87,12 +87,17 @@ function detectReason(
 ): RecommendedProduct["reason"] {
   const uniqueCartTypes = new Set(signals.cartProductTypes)
   if (uniqueCartTypes.size === 1 && !uniqueCartTypes.has(product.productType)) return "cross-sell"
-  const gap = signals.freeDeliveryThreshold > 0 && signals.cartTotal < signals.freeDeliveryThreshold
-    ? signals.freeDeliveryThreshold - signals.cartTotal
-    : signals.giftThreshold > 0 && signals.cartTotal < signals.giftThreshold
-    ? signals.giftThreshold - signals.cartTotal
-    : 0
-  if (gap > 0 && fScore >= 0.55) return "milestone"
+
+  // Разделяем два milestone-кейса: ДО бесплатной доставки и ДО подарка.
+  // Раньше reason был общий "milestone", и UI врал про "До бесплатной доставки"
+  // когда юзер уже её достиг, но ещё не набрал на подарок.
+  const needsFreeDelivery =
+    signals.freeDeliveryThreshold > 0 && signals.cartTotal < signals.freeDeliveryThreshold
+  const needsGift =
+    signals.giftThreshold > 0 && signals.cartTotal < signals.giftThreshold
+
+  if (needsFreeDelivery && fScore >= 0.55) return "milestone_free_delivery"
+  if (needsGift && fScore >= 0.55) return "milestone_gift"
   if (aScore >= 0.30) return "affinity"
   return "popular"
 }

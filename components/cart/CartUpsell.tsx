@@ -15,7 +15,8 @@ interface CartUpsellProps {
 }
 
 const REASON_LABEL: Record<RecommendedProduct["reason"], string> = {
-  milestone: "До бесплатной доставки",
+  milestone_free_delivery: "До бесплатной доставки",
+  milestone_gift: "До подарка",
   affinity: "Вам может понравиться",
   popular: "Популярное",
   "cross-sell": "Попробуйте также",
