@@ -360,7 +360,7 @@ export function CheckoutForm() {
           <button
             type="submit"
             disabled={loading || !agreed || !selectedRate}
-            className="w-full h-12 sm:h-14 bg-primary text-primary-foreground rounded-xl text-base sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+            className="w-full min-h-12 sm:min-h-14 px-3 py-2 bg-primary text-primary-foreground rounded-xl text-sm sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 whitespace-normal leading-tight"
           >
             {loading
               ? "Оформление..."

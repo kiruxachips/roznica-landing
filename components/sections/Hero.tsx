@@ -62,8 +62,8 @@ export function Hero() {
               <div className="text-sm text-muted-foreground mt-1">арабика</div>
             </div>
             <div className="text-center">
-              <div className="font-sans text-3xl sm:text-4xl font-bold text-primary">2-3</div>
-              <div className="text-sm text-muted-foreground mt-1">дня доставка</div>
+              <div className="font-sans text-3xl sm:text-4xl font-bold text-primary">24ч</div>
+              <div className="text-sm text-muted-foreground mt-1">до отправки</div>
             </div>
           </div>
         </div>

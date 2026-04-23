@@ -135,6 +135,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const { verifyTelegramAuth, getTelegramDisplayName } = await getTelegramModule()
         if (!verifyTelegramAuth(data)) return null
 
+        // P2-10: защита от replay перехваченного widget-пакета.
+        // Telegram подписывает всё, включая hash; используем hash как nonce.
+        // Если он уже обрабатывался — отклоняем (второй логин с тем же data).
+        try {
+          await prisma.processedInboundEvent.create({
+            data: { source: "telegram-login", eventId: String(data.hash) },
+          })
+        } catch (e) {
+          const err = e as { code?: string }
+          if (err?.code === "P2002") {
+            // Hash уже использован — это replay.
+            return null
+          }
+          throw e
+        }
+
         // Find or create user by telegramId
         let user = await prisma.user.findUnique({
           where: { telegramId: String(data.id) },

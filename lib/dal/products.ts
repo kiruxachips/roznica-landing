@@ -322,11 +322,17 @@ export async function getRelatedProducts(
   return items.map(mapToProductCard)
 }
 
+// P2-13: sitemap / generateStaticParams читают весь список slug'ов в память.
+// Пока товаров мало это ок, но при росте до тысяч — раздутый payload.
+// Ставим жёсткий cap 5000 (Google sitemap лимит — 50k URL/файл, но нам столько
+// не нужно; если вырастем больше — перейдём на пагинированные sitemap-индексы).
 export const getProductSlugs = unstable_cache(
   async (): Promise<string[]> => {
     const products = await prisma.product.findMany({
       where: { isActive: true },
       select: { slug: true },
+      take: 5000,
+      orderBy: { sortOrder: "asc" },
     })
     return products.map((p) => p.slug)
   },
