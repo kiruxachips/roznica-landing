@@ -2,6 +2,12 @@ import { prisma } from "@/lib/prisma"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 import type { StockAdjustResult } from "@/lib/dal/stock"
 import { buildStockPayload } from "@/lib/integrations/millorbot/payload"
+import { dispatchEmail } from "@/lib/dal/email-dispatch"
+import {
+  renderAdminStockAlertEmail,
+  sendRenderedEmail,
+  getAdminNotificationEmails,
+} from "@/lib/email"
 
 /**
  * Отправляет уведомления в millorbot о критичных переходах остатка:
@@ -17,10 +23,6 @@ import { buildStockPayload } from "@/lib/integrations/millorbot/payload"
 export async function notifyStockChange(result: StockAdjustResult): Promise<void> {
   if (!result.becameDepleted && !result.crossedLowThreshold) return
 
-  // Kill-switch: пока бот не готов принимать stock-события, не пишем в outbox.
-  // Сам stock adjust + StockHistory работают независимо — просто не шлём наружу.
-  if (process.env.STOCK_ALERTS_ENABLED !== "true") return
-
   try {
     // Подтягиваем карточку варианта для payload (единожды, даже если оба события)
     const variant = await prisma.productVariant.findUnique({
@@ -28,6 +30,40 @@ export async function notifyStockChange(result: StockAdjustResult): Promise<void
       include: { product: true },
     })
     if (!variant) return
+
+    // P1-11: email админу — всегда, вне зависимости от millorbot-канала.
+    // Админ-рассылка идёт через EmailDispatch (durable queue + idempotency
+    // по (orderId=null, kind, recipient, status=sent)). Кодируем переход
+    // stockBefore→stockAfter в kind, чтобы повторный adjustStock с тем же
+    // эффектом не создавал дубль-письма.
+    const adminEmails = getAdminNotificationEmails()
+    const transitionKey = `${result.variantId}:${result.stockBefore}->${result.stockAfter}`
+    const kind = result.becameDepleted
+      ? (`admin.stock_depleted:${transitionKey}` as const)
+      : (`admin.stock_low:${transitionKey}` as const)
+    for (const admin of adminEmails) {
+      dispatchEmail({
+        orderId: null,
+        kind,
+        recipient: admin,
+        render: () =>
+          renderAdminStockAlertEmail({
+            productName: variant.product.name,
+            variantWeight: variant.weight,
+            stockBefore: result.stockBefore,
+            stockAfter: result.stockAfter,
+            lowStockThreshold: variant.lowStockThreshold ?? 0,
+            isDepleted: result.becameDepleted,
+          }),
+        send: sendRenderedEmail,
+      }).catch((e) =>
+        console.error("[stock-alerts] admin email dispatch failed:", e)
+      )
+    }
+
+    // Kill-switch для millorbot-канала: пока бот не готов, не пишем в outbox.
+    // Email админу выше идёт независимо.
+    if (process.env.STOCK_ALERTS_ENABLED !== "true") return
 
     if (result.becameDepleted) {
       const eventId = `stock_depleted_${result.variantId}_${result.stockBefore}_to_0`

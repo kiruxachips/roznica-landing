@@ -5,6 +5,7 @@ import { revalidatePath, revalidateTag } from "next/cache"
 import { CACHE_TAGS } from "@/lib/cache-tags"
 import { getStorage } from "@/lib/storage"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
+import { validateImageMagicBytes } from "@/lib/image-validation"
 
 export async function createArticle(data: {
   title: string
@@ -138,6 +139,13 @@ export async function uploadArticleCoverImage(formData: FormData) {
   if (!file || !articleId) throw new Error("Файл и ID статьи обязательны")
 
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // P1-12: проверяем сигнатуру файла — file.type браузер позволяет подделать.
+  const magic = validateImageMagicBytes(buffer)
+  if (!magic.ok) {
+    throw new Error("Файл не является изображением (JPEG/PNG/WebP/GIF)")
+  }
+
   const storage = getStorage()
 
   // Delete old cover if exists
@@ -183,6 +191,13 @@ export async function uploadArticleContentImage(formData: FormData) {
   if (!file || !articleId) throw new Error("Файл и ID статьи обязательны")
 
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // P1-12: magic-bytes check
+  const magic = validateImageMagicBytes(buffer)
+  if (!magic.ok) {
+    throw new Error("Файл не является изображением (JPEG/PNG/WebP/GIF)")
+  }
+
   const storage = getStorage()
 
   const filename = `content-${Date.now()}.webp`

@@ -25,6 +25,11 @@ export type EmailDispatchKind =
   | `order.status:${string}`
   | "admin.new_order"
   | "admin.payment_success"
+  // P1-11: складские алерты админу. Kind несёт переход stockBefore→stockAfter
+  // в строке, чтобы idempotency по (orderId=null, kind, recipient) защищал от
+  // дублей при повторных вызовах adjustStock с тем же эффектом.
+  | `admin.stock_depleted:${string}`
+  | `admin.stock_low:${string}`
 
 export interface RenderedEmail {
   subject: string

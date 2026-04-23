@@ -568,3 +568,56 @@ export async function sendAdminPaymentSuccessEmail(data: OrderEmailData, to: str
   const { subject, html } = renderAdminPaymentSuccessEmail(data)
   return sendRenderedEmail({ to, subject, html })
 }
+
+// ── Admin: Stock Alert ──
+// P1-11: уведомление админу когда товар закончился (becameDepleted) или
+// приблизился к порогу low-stock (crossedLowThreshold). Отправляется в
+// реальном времени при списании stock через adjustStock.
+
+export interface StockAlertEmailData {
+  productName: string
+  variantWeight: string
+  stockBefore: number
+  stockAfter: number
+  lowStockThreshold: number
+  isDepleted: boolean
+}
+
+export function renderAdminStockAlertEmail(data: StockAlertEmailData): { subject: string; html: string } {
+  const statusText = data.isDepleted
+    ? "Товар закончился"
+    : `Остаток ниже порога (${data.lowStockThreshold})`
+  const statusColor = data.isDepleted ? "#d33" : "#e58200"
+
+  const html = wrapEmail(`
+    <h2 style="color: ${statusColor}; margin-bottom: 16px;">${e(statusText)}</h2>
+
+    <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="margin: 0 0 8px; font-size: 16px; font-weight: 600; color: #333;">
+        ${e(data.productName)} — ${e(data.variantWeight)}
+      </p>
+      <p style="margin: 4px 0; font-size: 14px; color: #555;">
+        <strong>Остаток:</strong> <span style="color: ${statusColor};">${data.stockBefore} → ${data.stockAfter} шт.</span>
+      </p>
+      <p style="margin: 4px 0; font-size: 14px; color: #555;">
+        <strong>Порог low-stock:</strong> ${data.lowStockThreshold}
+      </p>
+    </div>
+
+    <p style="margin-top: 24px;">
+      <a href="${siteUrl}/admin/warehouse" style="display: inline-block; background: #7c4a1e; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Открыть склад</a>
+    </p>
+  `)
+
+  return {
+    subject: data.isDepleted
+      ? `Товар закончился: ${data.productName} (${data.variantWeight})`
+      : `Мало остатков: ${data.productName} (${data.variantWeight}) — ${data.stockAfter} шт.`,
+    html,
+  }
+}
+
+export async function sendAdminStockAlertEmail(data: StockAlertEmailData, to: string): Promise<SendResult> {
+  const { subject, html } = renderAdminStockAlertEmail(data)
+  return sendRenderedEmail({ to, subject, html })
+}

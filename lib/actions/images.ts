@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getStorage } from "@/lib/storage"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { CACHE_TAGS } from "@/lib/cache-tags"
+import { validateImageMagicBytes } from "@/lib/image-validation"
 
 const MAX_UPLOAD_SIZE = 10 * 1024 * 1024 // 10 MB
 
@@ -23,6 +24,14 @@ export async function uploadImage(formData: FormData) {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
+
+  // Проверка сигнатуры ДО сохранения на диск и ДО записи в БД.
+  // Не полагаемся на file.type или расширение — их браузер позволяет подделать.
+  const magic = validateImageMagicBytes(buffer)
+  if (!magic.ok) {
+    throw new Error("Файл не является изображением (JPEG/PNG/WebP/GIF)")
+  }
+
   const filename = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`
 
   const storage = getStorage()
