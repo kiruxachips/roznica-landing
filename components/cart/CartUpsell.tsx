@@ -14,11 +14,16 @@ interface CartUpsellProps {
   variant?: "drawer" | "page"
 }
 
+// UX: заголовки должны мотивировать к добавлению. Milestone-варианты
+// оставлены специфичными ("До подарка") — они апеллируют к конкретной цели.
+// Для остальных (после всех milestone или при выключенной программе) —
+// нейтральные "часто берут вместе" / "к вашему заказу" вместо абстрактного
+// "Популярное".
 const REASON_LABEL: Record<RecommendedProduct["reason"], string> = {
   milestone_free_delivery: "До бесплатной доставки",
   milestone_gift: "До подарка",
-  affinity: "Вам может понравиться",
-  popular: "Популярное",
+  affinity: "Часто берут вместе",
+  popular: "Добавить к заказу",
   "cross-sell": "Попробуйте также",
 }
 
@@ -82,10 +87,12 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
   const sectionLabel = REASON_LABEL[topReason]
 
   return (
-    <div className="mt-1 rounded-2xl border border-border/60 bg-secondary/30 p-3">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2.5">
-        {sectionLabel}
-      </p>
+    <div className="mt-4 pt-4 border-t-2 border-primary/10">
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3">
+        <p className="text-xs font-semibold tracking-wide text-primary mb-3 flex items-center gap-1.5">
+          <span className="inline-block w-1 h-4 bg-primary rounded-full" />
+          {sectionLabel}
+        </p>
       <div className="space-y-1.5">
         {products
           .filter((rec) => !cartProductIds.includes(rec.id))
@@ -131,6 +138,7 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
               </div>
             )
           })}
+        </div>
       </div>
     </div>
   )
