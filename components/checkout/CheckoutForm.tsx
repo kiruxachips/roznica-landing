@@ -280,6 +280,31 @@ export function CheckoutForm() {
 
           <CitySearch />
           <DeliveryOptions />
+
+          {/* P1-8: сохранённые адреса залогиненного юзера — выбор из dropdown
+              автозаполняет поле адреса и переключает город, если он отличается. */}
+          {selectedRate?.deliveryType !== "pvz" && savedAddresses.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">Сохранённые адреса</label>
+              <select
+                className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+                defaultValue=""
+                onChange={(e) => {
+                  const sel = savedAddresses.find((a) => a.id === e.target.value)
+                  if (sel) setDoorAddress(sel.fullAddress)
+                }}
+              >
+                <option value="">— Выберите адрес —</option>
+                {savedAddresses.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.title}: {a.fullAddress}
+                    {a.isDefault ? " (по умолчанию)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {selectedRate?.deliveryType !== "pvz" && <AddressInput />}
           {selectedRate?.deliveryType === "pvz" && <PickupPointMap />}
 

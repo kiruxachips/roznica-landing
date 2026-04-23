@@ -89,22 +89,22 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
 
         <div className="bg-red-50 rounded-2xl p-6 sm:p-8 mb-8 text-center">
           <p className="text-sm text-muted-foreground mb-1">
-            Платёж был отменён. Вы можете оформить новый заказ.
+            Платёж был отменён. Товары вернулись на склад, можете попробовать оформить заказ ещё раз.
           </p>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/catalog"
+            href="/checkout"
             className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium text-center hover:bg-primary/90 transition-colors"
           >
-            Перейти в каталог
+            Оформить заказ заново
           </Link>
           <Link
-            href="/"
+            href="/catalog"
             className="px-6 py-3 border border-border rounded-xl font-medium text-center hover:bg-muted transition-colors"
           >
-            На главную
+            В каталог
           </Link>
         </div>
       </div>
