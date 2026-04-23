@@ -6,13 +6,15 @@ import { CACHE_TAGS } from "@/lib/cache-tags"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 import { getStorage } from "@/lib/storage"
 import { validateImageMagicBytes } from "@/lib/image-validation"
+import { invalidateSettingsCache } from "@/lib/dal/delivery-settings"
 
 function invalidate() {
   revalidateTag(CACHE_TAGS.gifts)
   revalidatePath("/admin/gifts")
-  // На checkout gift-picker читает напрямую через fetch — у него свой
-  // внутренний кэш response-у не ставится, поэтому revalidatePath
-  // /checkout избыточен.
+  // DeliverySetting кэш in-memory 60 сек — без явной инвалидации toggle
+  // kill-switch был бы виден клиенту не сразу. areGiftsEnabled() и
+  // getMinGiftThreshold() читают через getDeliverySettings.
+  invalidateSettingsCache()
 }
 
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024

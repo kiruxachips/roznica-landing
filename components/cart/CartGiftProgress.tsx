@@ -7,35 +7,53 @@ interface Thresholds {
   freeDelivery: number
   gift: number
   giftDescription: string
+  giftsEnabled: boolean
 }
 
 interface CartGiftProgressProps {
   total: number
 }
 
-let cachedThresholds: Thresholds | null = null
-
+/**
+ * Module-level кэш умышленно убран: он пережимал toggle kill-switch
+ * подарков, т.к. сохранялся между визитами пока загружен JS-bundle.
+ * Теперь каждый mount делает запрос — это 1-2кб JSON и копейки для backend.
+ */
 export function CartGiftProgress({ total }: CartGiftProgressProps) {
-  const [thresholds, setThresholds] = useState<Thresholds | null>(cachedThresholds)
+  const [thresholds, setThresholds] = useState<Thresholds | null>(null)
 
   useEffect(() => {
-    if (cachedThresholds) return
-    fetch("/api/delivery/settings")
+    let cancelled = false
+    // cache: "no-store" гарантирует что браузер не держит ответ в HTTP-кэше
+    // и всегда идёт в наш backend — после toggle kill-switch юзер сразу
+    // видит актуальное состояние после reload.
+    fetch("/api/delivery/settings", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
-        const t: Thresholds = {
-          freeDelivery: d.freeDeliveryThreshold || 3000,
-          gift: d.giftThreshold || 5000,
+        if (cancelled) return
+        setThresholds({
+          freeDelivery: d.freeDeliveryThreshold || 0,
+          // Уважаем giftsEnabled: при выключенной программе gift=0,
+          // все ветки с "Подарком" в рендере ниже автоматически выключатся.
+          gift: d.giftsEnabled === false ? 0 : d.giftThreshold || 0,
           giftDescription: d.giftDescription || "Подарок от нас",
-        }
-        cachedThresholds = t
-        setThresholds(t)
+          giftsEnabled: d.giftsEnabled !== false,
+        })
       })
       .catch(() => {
-        const fallback = { freeDelivery: 3000, gift: 5000, giftDescription: "Подарок от нас" }
-        cachedThresholds = fallback
-        setThresholds(fallback)
+        if (cancelled) return
+        // Fallback без подарка — лучше не обещать ничего, чем обещать
+        // то, что админ выключил.
+        setThresholds({
+          freeDelivery: 3000,
+          gift: 0,
+          giftDescription: "",
+          giftsEnabled: false,
+        })
       })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   if (!thresholds || total === 0) return null

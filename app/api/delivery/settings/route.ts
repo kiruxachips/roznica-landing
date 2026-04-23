@@ -21,17 +21,26 @@ export async function GET() {
         ? minGiftThreshold
         : parseInt(settings.gift_threshold) || 0
 
-    return NextResponse.json({
-      freeDeliveryThreshold: parseInt(settings.free_delivery_threshold) || 0,
-      giftThreshold,
-      giftDescription: settings.gift_description || "Подарок от нас",
-      giftsEnabled,
-      yandexMapsApiKey: settings.yandex_maps_api_key || "",
-      cdekEnabled: settings.cdek_enabled === "true",
-      pochtaEnabled: settings.pochta_enabled === "true",
-      courierEnabled: settings.courier_enabled === "true",
-      courierCity: settings.courier_city || "",
-    })
+    return NextResponse.json(
+      {
+        freeDeliveryThreshold: parseInt(settings.free_delivery_threshold) || 0,
+        giftThreshold,
+        giftDescription: settings.gift_description || "Подарок от нас",
+        giftsEnabled,
+        yandexMapsApiKey: settings.yandex_maps_api_key || "",
+        cdekEnabled: settings.cdek_enabled === "true",
+        pochtaEnabled: settings.pochta_enabled === "true",
+        courierEnabled: settings.courier_enabled === "true",
+        courierCity: settings.courier_city || "",
+      },
+      {
+        headers: {
+          // Запрещаем браузерный/прокси-кэш — при toggle kill-switch клиент
+          // должен увидеть новое состояние немедленно, без ожидания TTL.
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
+    )
   } catch {
     return NextResponse.json({ error: "Failed to load settings" }, { status: 500 })
   }
