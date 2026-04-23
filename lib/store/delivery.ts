@@ -1,28 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-
-interface DeliveryRate {
-  carrier: string
-  carrierName: string
-  tariffCode: number
-  tariffName: string
-  deliveryType: "door" | "pvz"
-  price: number
-  priceWithMarkup: number
-  minDays: number
-  maxDays: number
-}
-
-interface PickupPoint {
-  code: string
-  name: string
-  address: string
-  lat: number
-  lng: number
-  phone?: string
-  workTime?: string
-  carrier: string
-}
+import type { DeliveryRate, PickupPoint } from "@/lib/delivery/types"
 
 interface DeliveryState {
   // City
