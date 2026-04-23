@@ -3,12 +3,13 @@
 import { useState, useTransition } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
-import { Plus, Pencil, Archive, Upload } from "lucide-react"
+import { Plus, Pencil, Archive, Upload, PowerOff, Power } from "lucide-react"
 import {
   createGift,
   updateGift,
   archiveGift,
   uploadGiftImage,
+  setGiftsEnabled,
 } from "@/lib/actions/gifts"
 
 interface Gift {
@@ -33,6 +34,8 @@ interface Gift {
 
 interface GiftsManagerProps {
   gifts: Gift[]
+  /** Текущее состояние kill-switch — передаётся server-render'ом */
+  initialEnabled: boolean
 }
 
 type DraftGift = Partial<Gift> & { name: string; minCartTotal: number }
@@ -51,12 +54,36 @@ interface VariantOption {
   isActive: boolean
 }
 
-export function GiftsManager({ gifts }: GiftsManagerProps) {
+export function GiftsManager({ gifts, initialEnabled }: GiftsManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [editing, setEditing] = useState<DraftGift | null>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [error, setError] = useState("")
+  const [programEnabled, setProgramEnabled] = useState(initialEnabled)
+  const [toggling, setToggling] = useState(false)
+
+  async function handleToggleProgram() {
+    const next = !programEnabled
+    // Дополнительная защита от случайного выключения
+    if (
+      !next &&
+      !confirm(
+        "Выключить подарочную программу?\n\nКлиенты перестанут видеть подарки на checkout и в корзине. Пул подарков в этом списке сохранится и вернётся при включении обратно."
+      )
+    ) return
+
+    setToggling(true)
+    try {
+      await setGiftsEnabled(next)
+      setProgramEnabled(next)
+      router.refresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Не удалось переключить")
+    } finally {
+      setToggling(false)
+    }
+  }
 
   // Product-picker
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -200,6 +227,48 @@ export function GiftsManager({ gifts }: GiftsManagerProps) {
 
   return (
     <div className="space-y-4">
+      {/* Kill-switch программы — переключатель в том же разделе что и сам пул */}
+      <div
+        className={`rounded-2xl border p-4 flex items-center gap-4 ${
+          programEnabled
+            ? "bg-emerald-50/60 border-emerald-200"
+            : "bg-red-50/60 border-red-200"
+        }`}
+      >
+        <div
+          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            programEnabled ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+          }`}
+        >
+          {programEnabled ? <Power className="w-5 h-5" /> : <PowerOff className="w-5 h-5" />}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold">
+            Программа подарков {programEnabled ? "включена" : "выключена"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {programEnabled
+              ? "Клиенты видят подарки на checkout и в корзине. Выключение мгновенно скрывает весь gift-UI, но пул ниже сохраняется."
+              : "Подарки нигде не показываются клиентам. Пул ниже не потерян — включите обратно, и всё вернётся."}
+          </p>
+        </div>
+        <button
+          onClick={handleToggleProgram}
+          disabled={toggling}
+          className={`shrink-0 h-10 px-5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
+            programEnabled
+              ? "bg-red-600 text-white hover:bg-red-700"
+              : "bg-emerald-600 text-white hover:bg-emerald-700"
+          }`}
+        >
+          {toggling
+            ? "Сохранение…"
+            : programEnabled
+              ? "Выключить программу"
+              : "Включить программу"}
+        </button>
+      </div>
+
       <div className="flex justify-end gap-2">
         <button
           onClick={openPicker}

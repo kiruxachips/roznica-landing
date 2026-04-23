@@ -147,6 +147,29 @@ export async function archiveGift(id: string) {
   invalidate()
 }
 
+/**
+ * Переключение глобального kill-switch программы подарков.
+ * Пишет DeliverySetting.gifts_enabled — читается через areGiftsEnabled()
+ * во всех gift-endpoint'ах и createOrder. UI в /admin/gifts видит эффект
+ * сразу (delivery-settings кэш 60 сек).
+ */
+export async function setGiftsEnabled(enabled: boolean) {
+  const admin = await requireAdmin("gifts.edit")
+  const value = enabled ? "true" : "false"
+  await prisma.deliverySetting.upsert({
+    where: { key: "gifts_enabled" },
+    update: { value },
+    create: { key: "gifts_enabled", value },
+  })
+  void logAdminAction({
+    admin,
+    action: enabled ? "gift.program_enabled" : "gift.program_disabled",
+    entityType: "gift_program",
+    entityId: "global",
+  })
+  invalidate()
+}
+
 export async function uploadGiftImage(formData: FormData) {
   await requireAdmin("gifts.edit")
   const file = formData.get("file") as File

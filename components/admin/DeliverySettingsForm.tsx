@@ -413,25 +413,9 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               />
             </div>
 
-            {/* Kill-switch программы подарков */}
-            <div className="border border-amber-200 bg-amber-50 rounded-xl p-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 accent-amber-600"
-                  checked={localSettings.gifts_enabled !== "false"}
-                  onChange={(e) => set("gifts_enabled", e.target.checked ? "true" : "false")}
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-amber-900">
-                    Подарочная программа включена
-                  </span>
-                  <p className="text-xs text-amber-800 mt-1">
-                    Глобальный kill-switch. При выключении с checkout пропадает секция «Бесплатный подарок», прогресс-бар «До подарка» в корзине прячется, submit-запросы с selectedGiftId игнорируются сервером. Пул подарков в /admin/gifts остаётся нетронутым.
-                  </p>
-                </div>
-              </label>
-            </div>
+            {/* Управление подарочной программой (включение / выключение,
+                пул подарков) перенесено в /admin/gifts — все gift-настройки
+                в одном разделе. */}
 
             <div className="pt-2 space-y-3">
               <div className="flex items-center justify-between">

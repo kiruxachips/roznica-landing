@@ -1,12 +1,15 @@
 import { requireAdmin } from "@/lib/admin-guard"
-import { listGiftsForAdmin } from "@/lib/dal/gifts"
+import { listGiftsForAdmin, areGiftsEnabled } from "@/lib/dal/gifts"
 import { GiftsManager } from "@/components/admin/GiftsManager"
 
 export const dynamic = "force-dynamic"
 
 export default async function AdminGiftsPage() {
   await requireAdmin("gifts.view")
-  const gifts = await listGiftsForAdmin()
+  const [gifts, giftsEnabled] = await Promise.all([
+    listGiftsForAdmin(),
+    areGiftsEnabled(),
+  ])
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -17,7 +20,7 @@ export default async function AdminGiftsPage() {
         {" "}≤ сумме его корзины (после скидки). Если у подарка задан запас, он
         декрементится при оформлении.
       </p>
-      <GiftsManager gifts={gifts} />
+      <GiftsManager gifts={gifts} initialEnabled={giftsEnabled} />
     </div>
   )
 }
