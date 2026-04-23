@@ -106,8 +106,11 @@ async function fetchOverpassPoints(city: string, region?: string): Promise<Overp
   // оформлена как city/town/village/suburb, а не только admin_level 4/6/8.
   const escapedCity = escapeOverpass(city)
 
-  // Если регион задан — сужаем поиск в его area (разрешает однофамильные города:
-  // Гурьевск Калининградский vs Кемеровский).
+  // Если регион задан — применяем двойной spatial-фильтр: нода должна лежать
+  // и в area города, и в area региона. `(area.region)` на area-запросе
+  // Overpass НЕ использует для spatial containment — это фильтр применим
+  // только к нодам/вэям. Поэтому area-union собираем по всему миру, и
+  // пересечение делаем на слое node.
   let query: string
   if (region && region.trim()) {
     const regionCandidates = osmRegionName(region).map(escapeOverpass)
@@ -122,12 +125,12 @@ async function fetchOverpassPoints(city: string, region?: string): Promise<Overp
 ${regionUnion}
 )->.region;
 (
-  area["name"="${escapedCity}"](area.region)["admin_level"~"^[468]$"];
-  area["name:ru"="${escapedCity}"](area.region)["admin_level"~"^[468]$"];
-  area["name"="${escapedCity}"](area.region)["place"~"city|town|village|suburb"];
-  area["name:ru"="${escapedCity}"](area.region)["place"~"city|town|village|suburb"];
+  area["name"="${escapedCity}"]["admin_level"~"^[468]$"];
+  area["name:ru"="${escapedCity}"]["admin_level"~"^[468]$"];
+  area["name"="${escapedCity}"]["place"~"city|town|village|suburb"];
+  area["name:ru"="${escapedCity}"]["place"~"city|town|village|suburb"];
 )->.a;
-node(area.a)["amenity"="post_office"];
+node(area.a)(area.region)["amenity"="post_office"];
 out body 500;`
   } else {
     query = `[out:json][timeout:25];
