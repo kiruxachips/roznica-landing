@@ -335,6 +335,8 @@ model OrderItem {
   weight    String // snapshot
   price     Int // snapshot
   quantity  Int
+
+  @@index([orderId])
 }
 
 model ArticleCategory {
