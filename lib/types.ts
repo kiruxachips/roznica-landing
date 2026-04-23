@@ -98,7 +98,7 @@ export interface OrderData {
   customerEmail?: string
   customerPhone: string
   deliveryAddress?: string
-  deliveryMethod?: string
+  deliveryMethod?: "cdek" | "pochta" | "courier"
   paymentMethod?: string
   notes?: string
   userId?: string

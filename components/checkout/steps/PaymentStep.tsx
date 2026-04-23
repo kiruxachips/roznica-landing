@@ -54,6 +54,19 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
 
   async function handleSubmit() {
+    // Защита на случай программного dispatchEvent из sticky bar или от
+    // сторонних скриптов — `disabled` на кнопке не гарантирует, что код
+    // сюда не зайдёт.
+    if (!agreed) {
+      setError("Подтвердите согласие с политикой и офертой, чтобы продолжить")
+      return
+    }
+    if (!selectedRate) {
+      setError("Выберите способ доставки на предыдущем шаге")
+      return
+    }
+    if (loading) return
+
     setLoading(true)
     setError("")
     try {
@@ -121,6 +134,11 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
         }`
         router.push(url)
       }
+
+      // Safety-net: если по какой-то причине редирект не сработал
+      // (блокировка popup, ошибка роутера), через 5 секунд вернём кнопку
+      // в активное состояние, чтобы юзер не был заперт в "Оформление…".
+      setTimeout(() => setLoading(false), 5000)
     } catch (e) {
       console.error("Checkout submit failed:", e)
       const msg = e instanceof Error ? e.message : "Попробуйте ещё раз"

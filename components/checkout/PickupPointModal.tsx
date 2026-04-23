@@ -65,6 +65,13 @@ export function PickupPointModal({ open, onClose }: Props) {
   // Выбор внутри модалки — подтверждается только по кнопке «Выбрать».
   // Это позволяет юзеру пролистывать точки, не коммитя каждую случайно.
   const [draftPoint, setDraftPoint] = useState<PickupPoint | null>(null)
+  // Ref-зеркало draftPoint используется в marker-callbacks карты, чтобы
+  // клик по точке НЕ инвалидировал useCallback(initMap) и не вызывал
+  // дорогой destroy+reinit карты при каждом выборе.
+  const draftPointRef = useRef<PickupPoint | null>(null)
+  useEffect(() => {
+    draftPointRef.current = draftPoint
+  }, [draftPoint])
 
   const [apiKey, setApiKey] = useState("")
   const [scriptLoaded, setScriptLoaded] = useState(false)
@@ -301,16 +308,12 @@ export function PickupPointModal({ open, onClose }: Props) {
         geometry: { type: "Point", coordinates: [p.lng, p.lat] },
       }))
 
-      const markerElementFor = (pointCode: string, isDraft: boolean) => {
+      const markerElementFor = (pointCode: string) => {
         const point = mappablePoints.find((p) => p.code === pointCode)
         const el = document.createElement("div")
         el.className = "ymaps-marker"
-        // Draft-маркер крупнее и оранжево-красный, чтобы юзер видел где он
-        // сейчас стоит. Остальные — фирменный зелёный.
-        el.style.cssText = isDraft
-          ? "width:34px;height:34px;background:#dc2626;border-radius:50%;border:3px solid white;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;"
-          : "width:24px;height:24px;background:#2d6b4a;border-radius:50%;border:2px solid white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.3);"
-        if (isDraft) el.textContent = "✓"
+        el.style.cssText =
+          "width:24px;height:24px;background:#2d6b4a;border-radius:50%;border:2px solid white;cursor:pointer;box-shadow:0 2px 4px rgba(0,0,0,0.3);"
         el.title = point?.name || ""
         return el
       }
@@ -333,11 +336,12 @@ export function PickupPointModal({ open, onClose }: Props) {
         features,
         marker: (feature) => {
           const point = mappablePoints.find((p) => p.code === feature.id)
-          const isDraft = draftPoint?.code === feature.id
-          const el = markerElementFor(feature.id, isDraft)
+          const el = markerElementFor(feature.id)
           return new window.ymaps3!.YMapMarker(
             {
               coordinates: feature.geometry.coordinates,
+              // Используем ref, чтобы клик по маркеру не инвалидировал
+              // замыкание initMap и не триггерил destroy+reinit карты.
               onClick: () => point && setDraftPoint(point),
             },
             el
@@ -357,7 +361,9 @@ export function PickupPointModal({ open, onClose }: Props) {
       if (process.env.NODE_ENV !== "production") console.error("Yandex Maps init error:", err)
       setMapError(true)
     }
-  }, [scriptLoaded, mappablePoints, searchCenter, cityCenter, draftPoint?.code])
+    // draftPoint НЕ в deps — визуально подсвечивается только в списке;
+    // пересоздавать карту на каждый клик нельзя (destroy+init дорогие).
+  }, [scriptLoaded, mappablePoints, searchCenter, cityCenter])
 
   // Инициализация карты — на desktop всегда; на mobile только когда вкладка "map"
   useEffect(() => {

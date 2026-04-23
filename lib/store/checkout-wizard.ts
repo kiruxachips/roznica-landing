@@ -62,10 +62,16 @@ export const useCheckoutWizard = create<CheckoutWizardState>()(
     {
       name: "checkout-wizard",
       storage: createJSONStorage(() => sessionStorage),
-      // Не персистим completed и step при смене города/адреса: если юзер
-      // пришёл по старой ссылке, начинаем с первого шага заново. Данные
-      // контакта сохраняем — это самое ценное для вернувшегося юзера.
-      partialize: (s) => ({ contact: s.contact, notes: s.notes }),
+      // Персистим contact/notes (ввод юзера) и completed/step (прогресс по
+      // wizard'у), чтобы F5 на шаге payment вернул юзера туда же, где он был,
+      // а не откидывал на первый шаг. agreed — не персистим (требование
+      // оферты: юзер должен свежо ставить галочку перед оплатой).
+      partialize: (s) => ({
+        contact: s.contact,
+        notes: s.notes,
+        step: s.step,
+        completed: s.completed,
+      }),
     }
   )
 )

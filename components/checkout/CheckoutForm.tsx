@@ -26,10 +26,18 @@ export function CheckoutForm() {
   const completed = useCheckoutWizard((s) => s.completed)
   const contact = useCheckoutWizard((s) => s.contact)
   const setStep = useCheckoutWizard((s) => s.setStep)
+  const resetWizard = useCheckoutWizard((s) => s.reset)
   const agreed = useCheckoutWizard((s) => s.agreed)
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+
+  // Если юзер вернулся на /checkout с пустой корзиной — сбрасываем wizard,
+  // чтобы не «подвешивать» заполненные шаги поверх несуществующего заказа.
+  // Если он добавит товары и вернётся, начнём с чистого первого шага.
+  useEffect(() => {
+    if (mounted && items.length === 0) resetWizard()
+  }, [mounted, items.length, resetWizard])
 
   if (!mounted) return null
 
