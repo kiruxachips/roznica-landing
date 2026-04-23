@@ -8,8 +8,18 @@ function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 
+/**
+ * Нормализация email для БД-lookup. Postgres text case-sensitive,
+ * поэтому все точки работы с email должны гонять его через одну функцию:
+ * регистрация, resend code, verify, password reset, login. См. также
+ * lib/auth.ts — там customer credentials тоже нормализует.
+ */
+function normalizeEmail(raw: string): string {
+  return raw.toLowerCase().trim()
+}
+
 export async function registerUser({
-  email,
+  email: rawEmail,
   password,
   name,
 }: {
@@ -17,6 +27,7 @@ export async function registerUser({
   password: string
   name: string
 }) {
+  const email = normalizeEmail(rawEmail)
   // Check if user already exists
   const existing = await prisma.user.findUnique({ where: { email } })
   if (existing?.emailVerified) {
@@ -61,7 +72,8 @@ export async function registerUser({
   return { success: true }
 }
 
-export async function verifyEmailCode(email: string, code: string) {
+export async function verifyEmailCode(rawEmail: string, code: string) {
+  const email = normalizeEmail(rawEmail)
   const verification = await prisma.verificationCode.findFirst({
     where: {
       email,
@@ -106,7 +118,8 @@ export async function verifyEmailCode(email: string, code: string) {
   return { success: true, userId: user.id }
 }
 
-export async function resendVerificationCode(email: string) {
+export async function resendVerificationCode(rawEmail: string) {
+  const email = normalizeEmail(rawEmail)
   const user = await prisma.user.findUnique({ where: { email } })
   if (!user) {
     return { error: "Пользователь не найден" }
@@ -139,7 +152,8 @@ export async function resendVerificationCode(email: string) {
   return { success: true }
 }
 
-export async function requestPasswordReset(email: string) {
+export async function requestPasswordReset(rawEmail: string) {
+  const email = normalizeEmail(rawEmail)
   const user = await prisma.user.findUnique({ where: { email } })
   if (!user || !user.emailVerified) {
     // Don't reveal if user exists
@@ -170,7 +184,8 @@ export async function requestPasswordReset(email: string) {
   return { success: true }
 }
 
-export async function resetPassword(email: string, code: string, newPassword: string) {
+export async function resetPassword(rawEmail: string, code: string, newPassword: string) {
+  const email = normalizeEmail(rawEmail)
   const verification = await prisma.verificationCode.findFirst({
     where: {
       email,

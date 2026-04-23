@@ -61,9 +61,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        })
+        // Нормализация email: регистрация и reset могут сохранять его
+        // в разном регистре, а Postgres text comparison case-sensitive.
+        // Без .toLowerCase().trim() "John@X.com" и "john@x.com" для БД
+        // разные адреса → пользователь не находится, ошибка логина.
+        const email = String(credentials.email).toLowerCase().trim()
+        const user = await prisma.user.findUnique({ where: { email } })
         if (!user || !user.passwordHash) return null
         if (!user.emailVerified) return null
 
