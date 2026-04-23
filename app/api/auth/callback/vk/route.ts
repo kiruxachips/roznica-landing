@@ -156,7 +156,11 @@ async function handleCallback(request: NextRequest, origin: string, proto: strin
   const vkUserId = String(userInfo.sub ?? tokens.user_id ?? "")
   if (!vkUserId) return fail("no_user_id")
 
-  // Find existing user by VK account link OR by email match
+  // Поиск существующего пользователя только по связке provider+providerAccountId.
+  // Раньше при отсутствии связки fallback шёл по email → silent account linking:
+  // атакующий, зарегистрировавший VK на чужой email, получал доступ к заказам
+  // владельца этого email без его согласия. Теперь линковка возможна только
+  // через explicit UI (/account/connections) из-под уже авторизованного пользователя.
   const emailLower = userInfo.email?.toLowerCase()
   const existingAccount = await prisma.account.findFirst({
     where: { provider: "vk", providerAccountId: vkUserId },
@@ -164,8 +168,17 @@ async function handleCallback(request: NextRequest, origin: string, proto: strin
   })
 
   let user = existingAccount?.user ?? null
+
+  // Если VK-аккаунт не привязан, проверяем занят ли email.
+  // Если занят — блокируем логин, предлагаем войти паролем и привязать VK вручную.
   if (!user && emailLower) {
-    user = await prisma.user.findUnique({ where: { email: emailLower } })
+    const emailOwner = await prisma.user.findUnique({
+      where: { email: emailLower },
+      select: { id: true },
+    })
+    if (emailOwner) {
+      return fail("email_already_registered")
+    }
   }
 
   const fullName = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(" ").trim() || null
@@ -197,14 +210,14 @@ async function handleCallback(request: NextRequest, origin: string, proto: strin
       },
     })
   } else {
-    // Link VK account if not already linked (user matched by email)
-    if (!existingAccount) {
-      await prisma.account.create({
+    // user здесь всегда соответствует existingAccount (линковка по email отключена —
+    // см. проверку email_already_registered выше), поэтому отдельно создавать
+    // Account не нужно. Обновляем только токены на existingAccount — они могут
+    // refreshнуться при повторном входе.
+    if (existingAccount) {
+      await prisma.account.update({
+        where: { id: existingAccount.id },
         data: {
-          userId: user.id,
-          provider: "vk",
-          providerAccountId: vkUserId,
-          type: "oauth",
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token ?? null,
           expires_at: tokens.expires_in ? Math.floor(Date.now() / 1000) + tokens.expires_in : null,

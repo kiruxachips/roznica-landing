@@ -7,11 +7,28 @@ import Link from "next/link"
 import { OAuthButtons } from "./OAuthButtons"
 import { TelegramLoginButton } from "./TelegramLoginButton"
 
+// OAuth-ошибки, которые redirect-нули нас сюда с error=... параметром.
+// Пары code → человеческое сообщение; неизвестный code → generic fallback.
+const OAUTH_ERRORS: Record<string, string> = {
+  vk_email_already_registered:
+    "Этот email уже зарегистрирован другим способом. Войдите с паролем и подключите VK в настройках профиля.",
+  vk_token_exchange: "Не удалось войти через VK. Попробуйте ещё раз.",
+  vk_no_user_id: "VK не вернул ID пользователя. Попробуйте ещё раз.",
+  vk_state_mismatch: "Истекла сессия входа. Попробуйте ещё раз.",
+  vk_missing_params: "Неполный ответ от VK. Попробуйте ещё раз.",
+  vk_missing_cookies: "Потерялись cookies сессии. Попробуйте ещё раз.",
+  vk_unexpected: "Ошибка при входе через VK. Попробуйте ещё раз или войдите паролем.",
+}
+
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get("callbackUrl") || "/account"
   const verified = searchParams.get("verified")
+  const oauthError = searchParams.get("error")
+  const oauthErrorMessage = oauthError
+    ? OAUTH_ERRORS[oauthError] || "Не удалось войти через внешний сервис. Попробуйте ещё раз."
+    : null
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -45,6 +62,12 @@ export function LoginForm() {
       {verified === "1" && (
         <p className="text-sm text-green-700 bg-green-50 rounded-xl px-4 py-3 mb-4 text-center">
           Email подтверждён! Войдите в аккаунт.
+        </p>
+      )}
+
+      {oauthErrorMessage && (
+        <p className="text-sm text-amber-700 bg-amber-50 rounded-xl px-4 py-3 mb-4">
+          {oauthErrorMessage}
         </p>
       )}
 
