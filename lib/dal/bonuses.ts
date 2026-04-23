@@ -63,6 +63,49 @@ export async function creditBonusesForOrder(
   return earned
 }
 
+/**
+ * Списывает ранее начисленные за заказ бонусы. Используется при отмене
+ * уже доставленного заказа (P1-14): иначе покупатель получает бонусы за
+ * товар, которого у него фактически нет.
+ *
+ * Идемпотентно: сбрасывает Order.bonusEarned в 0, поэтому повторный вызов
+ * ничего не сделает.
+ *
+ * Если у юзера не хватает баланса (уже потратил бонусы), уводим в минус —
+ * это предпочтительно блокировке cancel-а: администратор должен иметь
+ * возможность аннулировать заказ при любых обстоятельствах, а отрицательный
+ * баланс восстановится из следующих начислений.
+ */
+export async function reverseOrderEarnedBonuses(userId: string, orderId: string) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { bonusEarned: true },
+  })
+  if (!order || order.bonusEarned <= 0) return 0
+
+  const amount = order.bonusEarned
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { bonusBalance: { decrement: amount } },
+    }),
+    prisma.bonusTransaction.create({
+      data: {
+        userId,
+        amount: -amount,
+        type: "admin_adjustment",
+        description: `Возврат бонусов — отмена доставленного заказа`,
+        orderId,
+      },
+    }),
+    prisma.order.update({
+      where: { id: orderId },
+      data: { bonusEarned: 0 },
+    }),
+  ])
+  return amount
+}
+
 export async function deductBonusesInTx(
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   userId: string,

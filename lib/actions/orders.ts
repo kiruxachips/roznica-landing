@@ -1,6 +1,6 @@
 "use server"
 
-import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS } from "@/lib/dal/orders"
+import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, type UnavailableItemDetail } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 import { updateTasteProfile } from "@/lib/dal/taste-profile"
 import type { OrderData } from "@/lib/types"
@@ -68,12 +68,22 @@ async function rollbackOrder(
 
 export type CreateOrderResult =
   | { success: true; orderNumber: string; id: string; thankYouToken: string | null; paymentUrl: string | null }
-  | { success: false; error: string }
+  | { success: false; error: string; unavailableItems?: UnavailableItemDetail[] }
 
 export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
   try {
     return await createOrderImpl(data)
   } catch (e) {
+    // Специальная ветка: stock/цена поменялись между add-to-cart и оформлением.
+    // Клиент получает список проблемных товаров и показывает модалку
+    // с кнопкой "Убрать из корзины и продолжить" — лучше UX чем generic error.
+    if (e instanceof UnavailableItemsError) {
+      return {
+        success: false,
+        error: "Некоторые товары больше недоступны",
+        unavailableItems: e.items,
+      }
+    }
     const msg = e instanceof Error ? e.message : "Неизвестная ошибка при создании заказа"
     console.error("[createOrder] failed:", {
       customer: data.customerName,

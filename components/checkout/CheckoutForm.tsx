@@ -54,6 +54,12 @@ export function CheckoutForm() {
   const [agreed, setAgreed] = useState(false)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  // Список товаров, которые backend отверг из-за stock/price-change.
+  // Используется для модалки "Убрать из корзины и продолжить" (P1-2).
+  const [unavailableItems, setUnavailableItems] = useState<
+    { variantId: string; name: string; available: number; requested: number; reason: string }[]
+  >([])
+  const removeItem = useCartStore((s) => s.removeItem)
   const paymentMethod = "online" as const
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
@@ -176,6 +182,13 @@ export function CheckoutForm() {
       })
 
       if (!result.success) {
+        // Stock/price изменились — показываем модалку со списком проблемных
+        // товаров; юзер одним кликом убирает их и повторяет оформление.
+        if (result.unavailableItems && result.unavailableItems.length > 0) {
+          setUnavailableItems(result.unavailableItems)
+          setLoading(false)
+          return
+        }
         setError(result.error)
         setLoading(false)
         return
@@ -373,6 +386,55 @@ export function CheckoutForm() {
           </div>
         </div>
       </div>
+
+      {/* Модалка P1-2: stock/цена поменялись между корзиной и submit'ом.
+          Юзер в один клик убирает проблемные товары и продолжает оформление. */}
+      {unavailableItems.length > 0 && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-2">Товары изменили статус</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Пока вы оформляли заказ, эти товары стали недоступны или изменились в цене. Мы не можем оформить заказ, пока они в корзине.
+            </p>
+            <ul className="space-y-2 mb-5 max-h-48 overflow-y-auto">
+              {unavailableItems.map((u) => (
+                <li key={u.variantId} className="text-sm bg-amber-50 rounded-xl px-3 py-2">
+                  <p className="font-medium">{u.name}</p>
+                  <p className="text-xs text-amber-700">
+                    {u.reason === "out_of_stock" && "Нет в наличии"}
+                    {u.reason === "insufficient_stock" && `Доступно только ${u.available} из запрошенных ${u.requested}`}
+                    {u.reason === "inactive" && "Товар снят с продажи"}
+                    {u.reason === "price_changed" && "Цена изменилась"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  for (const u of unavailableItems) removeItem(u.variantId)
+                  setUnavailableItems([])
+                }}
+                className="flex-1 h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Убрать из корзины и продолжить
+              </button>
+              <button
+                type="button"
+                onClick={() => setUnavailableItems([])}
+                className="flex-1 h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Отменить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
