@@ -556,9 +556,18 @@ export function PickupPointModal({ open, onClose }: Props) {
             {/* List */}
             <div className="flex-1 overflow-y-auto">
               {pickupPointsLoading ? (
-                <div className="p-6 text-sm text-muted-foreground text-center">
-                  Загружаем пункты…
-                </div>
+                <ul className="divide-y divide-border" aria-label="Загружаем пункты выдачи">
+                  {[0, 1, 2, 3, 4, 5].map((i) => (
+                    <li key={i} className="px-4 py-3 flex items-start gap-2">
+                      <div className="shrink-0 w-5 h-5 rounded-full bg-muted animate-pulse mt-0.5" />
+                      <div className="flex-1 space-y-1.5">
+                        <div className="h-3.5 bg-muted rounded animate-pulse w-2/3" />
+                        <div className="h-3 bg-muted rounded animate-pulse w-full" />
+                        <div className="h-3 bg-muted rounded animate-pulse w-1/2" />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
               ) : visiblePoints.length === 0 ? (
                 <div className="p-6 text-sm text-muted-foreground text-center">
                   {searchQuery ? (
@@ -579,10 +588,15 @@ export function PickupPointModal({ open, onClose }: Props) {
                 </div>
               ) : (
                 <ul className="divide-y divide-border">
-                  {visiblePoints.map((point) => {
+                  {visiblePoints.map((point, index) => {
                     const dist = distances.get(point.code)
                     const isDraft = draftPoint?.code === point.code
                     const noCoords = !hasCoords(point)
+                    // Бейдж «Ближайший» ставим на первом элементе отсортированного
+                    // списка — visiblePoints уже отсортированы по расстоянию
+                    // (cityCenter или searchCenter).
+                    const isNearest =
+                      index === 0 && hasCoords(point) && (cityCenter !== null || searchCenter !== null)
                     return (
                       <li key={point.code}>
                         <button
@@ -603,15 +617,22 @@ export function PickupPointModal({ open, onClose }: Props) {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium">{point.name}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium">{point.name}</p>
+                                {isNearest && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-semibold uppercase tracking-wide">
+                                    Ближайший
+                                  </span>
+                                )}
+                                {noCoords && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 font-semibold uppercase tracking-wide">
+                                    Без карты
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground">{point.address}</p>
                               {point.workTime && (
                                 <p className="text-xs text-muted-foreground">{point.workTime}</p>
-                              )}
-                              {noCoords && (
-                                <p className="text-[11px] text-amber-700 mt-0.5">
-                                  Координаты не уточнены — на карте не показан
-                                </p>
                               )}
                             </div>
                             {dist != null && (

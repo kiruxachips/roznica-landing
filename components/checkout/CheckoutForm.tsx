@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import Image from "next/image"
 import Link from "next/link"
 import { Pencil } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { StepIndicator } from "./StepIndicator"
+import { OrderSummary } from "./OrderSummary"
 import { ContactStep } from "./steps/ContactStep"
 import { DeliveryStep } from "./steps/DeliveryStep"
 import { PaymentStep } from "./steps/PaymentStep"
@@ -110,57 +110,14 @@ export function CheckoutForm() {
 
       {/* Order summary */}
       <div className="lg:col-span-1">
-        <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:sticky lg:top-24">
-          <h2 className="text-lg font-semibold mb-4">Ваш заказ</h2>
-          <div className="space-y-3 mb-4">
-            {items.map((item) => (
-              <div key={item.variantId} className="flex gap-3">
-                {item.image && (
-                  <Image
-                    src={item.image}
-                    alt={item.name}
-                    width={48}
-                    height={48}
-                    className="w-12 h-12 rounded-lg object-cover"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {item.weight} x {item.quantity}
-                  </p>
-                </div>
-                <p className="text-sm font-medium">{item.price * item.quantity}₽</p>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-border pt-4 space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Подытог</span>
-              <span>{total}₽</span>
-            </div>
-            {promoDiscount > 0 && (
-              <div className="flex justify-between text-green-600">
-                <span>Скидка ({promoCode})</span>
-                <span>-{promoDiscount}₽</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Доставка</span>
-              <span>
-                {selectedRate
-                  ? deliveryPrice === 0
-                    ? "Бесплатно"
-                    : `${deliveryPrice}₽`
-                  : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
-              <span>Итого</span>
-              <span className="text-primary">{finalTotal}₽</span>
-            </div>
-          </div>
-        </div>
+        <OrderSummary
+          items={items}
+          total={total}
+          promoCode={promoCode}
+          promoDiscount={promoDiscount}
+          deliveryPrice={deliveryPrice}
+          finalTotal={finalTotal}
+        />
       </div>
 
       {/* Sticky mobile CTA — работает только на шаге "payment", когда кнопка

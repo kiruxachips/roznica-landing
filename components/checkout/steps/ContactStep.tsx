@@ -1,10 +1,41 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { ArrowRight } from "lucide-react"
+
+// Частые опечатки доменов email. Показываем ненавязчивую подсказку
+// «Вы имели в виду kirill@gmail.com?» — кликом заменяет поле.
+const EMAIL_TYPO_FIXES: Record<string, string> = {
+  "gmial.com": "gmail.com",
+  "gmai.com": "gmail.com",
+  "gamil.com": "gmail.com",
+  "gmaill.com": "gmail.com",
+  "gmail.co": "gmail.com",
+  "gmail.ru": "gmail.com",
+  "yandex.com": "yandex.ru",
+  "yandx.ru": "yandex.ru",
+  "yandex.ur": "yandex.ru",
+  "ya.com": "ya.ru",
+  "mail.r": "mail.ru",
+  "mil.ru": "mail.ru",
+  "mial.ru": "mail.ru",
+  "rambler.com": "rambler.ru",
+  "outlok.com": "outlook.com",
+  "hotmial.com": "hotmail.com",
+}
+
+function suggestEmail(email: string): string | null {
+  const at = email.lastIndexOf("@")
+  if (at < 1 || at === email.length - 1) return null
+  const local = email.slice(0, at)
+  const domain = email.slice(at + 1).toLowerCase().trim()
+  const fix = EMAIL_TYPO_FIXES[domain]
+  if (!fix || fix === domain) return null
+  return `${local}@${fix}`
+}
 
 interface UserProfile {
   name: string | null
@@ -22,6 +53,10 @@ export function ContactStep() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
+
+  // Кандидат исправления email-опечатки. Не агрессивный — только подсказка
+  // рядом с полем, пользователь сам решает принимать или нет.
+  const emailTypoFix = useMemo(() => suggestEmail(contact.email), [contact.email])
 
   useEffect(() => {
     if (!isCustomer || !session?.user?.id) return
@@ -153,6 +188,19 @@ export function ContactStep() {
             placeholder="email@example.com"
           />
           {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+          {!errors.email && emailTypoFix && (
+            <p className="text-xs mt-1">
+              <span className="text-muted-foreground">Возможно, вы имели в виду </span>
+              <button
+                type="button"
+                onClick={() => setContact({ email: emailTypoFix })}
+                className="text-primary hover:underline font-medium"
+              >
+                {emailTypoFix}
+              </button>
+              <span className="text-muted-foreground">?</span>
+            </p>
+          )}
         </div>
       </div>
 

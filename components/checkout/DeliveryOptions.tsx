@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Truck, Package, Clock, ChevronDown } from "lucide-react"
+import { Truck, Package, Clock, ChevronDown, MapPin, Home } from "lucide-react"
 import { useDeliveryStore } from "@/lib/store/delivery"
 
 interface CarrierInfo {
@@ -239,32 +239,43 @@ export function DeliveryOptions() {
                 )}
               </button>
 
-              {/* Expanded tariff options */}
+              {/* Expanded tariff options. Крупные card'ы — каждый тариф это
+                  ясный выбор с иконкой, а не radio-строчка. Адрес выбранного
+                  ПВЗ показывается прямо под соответствующим тарифом. */}
               {isExpanded && isAvailable && (
                 <div className="mt-2 space-y-2 animate-in slide-in-from-top-2 duration-200">
                   {carrierRates.map((rate, i) => {
                     const isSelected =
                       selectedRate?.carrier === rate.carrier &&
                       selectedRate?.tariffCode === rate.tariffCode
+                    const isPvz = rate.deliveryType === "pvz"
+                    const Icon = isPvz ? MapPin : Home
                     return (
-                      <label
+                      <button
                         key={`${rate.carrier}-${rate.tariffCode}-${i}`}
-                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors text-left ${
+                        type="button"
+                        onClick={() => handleTariffSelect(rate)}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-lg border-2 cursor-pointer transition-colors text-left ${
                           isSelected
                             ? "border-primary bg-primary/5"
-                            : "border-border hover:border-primary/30"
+                            : "border-border hover:border-primary/40 hover:bg-muted/50"
                         }`}
                       >
-                        <input
-                          type="radio"
-                          name="deliveryTariff"
-                          checked={isSelected}
-                          onChange={() => handleTariffSelect(rate)}
-                          className="accent-primary shrink-0"
-                        />
+                        <div className={`shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          isSelected ? "border-primary bg-primary" : "border-muted-foreground/30"
+                        }`}>
+                          {isSelected && (
+                            <div className="w-2 h-2 bg-primary-foreground rounded-full" />
+                          )}
+                        </div>
+                        <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
+                          isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        }`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium">
-                            {rate.deliveryType === "pvz" ? "Забрать из пункта выдачи" : "Доставка до двери"}
+                            {isPvz ? "Забрать из пункта выдачи" : "Доставка до двери"}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {rate.minDays === rate.maxDays
@@ -275,7 +286,7 @@ export function DeliveryOptions() {
                         <span className="text-sm font-semibold whitespace-nowrap">
                           {rate.priceWithMarkup === 0 ? "Бесплатно" : `${rate.priceWithMarkup}₽`}
                         </span>
-                      </label>
+                      </button>
                     )
                   })}
                 </div>
