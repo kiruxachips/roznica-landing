@@ -100,18 +100,8 @@ function osmRegionName(region: string): string[] {
   return [trimmed]
 }
 
-async function fetchOverpassPoints(city: string, region?: string): Promise<OverpassNode[]> {
-  // Расширенный запрос: ищем area по нескольким подходящим admin_level и
-  // вариантам place-tag — для малых городов Подмосковья area может быть
-  // оформлена как city/town/village/suburb, а не только admin_level 4/6/8.
+function buildOverpassQuery(city: string, region?: string): string {
   const escapedCity = escapeOverpass(city)
-
-  // Если регион задан — применяем двойной spatial-фильтр: нода должна лежать
-  // и в area города, и в area региона. `(area.region)` на area-запросе
-  // Overpass НЕ использует для spatial containment — это фильтр применим
-  // только к нодам/вэям. Поэтому area-union собираем по всему миру, и
-  // пересечение делаем на слое node.
-  let query: string
   if (region && region.trim()) {
     const regionCandidates = osmRegionName(region).map(escapeOverpass)
     const regionUnion = regionCandidates
@@ -120,7 +110,7 @@ async function fetchOverpassPoints(city: string, region?: string): Promise<Overp
         `  area["name:ru"="${r}"]["admin_level"~"^[234]$"];`,
       ])
       .join("\n")
-    query = `[out:json][timeout:25];
+    return `[out:json][timeout:25];
 (
 ${regionUnion}
 )->.region;
@@ -132,8 +122,8 @@ ${regionUnion}
 )->.a;
 node(area.a)(area.region)["amenity"="post_office"];
 out body 500;`
-  } else {
-    query = `[out:json][timeout:25];
+  }
+  return `[out:json][timeout:25];
 (
   area["name"="${escapedCity}"]["admin_level"~"^[468]$"];
   area["name:ru"="${escapedCity}"]["admin_level"~"^[468]$"];
@@ -142,8 +132,9 @@ out body 500;`
 )->.a;
 node(area.a)["amenity"="post_office"];
 out body 500;`
-  }
+}
 
+async function runOverpassQuery(query: string, city: string): Promise<OverpassNode[]> {
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
       const res = await fetch(endpoint, {
@@ -172,6 +163,21 @@ out body 500;`
   }
   console.error(`[overpass] all ${OVERPASS_ENDPOINTS.length} endpoints failed for "${city}"`)
   return []
+}
+
+async function fetchOverpassPoints(city: string, region?: string): Promise<OverpassNode[]> {
+  // Первая попытка — со строгим region-фильтром.
+  const primary = await runOverpassQuery(buildOverpassQuery(city, region), city)
+  if (primary.length > 0 || !region || !region.trim()) return primary
+
+  // Fallback: регион задан, но ничего не вернулось (маленькая страна,
+  // спорная админ-граница, OSM без region-area и т.п.). Повторяем без
+  // region-фильтра — postal-prefix фильтр на вызывающей стороне отсечёт
+  // чужой одноимённый город.
+  console.warn(
+    `[overpass] region-constrained query returned 0 for "${city}" in "${region}" — retrying without region`
+  )
+  return runOverpassQuery(buildOverpassQuery(city), city)
 }
 
 async function fetchPochtaApiOffices(city: string, region?: string): Promise<PochtaOffice[]> {

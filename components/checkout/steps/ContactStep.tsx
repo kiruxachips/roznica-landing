@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
@@ -52,11 +52,10 @@ export function ContactStep() {
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  // Подсказка-опечатка вычисляется на onBlur, а не при каждом нажатии —
+  // иначе во время ввода "test@gmi" подсказка мерцала бы вкл/выкл.
+  const [emailTypoFix, setEmailTypoFix] = useState<string | null>(null)
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
-
-  // Кандидат исправления email-опечатки. Не агрессивный — только подсказка
-  // рядом с полем, пользователь сам решает принимать или нет.
-  const emailTypoFix = useMemo(() => suggestEmail(contact.email), [contact.email])
 
   useEffect(() => {
     if (!isCustomer || !session?.user?.id) return
@@ -68,12 +67,17 @@ export function ContactStep() {
         // Автозаполнение профилем — только если поле в сторе пустое
         // (юзер мог уже что-то ввести).
         const parts = data.name?.trim().split(" ") || []
+        const nextEmail = contact.email || data.email || ""
         setContact({
           firstName: contact.firstName || parts[0] || "",
           lastName: contact.lastName || parts.slice(1).join(" ") || "",
-          email: contact.email || data.email || "",
+          email: nextEmail,
           phone: contact.phone || data.phone || "",
         })
+        // Если профильный email содержит типичную опечатку — сразу
+        // показываем подсказку, иначе юзер её никогда не увидит
+        // (suggest триггерится только на onBlur ручного ввода).
+        if (nextEmail) setEmailTypoFix(suggestEmail(nextEmail))
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,7 +185,9 @@ export function ContactStep() {
             onChange={(e) => {
               setContact({ email: e.target.value })
               if (errors.email) setErrors((s) => ({ ...s, email: "" }))
+              if (emailTypoFix) setEmailTypoFix(null)
             }}
+            onBlur={() => setEmailTypoFix(suggestEmail(contact.email))}
             className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
               errors.email ? "border-red-400" : "border-input"
             }`}
@@ -189,11 +195,14 @@ export function ContactStep() {
           />
           {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
           {!errors.email && emailTypoFix && (
-            <p className="text-xs mt-1">
+            <p className="text-xs mt-1" aria-live="polite" aria-atomic="true">
               <span className="text-muted-foreground">Возможно, вы имели в виду </span>
               <button
                 type="button"
-                onClick={() => setContact({ email: emailTypoFix })}
+                onClick={() => {
+                  setContact({ email: emailTypoFix })
+                  setEmailTypoFix(null)
+                }}
                 className="text-primary hover:underline font-medium"
               >
                 {emailTypoFix}

@@ -96,18 +96,59 @@ export function PickupPointModal({ open, onClose }: Props) {
     if (open) setDraftPoint(selectedPickupPoint)
   }, [open, selectedPickupPoint])
 
-  // Scroll-lock + ESC to close
+  // Scroll-lock + ESC to close + focus trap внутри модалки.
+  // Tab за пределы модалки — ловим и возвращаем к первому элементу,
+  // чтобы screen reader и клавиатурные юзеры не уходили в невидимый
+  // фон под overlay.
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = "hidden"
+
+    function getFocusable(): HTMLElement[] {
+      if (!dialogRef.current) return []
+      return Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter((el) => !el.hasAttribute("aria-hidden") && el.offsetParent !== null)
+    }
+
     function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose()
+      if (e.key === "Escape") {
+        onClose()
+        return
+      }
+      if (e.key === "Tab") {
+        const focusable = getFocusable()
+        if (focusable.length === 0) return
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        const active = document.activeElement as HTMLElement | null
+        if (e.shiftKey && active === first) {
+          e.preventDefault()
+          last.focus()
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault()
+          first.focus()
+        }
+      }
     }
     document.addEventListener("keydown", handleKey)
+
+    // На открытии фокусируем первый фокусируемый элемент внутри модалки —
+    // это «заголовок-close» button, что сразу позволяет ESC-менее юзерам
+    // закрыть.
+    const focusTimer = setTimeout(() => {
+      const focusable = getFocusable()
+      focusable[0]?.focus()
+    }, 50)
+
     return () => {
       document.body.style.overflow = prevOverflow
       document.removeEventListener("keydown", handleKey)
+      clearTimeout(focusTimer)
     }
   }, [open, onClose])
 
@@ -365,7 +406,10 @@ export function PickupPointModal({ open, onClose }: Props) {
     // пересоздавать карту на каждый клик нельзя (destroy+init дорогие).
   }, [scriptLoaded, mappablePoints, searchCenter, cityCenter])
 
-  // Инициализация карты — на desktop всегда; на mobile только когда вкладка "map"
+  // Инициализация карты — на desktop всегда; на mobile только когда вкладка "map".
+  // При переключении с "list" на "map" контейнер карты из `hidden` становится
+  // видимым — в этот момент Yandex мог инициализироваться при width/height=0,
+  // поэтому ре-инициализируем.
   useEffect(() => {
     if (!open) return
     if (typeof window !== "undefined" && window.innerWidth >= 768) {
@@ -413,12 +457,23 @@ export function PickupPointModal({ open, onClose }: Props) {
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-0 sm:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="pickup-modal-title"
+      onClick={(e) => {
+        // Клик по backdrop закрывает; клик по контенту модалки — нет.
+        if (e.target === e.currentTarget) onClose()
+      }}
     >
-      <div className="bg-white w-full h-full sm:h-[90vh] sm:max-h-[720px] sm:max-w-6xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden">
+      {/* На mobile используем 100svh/100dvh, чтобы при открытой клавиатуре
+          модалка корректно укорачивалась (иначе половина контента уходит
+          под системный overflow на iOS/Android). */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-white w-full h-[100svh] sm:h-[90vh] sm:max-h-[720px] sm:max-w-6xl sm:rounded-2xl shadow-xl flex flex-col overflow-hidden"
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 p-4 sm:p-5 border-b border-border">
           <div className="min-w-0">
