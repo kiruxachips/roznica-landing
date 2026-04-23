@@ -57,9 +57,10 @@ export function CheckoutForm() {
   // Список товаров, которые backend отверг из-за stock/price-change.
   // Используется для модалки "Убрать из корзины и продолжить" (P1-2).
   const [unavailableItems, setUnavailableItems] = useState<
-    { variantId: string; name: string; available: number; requested: number; reason: string }[]
+    { variantId: string; name: string; available: number; requested: number; reason: string; currentPrice?: number }[]
   >([])
   const removeItem = useCartStore((s) => s.removeItem)
+  const updatePrice = useCartStore((s) => s.updatePrice)
   const paymentMethod = "online" as const
 
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
@@ -90,9 +91,25 @@ export function CheckoutForm() {
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-20">
-        <p className="text-xl text-muted-foreground mb-4">Корзина пуста</p>
-        <Link href="/catalog" className="text-primary hover:underline">Перейти в каталог</Link>
+      <div className="text-center py-16 sm:py-20">
+        <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-3">Корзина пуста</h1>
+        <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+          Нечего оформлять. Добавьте товары в корзину — и вернитесь сюда для оформления.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/catalog"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:bg-primary/90 transition-colors"
+          >
+            Перейти в каталог
+          </Link>
+          <Link
+            href="/"
+            className="px-6 py-3 border border-border rounded-xl font-medium hover:bg-muted transition-colors"
+          >
+            На главную
+          </Link>
+        </div>
       </div>
     )
   }
@@ -291,7 +308,24 @@ export function CheckoutForm() {
                 defaultValue=""
                 onChange={(e) => {
                   const sel = savedAddresses.find((a) => a.id === e.target.value)
-                  if (sel) setDoorAddress(sel.fullAddress)
+                  if (!sel) return
+                  setDoorAddress(sel.fullAddress)
+                  // PS4: если первая часть адреса (город) отличается от текущего
+                  // города доставки — предупреждаем. Address хранит full-string
+                  // без отдельного city-поля, точно распарсить нельзя, но
+                  // простая эвристика: city = первая часть до запятой.
+                  const firstPart = sel.fullAddress.split(",")[0]?.trim() || ""
+                  if (
+                    deliveryCity &&
+                    firstPart &&
+                    firstPart.toLowerCase() !== deliveryCity.toLowerCase()
+                  ) {
+                    setError(
+                      `Адрес относится к другому городу (${firstPart}). Обновите поле "Город доставки" вручную, иначе стоимость будет рассчитана для ${deliveryCity}.`
+                    )
+                  } else {
+                    setError("")
+                  }
                 }}
               >
                 <option value="">— Выберите адрес —</option>
@@ -433,26 +467,48 @@ export function CheckoutForm() {
                     {u.reason === "out_of_stock" && "Нет в наличии"}
                     {u.reason === "insufficient_stock" && `Доступно только ${u.available} из запрошенных ${u.requested}`}
                     {u.reason === "inactive" && "Товар снят с продажи"}
-                    {u.reason === "price_changed" && "Цена изменилась"}
+                    {u.reason === "price_changed" && u.currentPrice !== undefined
+                      ? `Цена изменилась, актуальная — ${u.currentPrice}₽`
+                      : u.reason === "price_changed" && "Цена изменилась"}
                   </p>
                 </li>
               ))}
             </ul>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col gap-2">
+              {/* PS9: если единственная причина — price_changed, предлагаем
+                  обновить цены вместо удаления. Юзер может не хотеть терять товар. */}
+              {unavailableItems.every(
+                (u) => u.reason === "price_changed" && u.currentPrice !== undefined
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    for (const u of unavailableItems) {
+                      if (u.currentPrice !== undefined) {
+                        updatePrice(u.variantId, u.currentPrice)
+                      }
+                    }
+                    setUnavailableItems([])
+                  }}
+                  className="h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                  Обновить цены и продолжить
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   for (const u of unavailableItems) removeItem(u.variantId)
                   setUnavailableItems([])
                 }}
-                className="flex-1 h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                className="h-11 border border-primary text-primary rounded-xl text-sm font-medium hover:bg-primary/5 transition-colors"
               >
                 Убрать из корзины и продолжить
               </button>
               <button
                 type="button"
                 onClick={() => setUnavailableItems([])}
-                className="flex-1 h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
+                className="h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
               >
                 Отменить
               </button>

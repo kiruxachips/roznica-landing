@@ -20,8 +20,18 @@ import {
  *
  * Идемпотентность через eventId на основе (variantId, переход stockBefore→stockAfter).
  */
+// PS6: не слать алерты для планового inventory_correction / write_off /
+// order_restored. Это ручные операции админа (или возврат отменённого заказа)
+// — спамить админа его же действиями контрпродуктивно. Реальный сигнал к
+// закупке — это продажи (order_placed); для остальных reason-ов админ сам
+// видит статистику в /admin/warehouse.
+const ALERT_REASONS: Set<StockAdjustResult["reason"]> = new Set([
+  "order_placed",
+])
+
 export async function notifyStockChange(result: StockAdjustResult): Promise<void> {
   if (!result.becameDepleted && !result.crossedLowThreshold) return
+  if (!ALERT_REASONS.has(result.reason)) return
 
   try {
     // Подтягиваем карточку варианта для payload (единожды, даже если оба события)

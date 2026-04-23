@@ -36,6 +36,9 @@ export interface UnavailableItemDetail {
   requested: number
   available: number
   reason: "out_of_stock" | "insufficient_stock" | "inactive" | "price_changed"
+  /** Для reason="price_changed" — актуальная цена с бэка; клиент может
+   * предложить юзеру "Обновить цену" вместо полного удаления позиции. */
+  currentPrice?: number
 }
 
 /**
@@ -79,6 +82,7 @@ export async function createOrder(data: OrderData) {
         requested: item.quantity,
         available: variant.stock,
         reason: "price_changed",
+        currentPrice: variant.price,
       })
       continue
     }

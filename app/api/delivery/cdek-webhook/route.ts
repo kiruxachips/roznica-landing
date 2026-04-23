@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import { creditBonusesForOrder } from "@/lib/dal/bonuses"
+import { creditBonusesForOrderInTx, getBonusRateValue } from "@/lib/dal/bonuses"
 
 const SOURCE = "cdek" as const
 const MAX_TIMESTAMP_SKEW_MS = 15 * 60 * 1000 // 15 минут
@@ -78,13 +78,6 @@ export async function POST(request: NextRequest) {
     statusDateTime || "_",
   ].join(":")
 
-  const already = await prisma.processedInboundEvent.findUnique({
-    where: { source_eventId: { source: SOURCE, eventId } },
-  })
-  if (already) {
-    return NextResponse.json({ status: "duplicate" }, { status: 200 })
-  }
-
   const order = await prisma.order.findFirst({
     where: { carrierOrderId },
   })
@@ -129,12 +122,28 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Атомарно: update + status log + идемпотентность-маркер в одной транзакции,
-  // чтобы повторная доставка webhook'а при падении на полпути не делала update
-  // дважды и не писала дубль в лог.
+  // Атомарно:
+  //   1) processedInboundEvent.create — ПЕРВОЙ операцией в tx. Это страхует
+  //      от TOCTOU-гонки: параллельный webhook с тем же eventId получит P2002
+  //      на unique-constraint, вся транзакция откатится, update не выполнится
+  //      дважды.
+  //   2) order.update + statusLog
+  //   3) creditBonusesForOrderInTx — в той же транзакции, чтобы не было
+  //      сценария «delivered записали, bonus не записали» при падении
+  //      процесса между коммитом и внешним вызовом.
+  const bonusRate =
+    updateData.status === "delivered" && updateData.status !== order.status && order.userId
+      ? await getBonusRateValue()
+      : null
+
   if (Object.keys(updateData).length > 0) {
     try {
       await prisma.$transaction(async (tx) => {
+        // Idempotency marker ПЕРВОЙ операцией — P2002 откатит всю tx.
+        await tx.processedInboundEvent.create({
+          data: { source: SOURCE, eventId },
+        })
+
         await tx.order.update({
           where: { id: order.id },
           data: updateData,
@@ -151,26 +160,18 @@ export async function POST(request: NextRequest) {
           })
         }
 
-        await tx.processedInboundEvent.create({
-          data: { source: SOURCE, eventId },
-        })
+        // Bonus credit в той же транзакции — атомарность delivered + earned.
+        if (bonusRate !== null && order.userId) {
+          await creditBonusesForOrderInTx(tx, order.userId, order.id, order.total, bonusRate)
+        }
       })
     } catch (err) {
-      // Unique-constraint на processedInboundEvent — значит параллельный webhook
-      // уже проскочил. Это ок, отвечаем 200 duplicate.
       const e = err as { code?: string }
       if (e?.code === "P2002") {
+        // Параллельный webhook уже обработал — idempotent duplicate.
         return NextResponse.json({ status: "duplicate" }, { status: 200 })
       }
       throw err
-    }
-
-    // Credit bonuses на delivery — вне транзакции, т.к. creditBonusesForOrder
-    // сам атомарен и не должен блокировать webhook-response.
-    if (updateData.status === "delivered" && updateData.status !== order.status && order.userId) {
-      creditBonusesForOrder(order.userId, order.id, order.total).catch((e) =>
-        console.error("CDEK webhook: failed to credit bonuses for order", order.id, e)
-      )
     }
   } else {
     // Update-полей нет, но событие мы обработали — записываем idempotency-маркер.

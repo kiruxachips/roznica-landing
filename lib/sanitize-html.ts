@@ -40,8 +40,12 @@ const SANITIZE_OPTIONS: sanitizeHtmlLib.IOptions = {
   },
   // Ограничиваем схемы ссылок — no javascript:, data:, vbscript:
   allowedSchemes: ["http", "https", "mailto", "tel"],
+  // PS8: data:-схему для img отключаем. Браузеры исполняют <script> внутри
+  // SVG, переданного через data:image/svg+xml; risk outweighs benefit от
+  // inline base64. Картинки в блоге хранятся на /uploads/articles/ — это
+  // обычный http(s) и достаточно.
   allowedSchemesByTag: {
-    img: ["http", "https", "data"], // картинки можно data: (inline base64)
+    img: ["http", "https"],
   },
   // target=_blank без rel=noopener — reverse tabnabbing уязвимость,
   // принудительно добавляем rel=noopener noreferrer ко всем внешним ссылкам.

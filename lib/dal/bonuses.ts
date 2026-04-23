@@ -64,6 +64,46 @@ export async function creditBonusesForOrder(
 }
 
 /**
+ * Tx-вариант creditBonusesForOrder. Используется когда начисление должно
+ * быть атомарно с другой операцией (напр. webhook status→delivered + credit).
+ * Rate читается перед транзакцией, чтобы не прогонять отдельный запрос внутри tx.
+ */
+export async function creditBonusesForOrderInTx(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  userId: string,
+  orderId: string,
+  orderTotal: number,
+  bonusRate: number
+) {
+  const earned = Math.floor(orderTotal * bonusRate)
+  if (earned <= 0) return 0
+
+  await tx.user.update({
+    where: { id: userId },
+    data: { bonusBalance: { increment: earned } },
+  })
+  await tx.bonusTransaction.create({
+    data: {
+      userId,
+      amount: earned,
+      type: "earned",
+      description: `Начислено за заказ`,
+      orderId,
+    },
+  })
+  await tx.order.update({
+    where: { id: orderId },
+    data: { bonusEarned: earned },
+  })
+  return earned
+}
+
+/** Экспортируем rate getter для tx-варианта creditBonuses. */
+export async function getBonusRateValue(): Promise<number> {
+  return getBonusRate()
+}
+
+/**
  * Списывает ранее начисленные за заказ бонусы. Используется при отмене
  * уже доставленного заказа (P1-14): иначе покупатель получает бонусы за
  * товар, которого у него фактически нет.

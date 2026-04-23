@@ -16,6 +16,10 @@ interface CartState {
   addItem: (item: CartItem) => void
   removeItem: (variantId: string) => void
   updateQuantity: (variantId: string, quantity: number) => void
+  /** PS9: обновить цену конкретного variant (цена поменялась на бэке между
+   *  add-to-cart и checkout). Используется в UnavailableItemsError-модалке,
+   *  когда юзер согласен оплатить по новой цене. */
+  updatePrice: (variantId: string, price: number) => void
   clearCart: () => void
   totalItems: () => number
   totalPrice: () => number
@@ -90,6 +94,17 @@ export const useCartStore = create<CartState>()(
             quantity <= 0
               ? state.items.filter((i) => i.variantId !== variantId)
               : state.items.map((i) => (i.variantId === variantId ? { ...i, quantity } : i))
+          return {
+            items: newItems,
+            promoDiscount: recalcPromoDiscount(newItems, state.promoType, state.promoValue),
+          }
+        }),
+
+      updatePrice: (variantId, price) =>
+        set((state) => {
+          const newItems = state.items.map((i) =>
+            i.variantId === variantId ? { ...i, price } : i
+          )
           return {
             items: newItems,
             promoDiscount: recalcPromoDiscount(newItems, state.promoType, state.promoValue),

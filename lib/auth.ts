@@ -175,12 +175,49 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
       },
     }),
-    // OAuth providers — only active if env vars are set
+    // OAuth providers — only active if env vars are set.
+    // PS2: кастомный profile() нормализует email ДО того как PrismaAdapter
+    // создаст запись — юзер в БД сразу с lowercase email, без post-hoc update.
     ...(process.env.GOOGLE_CLIENT_ID
-      ? [Google({ clientId: process.env.GOOGLE_CLIENT_ID!, clientSecret: process.env.GOOGLE_CLIENT_SECRET! })]
+      ? [
+          Google({
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            profile(profile) {
+              return {
+                id: profile.sub,
+                name: profile.name,
+                email: profile.email ? String(profile.email).toLowerCase().trim() : null,
+                image: profile.picture,
+              }
+            },
+          }),
+        ]
       : []),
     ...(process.env.YANDEX_CLIENT_ID
-      ? [Yandex({ clientId: process.env.YANDEX_CLIENT_ID!, clientSecret: process.env.YANDEX_CLIENT_SECRET! })]
+      ? [
+          Yandex({
+            clientId: process.env.YANDEX_CLIENT_ID!,
+            clientSecret: process.env.YANDEX_CLIENT_SECRET!,
+            profile(profile) {
+              const p = profile as unknown as Record<string, unknown>
+              return {
+                id: String(p.id),
+                name:
+                  (p.display_name as string) ||
+                  (p.real_name as string) ||
+                  (p.login as string),
+                email: p.default_email
+                  ? String(p.default_email).toLowerCase().trim()
+                  : null,
+                image:
+                  p.is_avatar_empty === false && p.default_avatar_id
+                    ? `https://avatars.yandex.net/get-yapic/${p.default_avatar_id}/islands-200`
+                    : null,
+              }
+            },
+          }),
+        ]
       : []),
     // VK ID (id.vk.ru) не через NextAuth-провайдер — @auth/core v5 не поддерживает кастомный
     // token.request, а VK требует device_id в обмене кода на токен. Реализовано в роутах
@@ -188,22 +225,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     async signIn({ user, account }) {
-      // PrismaAdapter fills name/email/image on OAuth sign-in. Sync image → avatarUrl
-      // (our UI reads avatarUrl). Non-blocking: never fail sign-in if DB sync errors.
-      if (account?.type === "oauth" && user?.id && user?.image) {
+      // PrismaAdapter fills name/email/image on OAuth sign-in. Дополнительно:
+      //   - Sync image → avatarUrl (UI читает avatarUrl)
+      //   - PS2: нормализуем email в lower-case. Если OAuth-провайдер вернул
+      //     "John@X.com", Postgres text case-sensitive → все последующие
+      //     lookup'ы по lower-case не найдут юзера. Делаем это DO-blocking:
+      //     если нормализация упирается в unique-constraint (дубль), не
+      //     блокируем signIn — legacy-пользователь войдёт, fix будет при
+      //     миграции consolidated.
+      if (account?.type === "oauth" && user?.id) {
         try {
           const existing = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { avatarUrl: true },
+            select: { avatarUrl: true, email: true },
           })
-          if (existing && !existing.avatarUrl) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { avatarUrl: user.image },
-            })
+          if (existing) {
+            const updates: Record<string, string> = {}
+            if (!existing.avatarUrl && user.image) {
+              updates.avatarUrl = user.image
+            }
+            if (existing.email && existing.email !== existing.email.toLowerCase()) {
+              updates.email = existing.email.toLowerCase()
+            }
+            if (Object.keys(updates).length > 0) {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: updates,
+              }).catch((e) => {
+                // P2002 на email-duplicate — уже есть lower-case юзер.
+                // Оставляем как было, не блокируем вход.
+                const err = e as { code?: string }
+                if (err?.code !== "P2002") throw e
+              })
+            }
           }
         } catch (e) {
-          console.error("OAuth avatar sync failed:", e)
+          console.error("OAuth post-signin sync failed:", e)
         }
       }
       return true

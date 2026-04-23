@@ -17,7 +17,14 @@ export async function GET(request: NextRequest) {
   try {
     return await handleCallback(request, origin, proto)
   } catch (e) {
-    console.error("VK callback fatal error:", e)
+    // PS7: санитизация — в error-объекте могут быть fetch.url с токенами,
+    // prisma-query-детали, cause-chain. Логируем только безопасное подмножество.
+    const err = e as { name?: string; code?: string; message?: string }
+    console.error("VK callback fatal error:", {
+      name: err?.name,
+      code: err?.code,
+      message: err?.message?.slice(0, 500),
+    })
     return NextResponse.redirect(`${origin}/auth/login?error=vk_unexpected`)
   }
 }

@@ -39,6 +39,9 @@ export interface StockAdjustResult {
   becameDepleted: boolean
   /** true если stock стал > 0 (был 0) — для возможных будущих сценариев */
   recovered: boolean
+  /** Причина изменения — пробрасывается, чтобы notifyStockChange мог
+   * фильтровать spam от inventory_correction / write_off. */
+  reason: StockReason
 }
 
 /**
@@ -104,6 +107,7 @@ export async function adjustStock(
       crossedLowThreshold,
       becameDepleted,
       recovered,
+      reason: input.reason,
     }
   }
 
