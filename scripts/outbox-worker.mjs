@@ -52,7 +52,10 @@ function signPayload(rawBody, secret) {
 }
 
 function backoffSeconds(attempts) {
-  const s = Math.min(5 * Math.pow(5, attempts), 86400)
+  // P2-7: было 5^attempts * 5 — растёт слишком круто (attempt=7 → ~24ч).
+  // Менее агрессивный 2^attempts * 60, capped at 1ч. Дает больше попыток
+  // в первый час после сбоя и быстрее "замечает" что бот оживел.
+  const s = Math.min(60 * Math.pow(2, attempts), 3600)
   return Math.floor(s)
 }
 

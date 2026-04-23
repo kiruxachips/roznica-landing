@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { deleteProduct, toggleProductActive } from "@/lib/actions/products"
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog"
-import { Pencil, Trash2, Eye, EyeOff } from "lucide-react"
+import { Pencil, Archive, Eye } from "lucide-react"
 
 export function ProductActions({ productId, productName }: { productId: string; productName: string }) {
   const router = useRouter()
@@ -25,16 +25,16 @@ export function ProductActions({ productId, productName }: { productId: string; 
         <Eye className="w-4 h-4" />
       </button>
       <ConfirmDialog
-        title="Удалить товар?"
-        message={`Товар "${productName}" будет удалён безвозвратно.`}
+        title="Архивировать товар?"
+        message={`Товар "${productName}" будет скрыт из каталога, но история заказов и отзывы сохранятся. Можно вернуть активность позже.`}
         onConfirm={async () => {
           await deleteProduct(productId)
           router.refresh()
         }}
       >
         {(open) => (
-          <button onClick={open} className="p-2 text-muted-foreground hover:text-red-600 rounded-lg hover:bg-muted transition-colors" title="Удалить">
-            <Trash2 className="w-4 h-4" />
+          <button onClick={open} className="p-2 text-muted-foreground hover:text-amber-600 rounded-lg hover:bg-muted transition-colors" title="Архивировать">
+            <Archive className="w-4 h-4" />
           </button>
         )}
       </ConfirmDialog>

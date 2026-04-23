@@ -1,5 +1,6 @@
 import { fetchWithTimeout } from "./utils"
 import { getPostalCodeForCity } from "./dadata"
+import { logIntegration } from "@/lib/dal/integration-log"
 import type {
   DeliveryProvider,
   DeliveryRateRequest,
@@ -59,6 +60,14 @@ async function calculateSinglePackagePrice(params: {
     if (tariffRes.status !== "fulfilled" || !tariffRes.value.ok) {
       const reason = tariffRes.status === "rejected" ? tariffRes.reason : `HTTP ${tariffRes.value.status}`
       console.error("Pochta tariff API failed:", reason)
+      // P2-8: пишем в audit-trail для админа — чтобы видеть когда API падает
+      void logIntegration({
+        direction: "outbound",
+        source: "pochta",
+        event: "tariff.calculate",
+        error: String(reason).slice(0, 4000),
+        statusCode: tariffRes.status === "fulfilled" ? tariffRes.value.status : null,
+      })
       return null
     }
 
@@ -77,6 +86,12 @@ async function calculateSinglePackagePrice(params: {
     return { price: priceRub, minDays, maxDays }
   } catch (e) {
     console.error("Pochta calculateSinglePackagePrice error:", e)
+    void logIntegration({
+      direction: "outbound",
+      source: "pochta",
+      event: "tariff.calculate",
+      error: e instanceof Error ? e.message : String(e),
+    })
     return null
   }
 }

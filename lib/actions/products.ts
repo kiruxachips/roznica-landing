@@ -153,13 +153,27 @@ export async function updateProduct(
 export async function deleteProduct(id: string) {
   const admin = await requireAdmin("products.delete")
   const snapshot = await prisma.product.findUnique({ where: { id }, select: { name: true, slug: true } })
-  await prisma.product.delete({ where: { id } })
+
+  // P2-9: soft-delete — Product больше нельзя физически удалить (onDelete: Restrict
+  // на ProductImage/ProductVariant/Review защитит на уровне БД даже при
+  // обходе этого кода). Архивация = isActive=false + все варианты неактивны.
+  // Исторические отзывы и OrderItem-снимки сохраняются навсегда.
+  await prisma.$transaction([
+    prisma.product.update({
+      where: { id },
+      data: { isActive: false },
+    }),
+    prisma.productVariant.updateMany({
+      where: { productId: id },
+      data: { isActive: false },
+    }),
+  ])
 
   invalidateCatalogCache()
 
   void logAdminAction({
     admin,
-    action: "product.deleted",
+    action: "product.archived",
     entityType: "product",
     entityId: id,
     payload: snapshot || undefined,
