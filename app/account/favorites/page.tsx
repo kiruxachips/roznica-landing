@@ -4,53 +4,13 @@ import { redirect } from "next/navigation"
 import { Heart } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getFavoritesByUserId } from "@/lib/dal/favorites"
+import { mapToProductCard } from "@/lib/dal/products"
 import { ProductCard } from "@/components/catalog/ProductCard"
-import type { ProductCard as ProductCardType } from "@/lib/types"
 
 export const dynamic = "force-dynamic"
 
 export const metadata: Metadata = {
   title: "Избранное | Millor Coffee",
-}
-
-function toProductCard(product: {
-  id: string
-  name: string
-  slug: string
-  description: string
-  productType: string
-  productForm: string | null
-  origin: string | null
-  roastLevel: string | null
-  badge: string | null
-  flavorNotes: string[]
-  images: { url: string; alt: string | null }[]
-  variants: { id: string; weight: string; price: number; oldPrice: number | null; stock: number }[]
-  reviews: { rating: number }[]
-}): ProductCardType {
-  const avgRating = product.reviews.length > 0
-    ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
-    : null
-
-  return {
-    id: product.id,
-    name: product.name,
-    slug: product.slug,
-    description: product.description,
-    productType: product.productType as ProductCardType["productType"],
-    productForm: product.productForm,
-    origin: product.origin,
-    roastLevel: product.roastLevel,
-    badge: product.badge,
-    flavorNotes: product.flavorNotes,
-    primaryImage: product.images[0]?.url ?? null,
-    primaryImageAlt: product.images[0]?.alt ?? null,
-    minPrice: product.variants[0]?.price ?? null,
-    minOldPrice: product.variants[0]?.oldPrice ?? null,
-    firstVariant: product.variants[0] ? { id: product.variants[0].id, weight: product.variants[0].weight, price: product.variants[0].price, oldPrice: product.variants[0].oldPrice, stock: product.variants[0].stock } : null,
-    reviewCount: product.reviews.length,
-    averageRating: avgRating,
-  }
 }
 
 export default async function FavoritesPage({
@@ -81,7 +41,7 @@ export default async function FavoritesPage({
             {favorites.map((fav) => (
               <ProductCard
                 key={fav.id}
-                product={toProductCard(fav.product)}
+                product={mapToProductCard(fav.product)}
                 favorited
               />
             ))}

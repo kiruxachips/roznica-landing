@@ -5,7 +5,7 @@ import { unstable_cache } from "next/cache"
 import { CACHE_TAGS } from "@/lib/cache-tags"
 
 // Shared select shape for ProductCard listings — keeps payload minimal
-const productCardSelect = {
+export const productCardSelect = {
   id: true,
   name: true,
   slug: true,
@@ -32,6 +32,54 @@ const productCardSelect = {
     select: { rating: true },
   },
 } satisfies Prisma.ProductSelect
+
+type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof productCardSelect }>
+
+/**
+ * Единый маппер Prisma-row → ProductCard. Используется во всех точках листинга
+ * (каталог, избранное, рекомендации), чтобы не терять поля типа `variants` или
+ * `smallImage` в разных копиях кода.
+ */
+export function mapToProductCard(p: ProductCardRow): ProductCard {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    description: p.description,
+    productType: p.productType as ProductType,
+    productForm: p.productForm,
+    origin: p.origin,
+    roastLevel: p.roastLevel,
+    badge: p.badge,
+    flavorNotes: p.flavorNotes,
+    primaryImage: p.images[0]?.url ?? null,
+    primaryImageAlt: p.images[0]?.alt ?? null,
+    smallImage: p.smallImage,
+    minPrice: p.variants[0]?.price ?? null,
+    minOldPrice: p.variants[0]?.oldPrice ?? null,
+    firstVariant: p.variants[0]
+      ? {
+          id: p.variants[0].id,
+          weight: p.variants[0].weight,
+          price: p.variants[0].price,
+          oldPrice: p.variants[0].oldPrice,
+          stock: p.variants[0].stock,
+        }
+      : null,
+    variants: p.variants.map((v) => ({
+      id: v.id,
+      weight: v.weight,
+      price: v.price,
+      oldPrice: v.oldPrice,
+      stock: v.stock,
+    })),
+    reviewCount: p.reviews.length,
+    averageRating:
+      p.reviews.length > 0
+        ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
+        : null,
+  }
+}
 
 export async function getProducts(filters: ProductFilters = {}): Promise<{
   products: ProductCard[]
@@ -139,30 +187,7 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
     total = count
   }
 
-  let products: ProductCard[] = items.map((p) => ({
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    description: p.description,
-    productType: p.productType as ProductType,
-    productForm: p.productForm,
-    origin: p.origin,
-    roastLevel: p.roastLevel,
-    badge: p.badge,
-    flavorNotes: p.flavorNotes,
-    primaryImage: p.images[0]?.url ?? null,
-    primaryImageAlt: p.images[0]?.alt ?? null,
-    smallImage: p.smallImage,
-    minPrice: p.variants[0]?.price ?? null,
-    minOldPrice: p.variants[0]?.oldPrice ?? null,
-    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, oldPrice: p.variants[0].oldPrice, stock: p.variants[0].stock } : null,
-    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, oldPrice: v.oldPrice, stock: v.stock })),
-    reviewCount: p.reviews.length,
-    averageRating:
-      p.reviews.length > 0
-        ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
-        : null,
-  }))
+  const products: ProductCard[] = items.map(mapToProductCard)
 
   return { products, total }
 }
@@ -247,31 +272,24 @@ async function getFeaturedProductsUncached(limit: number): Promise<ProductCard[]
     },
   })
 
+  // Featured показывает 1кг по дефолту, поэтому переопределяем firstVariant
+  // после общего маппинга. `variants` (весь массив) остаётся — ProductCard
+  // сам покажет селектор веса.
   return items.map((p) => {
+    const card = mapToProductCard(p)
     const displayVariant = p.variants.find((v) => v.weight === "1кг") ?? p.variants[0]
-    return {
-      id: p.id,
-      name: p.name,
-      slug: p.slug,
-      description: p.description,
-      productType: p.productType as ProductType,
-      productForm: p.productForm,
-      origin: p.origin,
-      roastLevel: p.roastLevel,
-      badge: p.badge,
-      flavorNotes: p.flavorNotes,
-      primaryImage: p.images[0]?.url ?? null,
-      primaryImageAlt: p.images[0]?.alt ?? null,
-      smallImage: p.smallImage,
-      minPrice: displayVariant?.price ?? null,
-      minOldPrice: displayVariant?.oldPrice ?? null,
-      firstVariant: displayVariant ? { id: displayVariant.id, weight: displayVariant.weight, price: displayVariant.price, oldPrice: displayVariant.oldPrice, stock: displayVariant.stock } : null,
-      reviewCount: p.reviews.length,
-      averageRating:
-        p.reviews.length > 0
-          ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
-          : null,
+    if (displayVariant) {
+      card.firstVariant = {
+        id: displayVariant.id,
+        weight: displayVariant.weight,
+        price: displayVariant.price,
+        oldPrice: displayVariant.oldPrice,
+        stock: displayVariant.stock,
+      }
+      card.minPrice = displayVariant.price
+      card.minOldPrice = displayVariant.oldPrice
     }
+    return card
   })
 }
 
@@ -301,30 +319,7 @@ export async function getRelatedProducts(
     select: productCardSelect,
   })
 
-  return items.map((p) => ({
-    id: p.id,
-    name: p.name,
-    slug: p.slug,
-    description: p.description,
-    productType: p.productType as ProductType,
-    productForm: p.productForm,
-    origin: p.origin,
-    roastLevel: p.roastLevel,
-    badge: p.badge,
-    flavorNotes: p.flavorNotes,
-    primaryImage: p.images[0]?.url ?? null,
-    primaryImageAlt: p.images[0]?.alt ?? null,
-    smallImage: p.smallImage,
-    minPrice: p.variants[0]?.price ?? null,
-    minOldPrice: p.variants[0]?.oldPrice ?? null,
-    firstVariant: p.variants[0] ? { id: p.variants[0].id, weight: p.variants[0].weight, price: p.variants[0].price, oldPrice: p.variants[0].oldPrice, stock: p.variants[0].stock } : null,
-    variants: p.variants.map((v) => ({ id: v.id, weight: v.weight, price: v.price, oldPrice: v.oldPrice, stock: v.stock })),
-    reviewCount: p.reviews.length,
-    averageRating:
-      p.reviews.length > 0
-        ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
-        : null,
-  }))
+  return items.map(mapToProductCard)
 }
 
 export const getProductSlugs = unstable_cache(

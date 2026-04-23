@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { productCardSelect } from "@/lib/dal/products"
 
 export async function getFavoritesByUserId(
   userId: string,
@@ -10,14 +11,10 @@ export async function getFavoritesByUserId(
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
-      include: {
-        product: {
-          include: {
-            images: { where: { isPrimary: true }, take: 1 },
-            variants: { where: { isActive: true }, orderBy: { price: "asc" } },
-            reviews: { where: { isVisible: true }, select: { rating: true } },
-          },
-        },
+      select: {
+        id: true,
+        createdAt: true,
+        product: { select: productCardSelect },
       },
     }),
     prisma.favorite.count({ where: { userId } }),
