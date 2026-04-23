@@ -2,6 +2,13 @@
 
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
+import { after } from "next/server"
+import {
+  renderAdminPendingRegistrationEmail,
+  sendRenderedEmail,
+  getAdminNotificationEmails,
+} from "@/lib/email"
+import { dispatchEmail } from "@/lib/dal/email-dispatch"
 
 /**
  * Публичное действие — регистрация нового менеджера.
@@ -41,6 +48,29 @@ export async function registerManagerAction(input: {
       role: "manager",
       status: "pending",
     },
+  })
+
+  // N-2: уведомление суперадминам о pending-менеджере, чтобы они могли
+  // одобрить сразу, а не ждать пока кто-то случайно зайдёт в /admin/users.
+  // Через EmailDispatch — durability + idempotency (дубли по email невозможны
+  // благодаря AdminUser.email unique-constraint выше).
+  const adminEmails = getAdminNotificationEmails()
+  after(async () => {
+    for (const admin of adminEmails) {
+      await dispatchEmail({
+        orderId: null,
+        kind: `admin.pending_manager:${email}` as const,
+        recipient: admin,
+        render: () =>
+          renderAdminPendingRegistrationEmail({
+            managerName: name,
+            managerEmail: email,
+          }),
+        send: sendRenderedEmail,
+      }).catch((e) =>
+        console.error("[register-manager] admin email dispatch failed:", e)
+      )
+    }
   })
 
   return { success: true }

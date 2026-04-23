@@ -44,9 +44,16 @@ export async function updateCollection(
 }
 
 export async function deleteCollection(id: string) {
+  // N-5: soft-delete через isActive=false. Раньше жёстко удаляли,
+  // теряя все ProductCollectionItem — клиенты не могли вернуть коллекцию
+  // если передумали. Теперь просто скрываем из каталога, все связи и
+  // сортировки сохраняются.
   const admin = await requireAdmin("collections.delete")
-  await prisma.productCollection.delete({ where: { id } })
-  void logAdminAction({ admin, action: "collection.deleted", entityType: "collection", entityId: id })
+  await prisma.productCollection.update({
+    where: { id },
+    data: { isActive: false },
+  })
+  void logAdminAction({ admin, action: "collection.archived", entityType: "collection", entityId: id })
   invalidateCollections()
 }
 

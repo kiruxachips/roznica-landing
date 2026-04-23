@@ -621,3 +621,47 @@ export async function sendAdminStockAlertEmail(data: StockAlertEmailData, to: st
   const { subject, html } = renderAdminStockAlertEmail(data)
   return sendRenderedEmail({ to, subject, html })
 }
+
+// ── Admin: Pending Manager Registration ──
+// N-2: письмо суперадминам когда менеджер зарегистрировался и ждёт одобрения.
+// Без этого pending-менеджеры зависали в БД, пока суперадмин случайно не
+// заглянет в /admin/users.
+
+export interface PendingAdminEmailData {
+  managerName: string
+  managerEmail: string
+}
+
+export function renderAdminPendingRegistrationEmail(data: PendingAdminEmailData): { subject: string; html: string } {
+  const html = wrapEmail(`
+    <h2 style="color: #7c4a1e; margin-bottom: 16px;">Новая заявка на роль менеджера</h2>
+    <p style="color: #555; font-size: 16px; line-height: 1.5;">
+      Зарегистрирован новый менеджер и ожидает вашего одобрения.
+    </p>
+
+    <div style="background: #f9f7f4; border-radius: 8px; padding: 16px; margin: 16px 0;">
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Имя:</strong> ${e(data.managerName)}</p>
+      <p style="margin: 4px 0; font-size: 14px; color: #555;"><strong>Email:</strong> ${e(data.managerEmail)}</p>
+    </div>
+
+    <p style="margin-top: 24px;">
+      <a href="${siteUrl}/admin/users" style="display: inline-block; background: #7c4a1e; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-size: 14px; font-weight: 600;">Открыть управление пользователями</a>
+    </p>
+
+    <p style="color: #888; font-size: 14px; margin-top: 16px;">
+      До одобрения менеджер не сможет войти в админку.
+    </p>
+  `)
+  return {
+    subject: `Новая заявка менеджера — ${data.managerName}`,
+    html,
+  }
+}
+
+export async function sendAdminPendingRegistrationEmail(
+  data: PendingAdminEmailData,
+  to: string
+): Promise<SendResult> {
+  const { subject, html } = renderAdminPendingRegistrationEmail(data)
+  return sendRenderedEmail({ to, subject, html })
+}

@@ -30,6 +30,8 @@ export type EmailDispatchKind =
   // дублей при повторных вызовах adjustStock с тем же эффектом.
   | `admin.stock_depleted:${string}`
   | `admin.stock_low:${string}`
+  // N-2: уведомление суперадминам о pending-менеджере
+  | `admin.pending_manager:${string}`
 
 export interface RenderedEmail {
   subject: string
