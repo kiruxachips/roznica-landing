@@ -233,7 +233,7 @@ export function CheckoutForm() {
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-8">
       {/* Form */}
       <div className="lg:col-span-2">
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-4 sm:space-y-5">
+        <form id="checkout-form" onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-sm space-y-4 sm:space-y-5">
           <h2 className="text-lg font-semibold">Контактные данные</h2>
 
           {isCustomer && profile && (
@@ -397,10 +397,12 @@ export function CheckoutForm() {
             </span>
           </label>
 
+          {/* Desktop submit — на mobile дублируется sticky bar'ом снизу экрана,
+              чтобы юзер не терял CTA во время заполнения длинной формы. */}
           <button
             type="submit"
             disabled={loading || !agreed || !selectedRate}
-            className="w-full min-h-12 sm:min-h-14 px-3 py-2 bg-primary text-primary-foreground rounded-xl text-sm sm:text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 whitespace-normal leading-tight"
+            className="hidden lg:flex w-full min-h-14 px-3 py-2 bg-primary text-primary-foreground rounded-xl text-lg font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 whitespace-normal leading-tight items-center justify-center"
           >
             {loading
               ? "Оформление..."
@@ -450,6 +452,37 @@ export function CheckoutForm() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* R1: sticky mobile summary. Desktop видит sidebar и submit в форме;
+          mobile терял CTA пока скроллил по полям доставки и ПВЗ — conversion
+          страдал. Фиксируем mini-summary с кнопкой оплаты внизу viewport,
+          прикрепляем через form="checkout-form" к той же форме. */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-border shadow-[0_-4px_12px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
+        <div className="px-4 py-3 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground">Итого</p>
+            <p className="text-lg font-bold text-primary truncate">{finalTotal}₽</p>
+          </div>
+          <button
+            type="submit"
+            form="checkout-form"
+            disabled={loading || !agreed || !selectedRate}
+            className="shrink-0 h-12 px-5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {loading ? "Оформление..." : paymentMethod === "online" ? "Оплатить" : "Оформить"}
+          </button>
+        </div>
+        {!agreed && (
+          <p className="px-4 pb-2 text-[11px] text-amber-700">
+            Подтвердите согласие с политикой, чтобы продолжить
+          </p>
+        )}
+        {!selectedRate && agreed && (
+          <p className="px-4 pb-2 text-[11px] text-amber-700">
+            Выберите способ доставки, чтобы продолжить
+          </p>
+        )}
       </div>
 
       {/* Модалка P1-2: stock/цена поменялись между корзиной и submit'ом.

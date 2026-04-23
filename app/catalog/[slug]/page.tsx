@@ -62,25 +62,61 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
     getRelatedProducts(product.id, product.productType as ProductType, product.categoryId, 4),
   ])
 
+  // R3: расширенный Product schema для rich snippets Google/Yandex.
+  // Добавлено: brand, url каждого offer, priceValidUntil (+1 год),
+  // seller, itemCondition, reviewBody у aggregateRating — это даёт
+  // шанс попасть в price-карточку и звёзды в выдаче.
+  const priceValidUntil = new Date()
+  priceValidUntil.setFullYear(priceValidUntil.getFullYear() + 1)
+  const productUrl = `https://millor-coffee.ru/catalog/${slug}`
+  const hasAbsoluteImages = product.images
+    .filter((img) => img.url)
+    .map((img) => (img.url.startsWith("http") ? img.url : `https://millor-coffee.ru${img.url}`))
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
     name: product.name,
     description: product.description,
-    image: product.images[0]?.url,
+    image: hasAbsoluteImages.length > 0 ? hasAbsoluteImages : undefined,
+    url: productUrl,
+    brand: {
+      "@type": "Brand",
+      name: "Millor Coffee",
+    },
+    category:
+      product.productType === "tea"
+        ? "Чай"
+        : product.productType === "instant"
+          ? "Растворимые напитки"
+          : "Кофе",
     offers: product.variants.map((v) => ({
       "@type": "Offer",
+      url: productUrl,
       price: v.price,
       priceCurrency: "RUB",
+      priceValidUntil: priceValidUntil.toISOString().slice(0, 10),
       availability: v.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+      seller: {
+        "@type": "Organization",
+        name: "Millor Coffee",
+      },
+      sku: v.id,
+      // name у Offer = вес варианта, чтобы Google показал правильный price-диапазон
+      name: `${product.name}, ${v.weight}`,
     })),
-    aggregateRating: product.reviews.length > 0
-      ? {
-          "@type": "AggregateRating",
-          ratingValue: (product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length).toFixed(1),
-          reviewCount: product.reviews.length,
-        }
-      : undefined,
+    aggregateRating:
+      product.reviews.length > 0
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: (
+              product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
+            ).toFixed(1),
+            reviewCount: product.reviews.length,
+            bestRating: 5,
+            worstRating: 1,
+          }
+        : undefined,
   }
 
   const breadcrumbLd = {

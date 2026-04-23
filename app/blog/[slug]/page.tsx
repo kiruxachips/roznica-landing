@@ -55,18 +55,40 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
 
   const relatedArticles = await getRelatedArticles(article.id, article.categoryId, 3)
 
+  // R3: расширенный Article schema для rich snippets в Google/Yandex.
+  // Добавлено: mainEntityOfPage, author, publisher.logo, wordCount, keywords.
+  const articleUrl = `https://millor-coffee.ru/blog/${slug}`
+  const coverImageAbs = article.coverImage?.startsWith("http")
+    ? article.coverImage
+    : article.coverImage
+      ? `https://millor-coffee.ru${article.coverImage}`
+      : undefined
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": articleUrl,
+    },
     headline: article.title,
     description: article.excerpt,
-    image: article.coverImage,
+    image: coverImageAbs,
     datePublished: article.publishedAt?.toISOString(),
     dateModified: article.publishedAt?.toISOString(),
+    author: {
+      "@type": "Organization",
+      name: "Millor Coffee",
+      url: "https://millor-coffee.ru",
+    },
     publisher: {
       "@type": "Organization",
       name: "Millor Coffee",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://millor-coffee.ru/apple-touch-icon.png",
+      },
     },
+    keywords: article.tags?.length ? article.tags.join(", ") : undefined,
   }
 
   const breadcrumbLd = {

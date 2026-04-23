@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { User as UserIcon } from "lucide-react"
@@ -27,6 +27,31 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const [passwordError, setPasswordError] = useState("")
   const [loadingProfile, setLoadingProfile] = useState(false)
   const [loadingPassword, setLoadingPassword] = useState(false)
+  // R6: флаг "форма изменена, но не сохранена". Включается при любом onChange
+  // в inputs формы профиля, сбрасывается после успешного save.
+  const [profileDirty, setProfileDirty] = useState(false)
+
+  // R6: browser-level warning при попытке уйти со страницы (reload,
+  // закрыть таб, navigate-away в адресной строке) с несохранёнными изменениями.
+  // Next-link клики перехватить надёжно можно только через router.events,
+  // которого в app-router нет; делегируем visual-индикатору кнопки "Сохранить".
+  useEffect(() => {
+    if (!profileDirty) return
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault()
+      // Современные браузеры игнорируют текст returnValue и показывают свой
+      // стандартный диалог, но поле нужно установить для Legacy-совместимости.
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [profileDirty])
+
+  function markDirty() {
+    if (!profileDirty) setProfileDirty(true)
+    // Чистим старые сообщения, чтобы не вводили в заблуждение
+    if (profileMsg) setProfileMsg("")
+  }
 
   async function handleProfileSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -48,6 +73,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
       setProfileError(result.error)
     } else {
       setProfileMsg("Профиль сохранён")
+      setProfileDirty(false)
       router.refresh()
     }
   }
@@ -98,7 +124,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Profile info */}
-      <form onSubmit={handleProfileSubmit} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
+      <form onSubmit={handleProfileSubmit} onChange={markDirty} className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 space-y-4">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full overflow-hidden bg-muted flex items-center justify-center shrink-0">
             {user.avatarUrl ? (
@@ -182,13 +208,21 @@ export function ProfileForm({ user }: ProfileFormProps) {
           <p className="text-sm text-green-600 bg-green-50 rounded-xl px-4 py-3">{profileMsg}</p>
         )}
 
-        <button
-          type="submit"
-          disabled={loadingProfile}
-          className="h-11 px-6 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
-        >
-          {loadingProfile ? "Сохранение..." : "Сохранить"}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={loadingProfile}
+            className="h-11 px-6 bg-primary text-primary-foreground rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {loadingProfile ? "Сохранение..." : "Сохранить"}
+          </button>
+          {profileDirty && !loadingProfile && (
+            <span className="text-xs text-amber-700 flex items-center gap-1.5">
+              <span className="w-2 h-2 bg-amber-500 rounded-full inline-block animate-pulse" />
+              Есть несохранённые изменения
+            </span>
+          )}
+        </div>
       </form>
 
       {/* Connected accounts */}

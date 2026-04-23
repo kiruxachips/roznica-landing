@@ -1,11 +1,16 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { OAuthButtons } from "./OAuthButtons"
 import { TelegramLoginButton } from "./TelegramLoginButton"
+
+// R5: ключ в localStorage для запоминания email (НЕ пароля — только email,
+// чтобы не заставлять юзера вводить его повторно). Пароль приходит через
+// password-manager или вводится руками.
+const REMEMBER_EMAIL_KEY = "mc.remember_email"
 
 // OAuth-ошибки, которые redirect-нули нас сюда с error=... параметром.
 // Пары code → человеческое сообщение; неизвестный code → generic fallback.
@@ -33,6 +38,26 @@ export function LoginForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
+  const [rememberedEmail, setRememberedEmail] = useState("")
+  const [remember, setRemember] = useState(true)
+
+  // R5: восстанавливаем сохранённый email при загрузке формы. В default-value
+  // это попасть не может (SSR), поэтому ставим после mount через key-based
+  // re-render через controlled state — но используем uncontrolled input
+  // с defaultValue, управляем через key.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_EMAIL_KEY)
+      if (saved) {
+        setRememberedEmail(saved)
+      } else {
+        // Если email не сохранён, галочку снимаем (значит юзер явно отказался).
+        setRemember(false)
+      }
+    } catch {
+      /* localStorage недоступен — ок */
+    }
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -41,8 +66,9 @@ export function LoginForm() {
 
     const form = new FormData(e.currentTarget)
 
+    const emailValue = form.get("email") as string
     const result = await signIn("customer-credentials", {
-      email: form.get("email") as string,
+      email: emailValue,
       password: form.get("password") as string,
       redirect: false,
     })
@@ -52,6 +78,17 @@ export function LoginForm() {
     if (result?.error) {
       setError("Неверный email или пароль")
     } else {
+      // R5: при успешном входе сохраняем / чистим email в зависимости
+      // от состояния галочки.
+      try {
+        if (remember && emailValue) {
+          localStorage.setItem(REMEMBER_EMAIL_KEY, emailValue.toLowerCase().trim())
+        } else {
+          localStorage.removeItem(REMEMBER_EMAIL_KEY)
+        }
+      } catch {
+        /* no-op */
+      }
       router.push(callbackUrl)
       router.refresh()
     }
@@ -79,12 +116,14 @@ export function LoginForm() {
             Email
           </label>
           <input
+            key={rememberedEmail}
             id="email"
             name="email"
             type="email"
             required
             autoComplete="email"
             autoFocus
+            defaultValue={rememberedEmail}
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="email@example.com"
           />
@@ -110,6 +149,16 @@ export function LoginForm() {
             </p>
           )}
         </div>
+
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            className="h-4 w-4 rounded border-input accent-primary"
+          />
+          <span className="text-sm text-muted-foreground">Запомнить меня</span>
+        </label>
 
         {error && (
           <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{error}</p>
