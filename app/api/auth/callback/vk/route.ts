@@ -80,7 +80,14 @@ async function handleCallback(request: NextRequest, origin: string, proto: strin
   }
 
   if (!tokens.access_token) {
-    console.error("VK token exchange failed:", tokens)
+    // Не логируем сам tokens-объект — он может содержать access_token/id_token/
+    // refresh_token даже при частичном fail'e. Утекут в журналы Beget'а.
+    console.error("VK token exchange failed:", {
+      error: tokens.error,
+      errorDescription: tokens.error_description,
+      hasIdToken: Boolean(tokens.id_token),
+      hasRefreshToken: Boolean(tokens.refresh_token),
+    })
     return fail("token_exchange")
   }
 
