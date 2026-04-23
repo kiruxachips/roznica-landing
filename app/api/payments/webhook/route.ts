@@ -17,7 +17,8 @@ import { buildOrderPaidPayload } from "@/lib/integrations/millorbot/payload"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
 
-// YooKassa IP ranges (first line of defense)
+// YooKassa IP ranges (first line of defense).
+// Актуальный список: https://yookassa.ru/developers/using-api/webhooks#ip
 const YOOKASSA_IPS = [
   "185.71.76.",
   "185.71.77.",
@@ -30,9 +31,20 @@ function isYookassaIp(ip: string): boolean {
   return YOOKASSA_IPS.some((prefix) => ip.startsWith(prefix))
 }
 
+/**
+ * Разрешаем обойти IP-check только для explicit dev-setup'а
+ * (NEXT_ALLOW_UNTRUSTED_WEBHOOKS=1 в локальном .env). В production,
+ * staging и любых preview-окружениях — всегда строгая проверка.
+ * Раньше было `NODE_ENV === "production"`: любой staging принимал
+ * поддельные webhook'и и создавал fake платежи/письма.
+ */
+function allowBypassIpCheck(): boolean {
+  return process.env.NEXT_ALLOW_UNTRUSTED_WEBHOOKS === "1"
+}
+
 export async function POST(request: NextRequest) {
-  // IP validation in production (first line of defense)
-  if (process.env.NODE_ENV === "production") {
+  // IP validation (first line of defense) — всегда, во всех окружениях.
+  if (!allowBypassIpCheck()) {
     const forwarded = request.headers.get("x-forwarded-for")
     const ip = forwarded?.split(",")[0]?.trim() || ""
     if (!isYookassaIp(ip)) {
