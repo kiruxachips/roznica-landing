@@ -14,6 +14,8 @@ export function StepIndicator() {
   const completed = useCheckoutWizard((s) => s.completed)
   const setStep = useCheckoutWizard((s) => s.setStep)
 
+  const currentIndex = STEPS.findIndex((s) => s.key === step)
+
   return (
     <nav
       aria-label="Шаги оформления"
@@ -22,8 +24,13 @@ export function StepIndicator() {
       <ol className="flex items-center justify-between gap-1 sm:gap-2">
         {STEPS.map((s, i) => {
           const isCurrent = step === s.key
-          const isDone = completed[s.key]
-          const isClickable = isDone || isCurrent
+          const isDone = completed[s.key] && !isCurrent
+          const isClickable = completed[s.key] || isCurrent
+          // Коннектор между i и i+1 — зелёный только если i-шаг пройден
+          // И текущий шаг >= i+1. Это предотвращает "обгон" линии прогресса
+          // при возврате с payment на delivery (раньше линия оставалась
+          // полностью зелёной, как будто юзер всё ещё на оплате).
+          const connectorReached = i < currentIndex
           return (
             <li key={s.key} className="flex items-center flex-1 min-w-0">
               <button
@@ -31,16 +38,16 @@ export function StepIndicator() {
                 onClick={() => isClickable && setStep(s.key)}
                 disabled={!isClickable}
                 className={`flex items-center gap-2 sm:gap-3 min-w-0 transition-colors ${
-                  isClickable ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                  isClickable ? "cursor-pointer" : "cursor-not-allowed"
                 }`}
                 aria-current={isCurrent ? "step" : undefined}
               >
                 <span
                   className={`flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full font-semibold text-sm shrink-0 transition-colors ${
-                    isDone
-                      ? "bg-primary text-primary-foreground"
-                      : isCurrent
-                      ? "bg-primary/10 text-primary border-2 border-primary"
+                    isCurrent
+                      ? "bg-primary text-primary-foreground ring-4 ring-primary/15"
+                      : isDone
+                      ? "bg-primary/80 text-primary-foreground"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
@@ -48,7 +55,11 @@ export function StepIndicator() {
                 </span>
                 <span
                   className={`font-medium text-sm truncate hidden sm:block ${
-                    isCurrent ? "text-foreground" : isDone ? "text-foreground/80" : "text-muted-foreground"
+                    isCurrent
+                      ? "text-foreground font-semibold"
+                      : isDone
+                      ? "text-foreground/70"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {s.label}
@@ -57,7 +68,7 @@ export function StepIndicator() {
               {i < STEPS.length - 1 && (
                 <div
                   className={`flex-1 h-0.5 mx-2 sm:mx-3 rounded-full transition-colors ${
-                    completed[s.key] ? "bg-primary" : "bg-muted"
+                    connectorReached ? "bg-primary/80" : "bg-muted"
                   }`}
                 />
               )}

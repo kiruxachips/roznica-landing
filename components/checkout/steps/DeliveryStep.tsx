@@ -42,19 +42,10 @@ export function DeliveryStep() {
       .catch(() => {})
   }, [isCustomer, session?.user?.id])
 
-  // Автоматически открываем модалку ПВЗ, когда юзер только что выбрал тариф
-  // "в пункт выдачи" и ещё ничего не выбрал. Это убирает лишний клик и делает
-  // flow линейным.
-  useEffect(() => {
-    if (
-      selectedRate?.deliveryType === "pvz" &&
-      !selectedPickupPoint &&
-      !pickupModalOpen
-    ) {
-      setPickupModalOpen(true)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedRate?.tariffCode, selectedRate?.deliveryType])
+  // Модалка ПВЗ открывается только по явному клику юзера на кнопку
+  // "Выбрать пункт выдачи на карте" или "Изменить". Автооткрытие при
+  // переключении перевозчика ломало flow: юзер хочет сравнить СДЭК/Почту,
+  // а ему в лицо прыгает карта.
 
   function validate(): boolean {
     if (!city) {
