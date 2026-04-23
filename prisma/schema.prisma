@@ -103,6 +103,7 @@ model ProductVariant {
   sortOrder         Int            @default(0)
   orderItems        OrderItem[]
   stockHistory      StockHistory[]
+  linkedGifts       Gift[]         @relation("ProductVariantGifts")
 
   @@index([isActive, productId])
   @@index([stock])
@@ -331,23 +332,36 @@ model Order {
 // и выбирает один (radio).
 model Gift {
   id           String   @id @default(cuid())
-  name         String   // "Кружка Millor", "Образец Эфиопия 50г"
+  // Название для клиента. Для linked-gift можно оставить свой маркетинговый
+  // текст («Образец Эфиопия в подарок») — он покажется клиенту вместо
+  // product.name, но на складе/адмике показан линк на реальный ProductVariant.
+  name         String
   description  String?  @db.Text
-  imageUrl     String?  // /uploads/gifts/{id}/xxx.webp
+  imageUrl     String?  // /uploads/gifts/{id}/xxx.webp — custom или копия product image
   imageAlt     String?
   // Порог cartTotal (после скидки, до бонусов) — от какой суммы подарок доступен.
-  // Если несколько gifts с разными порогами — клиент видит все, которые подошли,
-  // и выбирает ОДИН. Минимальный порог среди active задаёт "До подарка" в UI.
   minCartTotal Int      @default(0)
-  // Stock: если > 0 — декрементим при оформлении заказа, если NULL — unlimited.
+  // Stock-логика:
+  //   - productVariantId задан → stock НЕ используется; читаем ProductVariant.stock,
+  //     декрементим его через adjustStock(reason="gifted"). Это кейс «дарим неликвид».
+  //   - productVariantId NULL + stock NULL → unlimited custom gift (открытка, наклейка).
+  //   - productVariantId NULL + stock=число → custom gift с ограниченным запасом.
   stock        Int?
   isActive     Boolean  @default(true)
   sortOrder    Int      @default(0)
+
+  // Линк на вариант товара из каталога — использовать для дарения неликвида.
+  // onDelete: SetNull — удаление товара не роняет Gift-запись; админ увидит
+  // в UI что линка нет и переконфигурирует.
+  productVariantId String?
+  productVariant   ProductVariant? @relation("ProductVariantGifts", fields: [productVariantId], references: [id], onDelete: SetNull)
+
   orders       Order[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@index([isActive, minCartTotal])
+  @@index([productVariantId])
 }
 
 model OrderStatusLog {

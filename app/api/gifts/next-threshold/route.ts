@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
+import { areGiftsEnabled } from "@/lib/dal/gifts"
 
 /**
  * Возвращает ближайший ещё-недостигнутый gift-порог — используется
@@ -9,6 +10,11 @@ import { withRateLimit, DELIVERY_RATE_LIMIT } from "@/lib/api-helpers"
  * Отсортировано по возрастанию порога, берём ближайший.
  */
 export const GET = withRateLimit(async (request: NextRequest) => {
+  // Kill-switch — программа выключена админом, прячем мотивационный UI
+  if (!(await areGiftsEnabled())) {
+    return NextResponse.json({ next: null })
+  }
+
   const cartTotalRaw = request.nextUrl.searchParams.get("cartTotal")
   const cartTotal = Math.max(0, parseInt(cartTotalRaw || "0", 10) || 0)
 

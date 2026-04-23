@@ -21,6 +21,14 @@ interface Gift {
   stock: number | null
   isActive: boolean
   sortOrder: number
+  productVariantId: string | null
+  productVariant: {
+    id: string
+    weight: string
+    sku: string | null
+    stock: number
+    product: { id: string; name: string; isActive: boolean }
+  } | null
 }
 
 interface GiftsManagerProps {
@@ -29,12 +37,79 @@ interface GiftsManagerProps {
 
 type DraftGift = Partial<Gift> & { name: string; minCartTotal: number }
 
+interface VariantOption {
+  variantId: string
+  productId: string
+  productName: string
+  productSlug: string
+  weight: string
+  sku: string | null
+  price: number
+  stock: number
+  daysSinceLastSale: number | null
+  linkedToActiveGift: boolean
+  isActive: boolean
+}
+
 export function GiftsManager({ gifts }: GiftsManagerProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [editing, setEditing] = useState<DraftGift | null>(null)
   const [uploadingFor, setUploadingFor] = useState<string | null>(null)
   const [error, setError] = useState("")
+
+  // Product-picker
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerSearch, setPickerSearch] = useState("")
+  const [pickerSort, setPickerSort] = useState<"stock" | "stale">("stale")
+  const [variants, setVariants] = useState<VariantOption[]>([])
+  const [variantsLoading, setVariantsLoading] = useState(false)
+
+  function openPicker() {
+    setPickerOpen(true)
+    setPickerSearch("")
+    fetchVariants("")
+  }
+
+  async function fetchVariants(search: string) {
+    setVariantsLoading(true)
+    try {
+      const qs = search ? `?search=${encodeURIComponent(search)}` : ""
+      const res = await fetch(`/api/admin/gifts/variants${qs}`)
+      if (res.ok) {
+        const data = await res.json()
+        setVariants(data.variants || [])
+      }
+    } finally {
+      setVariantsLoading(false)
+    }
+  }
+
+  const sortedVariants = [...variants].sort((a, b) => {
+    if (pickerSort === "stock") {
+      return b.stock - a.stock
+    }
+    // "stale" — сначала те, что давно не продавались; без продаж (null) — в начало.
+    const aDays = a.daysSinceLastSale ?? Infinity
+    const bDays = b.daysSinceLastSale ?? Infinity
+    return bDays - aDays
+  })
+
+  async function addFromVariant(v: VariantOption) {
+    if (!confirm(`Создать подарок "${v.productName} (${v.weight})"? Порог по умолчанию — 3000₽, можно поменять.`)) return
+    try {
+      await createGift({
+        name: `${v.productName} (${v.weight}) в подарок`,
+        description: `Вариант из каталога. Остаток на складе: ${v.stock}.`,
+        minCartTotal: 3000,
+        productVariantId: v.variantId,
+      })
+      setPickerOpen(false)
+      router.refresh()
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Ошибка")
+    }
+  }
 
   function openCreate() {
     setEditing({
@@ -125,13 +200,21 @@ export function GiftsManager({ gifts }: GiftsManagerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={openPicker}
+          className="inline-flex items-center gap-2 h-10 px-4 border border-primary/30 text-primary rounded-xl text-sm font-medium hover:bg-primary/5"
+          title="Выбрать товар из каталога — полезно чтобы раздавать неликвид"
+        >
+          <Plus className="w-4 h-4" />
+          Из каталога
+        </button>
         <button
           onClick={openCreate}
           className="inline-flex items-center gap-2 h-10 px-4 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90"
         >
           <Plus className="w-4 h-4" />
-          Добавить подарок
+          Кастомный подарок
         </button>
       </div>
 
@@ -167,14 +250,35 @@ export function GiftsManager({ gifts }: GiftsManagerProps) {
                       Архив
                     </span>
                   )}
-                  {g.stock !== null && g.stock <= 0 && (
-                    <span className="text-[11px] px-2 py-0.5 bg-red-50 text-red-700 rounded-full">
-                      Закончился
+                  {g.productVariantId && (
+                    <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                      Из каталога
                     </span>
                   )}
+                  {/* Out-of-stock индикатор учитывает linked-случай */}
+                  {(() => {
+                    const effStock = g.productVariantId
+                      ? g.productVariant?.stock ?? 0
+                      : g.stock
+                    if (effStock !== null && effStock <= 0) {
+                      return (
+                        <span className="text-[11px] px-2 py-0.5 bg-red-50 text-red-700 rounded-full">
+                          Закончился
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  От {g.minCartTotal}₽ · {g.stock === null ? "без учёта запаса" : `остаток: ${g.stock}`}
+                  От {g.minCartTotal}₽ · {(() => {
+                    if (g.productVariantId) {
+                      return g.productVariant
+                        ? `линк: ${g.productVariant.product.name} (${g.productVariant.weight}), остаток ${g.productVariant.stock}`
+                        : "линк потерян — вариант удалён"
+                    }
+                    return g.stock === null ? "без учёта запаса" : `остаток: ${g.stock}`
+                  })()}
                 </p>
                 {g.description && (
                   <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{g.description}</p>
@@ -333,6 +437,128 @@ export function GiftsManager({ gifts }: GiftsManagerProps) {
               </p>
             )}
           </form>
+        </div>
+      )}
+
+      {/* GP2: product-picker с stock-insights для дарения неликвида */}
+      {pickerOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl p-5 max-w-3xl w-full shadow-xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Выбрать вариант из каталога</h2>
+              <button
+                onClick={() => setPickerOpen(false)}
+                className="text-muted-foreground hover:text-foreground p-2"
+                aria-label="Закрыть"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Подсветка помогает дарить неликвид: варианты с большим запасом и давним
+              отсутствием продаж — сверху. При выдаче подарка остаток на складе уменьшится автоматически.
+            </p>
+
+            <div className="flex gap-2 mb-3">
+              <input
+                type="search"
+                placeholder="Поиск по названию или SKU…"
+                value={pickerSearch}
+                onChange={(e) => {
+                  setPickerSearch(e.target.value)
+                  fetchVariants(e.target.value)
+                }}
+                className="flex-1 h-10 px-3 rounded-lg border border-input text-sm"
+              />
+              <select
+                value={pickerSort}
+                onChange={(e) => setPickerSort(e.target.value as "stock" | "stale")}
+                className="h-10 px-3 rounded-lg border border-input text-sm bg-white"
+              >
+                <option value="stale">Давность продаж</option>
+                <option value="stock">Размер остатка</option>
+              </select>
+            </div>
+
+            <div className="flex-1 overflow-y-auto border border-border rounded-xl divide-y divide-border">
+              {variantsLoading && (
+                <p className="p-6 text-center text-sm text-muted-foreground">Загрузка…</p>
+              )}
+              {!variantsLoading && sortedVariants.length === 0 && (
+                <p className="p-6 text-center text-sm text-muted-foreground">
+                  Нет активных вариантов
+                </p>
+              )}
+              {sortedVariants.map((v) => {
+                const staleTag =
+                  v.daysSinceLastSale === null
+                    ? "Никогда не продавался"
+                    : v.daysSinceLastSale >= 90
+                      ? `Давно не продаётся (${v.daysSinceLastSale} дн.)`
+                      : v.daysSinceLastSale >= 30
+                        ? `${v.daysSinceLastSale} дн. без продаж`
+                        : `${v.daysSinceLastSale} дн. назад`
+                const isStale =
+                  v.daysSinceLastSale === null || (v.daysSinceLastSale ?? 0) >= 60
+                return (
+                  <div
+                    key={v.variantId}
+                    className={`p-3 flex items-center gap-3 ${isStale ? "bg-amber-50/40" : ""}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {v.productName}
+                        <span className="text-xs text-muted-foreground ml-2">
+                          {v.weight}
+                          {v.sku ? ` · ${v.sku}` : ""}
+                        </span>
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span
+                          className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${
+                            v.stock === 0
+                              ? "bg-red-50 text-red-700"
+                              : v.stock < 5
+                                ? "bg-amber-50 text-amber-800"
+                                : "bg-emerald-50 text-emerald-700"
+                          }`}
+                        >
+                          Остаток: {v.stock}
+                        </span>
+                        <span
+                          className={`text-[11px] px-2 py-0.5 rounded-full ${
+                            isStale ? "bg-amber-100 text-amber-800" : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {staleTag}
+                        </span>
+                        {v.linkedToActiveGift && (
+                          <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full">
+                            Уже в подарках
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => addFromVariant(v)}
+                      disabled={v.stock === 0 || v.linkedToActiveGift}
+                      className="shrink-0 h-9 px-4 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {v.linkedToActiveGift ? "Уже выбран" : "Добавить"}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <p className="text-xs text-muted-foreground mt-3">
+              💡 Жёлтая подсветка — варианты, которые давно не продавались (≥60 дней) или никогда. Отличные кандидаты для подарков.
+            </p>
+          </div>
         </div>
       )}
     </div>

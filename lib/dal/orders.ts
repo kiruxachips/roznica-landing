@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx, reverseOrderEarnedBonuses } from "@/lib/dal/bonuses"
-import { refundGiftStock } from "@/lib/dal/gifts"
+import { refundGiftStock, areGiftsEnabled } from "@/lib/dal/gifts"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
@@ -173,11 +173,33 @@ export async function createOrder(data: OrderData) {
   // Если он выбрал не-существующий/недоступный/закончившийся — выбрасываем
   // ошибку, требующую обновить страницу.
   const cartTotalForGift = afterDiscount
-  let giftToAttach: { id: string; name: string; stock: number | null } | null = null
-  if (data.selectedGiftId) {
+  type GiftAttachment = {
+    id: string
+    name: string
+    // Для linked-gift — id и остаток ProductVariant (используем в tx для adjustStock).
+    // Для custom — null и локальный stock.
+    productVariantId: string | null
+    stock: number | null
+  }
+  let giftToAttach: GiftAttachment | null = null
+  // Kill-switch: если админ выключил программу между рендером checkout
+  // и submit'ом, игнорируем selectedGiftId без ошибки — юзер получит обычный
+  // заказ, подарка не будет. Это лучше чем ронять оформление.
+  const giftsProgramEnabled = await areGiftsEnabled()
+  if (giftsProgramEnabled && data.selectedGiftId) {
     const gift = await prisma.gift.findUnique({
       where: { id: data.selectedGiftId },
-      select: { id: true, name: true, isActive: true, minCartTotal: true, stock: true },
+      select: {
+        id: true,
+        name: true,
+        isActive: true,
+        minCartTotal: true,
+        stock: true,
+        productVariantId: true,
+        productVariant: {
+          select: { stock: true, isActive: true, product: { select: { isActive: true } } },
+        },
+      },
     })
     if (!gift || !gift.isActive) {
       throw new Error("Выбранный подарок больше недоступен. Обновите страницу и выберите заново")
@@ -187,10 +209,24 @@ export async function createOrder(data: OrderData) {
         `Подарок "${gift.name}" доступен от ${gift.minCartTotal}₽. Добавьте товаров или выберите другой`
       )
     }
-    if (gift.stock !== null && gift.stock <= 0) {
+    // Для linked-gift проверяем сам ProductVariant + родительский Product
+    if (gift.productVariantId) {
+      if (!gift.productVariant || !gift.productVariant.isActive || !gift.productVariant.product.isActive) {
+        throw new Error(`Подарок "${gift.name}" больше недоступен. Выберите другой`)
+      }
+      if (gift.productVariant.stock <= 0) {
+        throw new Error(`Подарок "${gift.name}" закончился на складе. Выберите другой`)
+      }
+    } else if (gift.stock !== null && gift.stock <= 0) {
+      // Custom gift с исчерпанным запасом
       throw new Error(`Подарок "${gift.name}" закончился. Выберите другой`)
     }
-    giftToAttach = { id: gift.id, name: gift.name, stock: gift.stock }
+    giftToAttach = {
+      id: gift.id,
+      name: gift.name,
+      productVariantId: gift.productVariantId,
+      stock: gift.productVariantId ? gift.productVariant?.stock ?? null : gift.stock,
+    }
   }
 
   const order = await prisma.$transaction(async (tx) => {
@@ -262,17 +298,42 @@ export async function createOrder(data: OrderData) {
       include: { items: true },
     })
 
-    // G5: декремент stock подарка, если задан. Unlimited (stock=null) пропускаем.
-    // Используем condition-based UPDATE чтобы защититься от race (одновременные
-    // заказы на последний экземпляр): WHERE stock > 0. Если affected=0 —
-    // подарок закончился между валидацией выше и commit'ом, откатываем tx.
-    if (giftToAttach && giftToAttach.stock !== null) {
-      const affected = await tx.$executeRaw`
-        UPDATE "Gift" SET stock = stock - 1
-        WHERE id = ${giftToAttach.id} AND stock > 0
-      `
-      if (affected === 0) {
-        throw new Error(`Подарок "${giftToAttach.name}" закончился. Выберите другой`)
+    // Декремент подарка:
+    //   - linked-gift (productVariantId) → adjustStock(-1, reason="gifted")
+    //     с записью в StockHistory для аудита "куда ушёл товар"
+    //   - custom gift с числовым stock → UPDATE Gift SET stock-1 WHERE stock>0
+    //   - unlimited custom (stock=null без линка) → no-op
+    // Везде condition-based (stock > 0 или SELECT FOR UPDATE внутри adjustStock) —
+    // защита от race при одновременных заказах на последний экземпляр.
+    if (giftToAttach) {
+      if (giftToAttach.productVariantId) {
+        try {
+          await adjustStock(
+            {
+              variantId: giftToAttach.productVariantId,
+              delta: -1,
+              reason: "gifted",
+              orderId: created.id,
+              notes: `Подарок в заказе ${created.orderNumber}`,
+              changedBy: "system",
+            },
+            tx
+          )
+        } catch (e) {
+          throw new Error(
+            e instanceof Error && e.message.startsWith("Недостаточно")
+              ? `Подарок "${giftToAttach.name}" закончился на складе. Выберите другой`
+              : `Не удалось зарезервировать подарок "${giftToAttach.name}"`
+          )
+        }
+      } else if (giftToAttach.stock !== null) {
+        const affected = await tx.$executeRaw`
+          UPDATE "Gift" SET stock = stock - 1
+          WHERE id = ${giftToAttach.id} AND stock > 0
+        `
+        if (affected === 0) {
+          throw new Error(`Подарок "${giftToAttach.name}" закончился. Выберите другой`)
+        }
       }
     }
 

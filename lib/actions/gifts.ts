@@ -24,6 +24,9 @@ export async function createGift(input: {
   stock?: number | null
   isActive?: boolean
   sortOrder?: number
+  /** Опциональный линк на вариант товара — stock берётся из него,
+   *  при выдаче декрементится ProductVariant.stock через adjustStock. */
+  productVariantId?: string | null
 }) {
   const admin = await requireAdmin("gifts.edit")
   if (!input.name.trim()) throw new Error("Укажите название подарка")
@@ -31,14 +34,31 @@ export async function createGift(input: {
     throw new Error("Некорректный порог стоимости")
   }
 
+  // Если линкуем — проверяем что вариант существует
+  if (input.productVariantId) {
+    const variant = await prisma.productVariant.findUnique({
+      where: { id: input.productVariantId },
+      select: { id: true },
+    })
+    if (!variant) throw new Error("Выбранный вариант товара не найден")
+  }
+
   const gift = await prisma.gift.create({
     data: {
       name: input.name.trim(),
       description: input.description?.trim() || null,
       minCartTotal: Math.floor(input.minCartTotal),
-      stock: input.stock === null ? null : input.stock !== undefined ? input.stock : null,
+      // Для linked-gift Gift.stock всегда null — stock читается из ProductVariant.stock
+      stock: input.productVariantId
+        ? null
+        : input.stock === null
+          ? null
+          : input.stock !== undefined
+            ? input.stock
+            : null,
       isActive: input.isActive ?? true,
       sortOrder: input.sortOrder ?? 0,
+      productVariantId: input.productVariantId || null,
     },
   })
 
@@ -47,7 +67,7 @@ export async function createGift(input: {
     action: "gift.created",
     entityType: "gift",
     entityId: gift.id,
-    payload: { name: gift.name, minCartTotal: gift.minCartTotal },
+    payload: { name: gift.name, minCartTotal: gift.minCartTotal, linked: !!input.productVariantId },
   })
   invalidate()
   return gift
@@ -62,6 +82,7 @@ export async function updateGift(
     stock: number | null
     isActive: boolean
     sortOrder: number
+    productVariantId: string | null
   }>
 ) {
   const admin = await requireAdmin("gifts.edit")
@@ -81,6 +102,21 @@ export async function updateGift(
   if (input.stock !== undefined) data.stock = input.stock
   if (input.isActive !== undefined) data.isActive = input.isActive
   if (input.sortOrder !== undefined) data.sortOrder = input.sortOrder
+  if (input.productVariantId !== undefined) {
+    if (input.productVariantId) {
+      const variant = await prisma.productVariant.findUnique({
+        where: { id: input.productVariantId },
+        select: { id: true },
+      })
+      if (!variant) throw new Error("Выбранный вариант товара не найден")
+      data.productVariantId = input.productVariantId
+      // При установке линка обнуляем собственный stock — это маркер
+      // «идёт с ProductVariant»
+      data.stock = null
+    } else {
+      data.productVariantId = null
+    }
+  }
 
   const gift = await prisma.gift.update({ where: { id }, data })
   void logAdminAction({

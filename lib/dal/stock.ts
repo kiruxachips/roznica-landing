@@ -19,6 +19,8 @@ export type StockReason =
   | "supplier_received"     // приход от поставщика (менеджер в админке)
   | "inventory_correction"  // ручная коррекция менеджером
   | "write_off"             // списание (брак, потеря)
+  | "gifted"                // отдан как подарок в составе заказа (linked-gift)
+  | "gift_returned"         // возврат при отмене заказа с linked-gift
 
 export interface StockAdjustInput {
   variantId: string
