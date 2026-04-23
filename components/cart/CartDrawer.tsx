@@ -47,7 +47,11 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-lg font-semibold">Корзина</h2>
-          <button onClick={onClose} className="p-2 hover:bg-muted rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="Закрыть корзину"
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -85,12 +89,17 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                 </div>
 
                 <div className="flex flex-col items-end justify-between">
-                  <button onClick={() => removeItem(item.variantId)} className="p-2 text-muted-foreground hover:text-red-500">
+                  <button
+                    onClick={() => removeItem(item.variantId)}
+                    aria-label={`Удалить ${item.name} из корзины`}
+                    className="p-2 text-muted-foreground hover:text-red-500"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
+                      aria-label="Уменьшить количество"
                       className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
                     >
                       <Minus className="w-3.5 h-3.5" />
@@ -99,6 +108,7 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     <button
                       onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
                       disabled={item.quantity >= 99}
+                      aria-label="Увеличить количество"
                       className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
                     >
                       <Plus className="w-3 h-3" />

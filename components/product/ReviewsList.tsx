@@ -20,18 +20,32 @@ const avatarColors = [
 
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    return ((parts[0][0] || "") + (parts[1][0] || "")).toUpperCase()
+  }
+  return (name.slice(0, 2) || "??").toUpperCase()
+}
+
+// P2-5: цвет аватара — детерминированная функция имени, не индекса.
+// Иначе при удалении/перестановке отзыва цвет Ивана "перекрашивается"
+// в цвет Петра. Хеш DJB2 — мелкий и без зависимостей.
+function hashCode(s: string): number {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+function avatarColorFor(name: string): string {
+  return avatarColors[hashCode(name) % avatarColors.length]
 }
 
 export function ReviewsList({ reviews }: { reviews: Review[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {reviews.map((review, i) => (
+      {reviews.map((review) => (
         <div key={review.id} className="bg-white border border-border/60 rounded-2xl p-5 hover:shadow-sm transition-shadow">
           <div className="flex items-start gap-3 mb-3">
             {/* Avatar */}
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColors[i % avatarColors.length]}`}>
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${avatarColorFor(review.name)}`}>
               {getInitials(review.name)}
             </div>
             <div className="flex-1 min-w-0">

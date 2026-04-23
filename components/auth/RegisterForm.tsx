@@ -27,8 +27,16 @@ export function RegisterForm() {
       return
     }
 
-    if (password.length < 6) {
-      setError("Пароль должен быть не менее 6 символов")
+    // P2-2: 8 символов + буквы + цифры. Спец. символы не требуем, чтобы не
+    // ломать UX юзерам со сложными менеджерами паролей, но элементарный
+    // brute-force с 6 символов теперь не проходит.
+    if (password.length < 8) {
+      setError("Пароль должен быть не менее 8 символов")
+      setLoading(false)
+      return
+    }
+    if (!/[a-zA-Zа-яА-ЯёЁ]/.test(password) || !/\d/.test(password)) {
+      setError("Пароль должен содержать хотя бы одну букву и одну цифру")
       setLoading(false)
       return
     }
