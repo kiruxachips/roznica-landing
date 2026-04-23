@@ -37,6 +37,8 @@ interface OverpassNode {
   lon: number
   tags?: {
     name?: string
+    brand?: string
+    operator?: string
     ref?: string
     "addr:street"?: string
     "addr:housenumber"?: string
@@ -177,6 +179,24 @@ export async function getPochtaOfficesByCity(city: string): Promise<PickupPoint[
     if (el.type !== "node" || !el.lat || !el.lon) continue
 
     const tags = el.tags || {}
+
+    // Картографы иногда маркируют ПВЗ СДЭК как amenity=post_office (ошибочно),
+    // поэтому отфильтровываем по brand/operator/name. Без этого в списке
+    // "Почта России" на checkout попадают «Почтовое отделение СДЭК».
+    const brand = (tags.brand || tags.operator || tags.name || "").toLowerCase()
+    if (
+      brand.includes("сдэк") ||
+      brand.includes("cdek") ||
+      brand.includes("boxberry") ||
+      brand.includes("pick") /* PickPoint */ ||
+      brand.includes("dpd") ||
+      brand.includes("wildberries") ||
+      brand.includes("ozon") ||
+      brand.includes("яндекс") /* Yandex.Dostavka */
+    ) {
+      continue
+    }
+
     const ref = (tags.ref || "").trim()
     const pochtaData = ref ? pochtaByCode.get(ref) : undefined
 
