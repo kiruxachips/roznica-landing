@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx, reverseOrderEarnedBonuses } from "@/lib/dal/bonuses"
+import { refundGiftStock } from "@/lib/dal/gifts"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
@@ -462,6 +463,15 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
           tx
         )
         stockResults.push(res)
+      }
+      // GF1: возвращаем gift-stock при отмене до отгрузки. Одно обнуление
+      // selectedGiftId предотвращает double-refund если cancel повторится.
+      if (order.selectedGiftId) {
+        await refundGiftStock(order.selectedGiftId, tx)
+        await tx.order.update({
+          where: { id },
+          data: { selectedGiftId: null },
+        })
       }
     }
 

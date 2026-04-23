@@ -71,3 +71,22 @@ export async function listGiftsForAdmin() {
 export async function getGiftById(id: string) {
   return prisma.gift.findUnique({ where: { id } })
 }
+
+/**
+ * Возвращает единицу подарка на склад при отмене заказа. Идемпотентно в том
+ * смысле, что stock=NULL (unlimited) не трогается; повторный вызов с тем же
+ * giftId будет добавлять ещё +1 — поэтому caller обязан гарантировать
+ * одиночный вызов (обычно это происходит ровно один раз при cancellation).
+ *
+ * Атомарный $executeRaw вместо read-modify-write чтобы избежать race при
+ * параллельных отменах разных заказов с одним подарком.
+ */
+export async function refundGiftStock(
+  giftId: string,
+  tx?: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+): Promise<void> {
+  const client = tx ?? prisma
+  await client.$executeRaw`
+    UPDATE "Gift" SET stock = stock + 1 WHERE id = ${giftId} AND stock IS NOT NULL
+  `
+}

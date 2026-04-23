@@ -15,6 +15,7 @@ import { getPayment } from "@/lib/yookassa"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 import { buildOrderPaidPayload } from "@/lib/integrations/millorbot/payload"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
+import { refundGiftStock } from "@/lib/dal/gifts"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
 
 // YooKassa IP ranges (first line of defense).
@@ -228,7 +229,13 @@ export async function POST(request: NextRequest) {
     await prisma.$transaction(async (tx) => {
       await tx.order.update({
         where: { id: order.id },
-        data: { status: "cancelled", paymentStatus: "canceled" },
+        data: {
+          status: "cancelled",
+          paymentStatus: "canceled",
+          // GF1: освобождаем подарок при отмене платежа — иначе gift.stock
+          // медленно «съедается» незавершёнными заказами.
+          selectedGiftId: null,
+        },
       })
       await tx.orderStatusLog.create({
         data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
@@ -247,6 +254,9 @@ export async function POST(request: NextRequest) {
           tx
         )
         stockResults.push(res)
+      }
+      if (order.selectedGiftId) {
+        await refundGiftStock(order.selectedGiftId, tx)
       }
     })
     if (stockResults.length > 0) {

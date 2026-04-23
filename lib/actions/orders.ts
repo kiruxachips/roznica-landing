@@ -2,6 +2,7 @@
 
 import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, type UnavailableItemDetail } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
+import { refundGiftStock } from "@/lib/dal/gifts"
 import { updateTasteProfile } from "@/lib/dal/taste-profile"
 import type { OrderData } from "@/lib/types"
 import { revalidatePath } from "next/cache"
@@ -33,9 +34,14 @@ async function rollbackOrder(
   const stockResults: StockAdjustResult[] = []
   try {
     await prisma.$transaction(async (tx) => {
+      // GF1: читаем selectedGiftId до обнуления, чтобы вернуть его stock
+      const existing = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { selectedGiftId: true },
+      })
       await tx.order.update({
         where: { id: orderId },
-        data: { status: "cancelled" },
+        data: { status: "cancelled", selectedGiftId: null },
       })
       for (const item of items) {
         const res = await adjustStock(
@@ -50,6 +56,9 @@ async function rollbackOrder(
           tx
         )
         stockResults.push(res)
+      }
+      if (existing?.selectedGiftId) {
+        await refundGiftStock(existing.selectedGiftId, tx)
       }
       if (bonusUsed > 0 && userId) {
         await tx.user.update({
@@ -415,6 +424,15 @@ export async function cancelOrder(orderId: string) {
         )
         stockResults.push(res)
       }
+    }
+
+    // GF1: gift-stock возвращаем и обнуляем selectedGiftId в том же tx
+    if (order.selectedGiftId) {
+      await refundGiftStock(order.selectedGiftId, tx)
+      await tx.order.update({
+        where: { id: order.id },
+        data: { selectedGiftId: null },
+      })
     }
 
     // Refund bonuses
