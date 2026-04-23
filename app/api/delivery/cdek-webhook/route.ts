@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 
+const SOURCE = "cdek" as const
+const MAX_TIMESTAMP_SKEW_MS = 15 * 60 * 1000 // 15 минут
+
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.CDEK_WEBHOOK_SECRET
   if (!webhookSecret) {
@@ -42,12 +45,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({}, { status: 200 })
   }
 
+  // Timestamp skew check — отклоняем события старше MAX_TIMESTAMP_SKEW_MS.
+  // Защита от replay старых захваченных webhook'ов. Если СДЭК не прислал
+  // status_date_time — пропускаем проверку (old/new API могут отличаться).
+  const statusDateTime = body.attributes?.status_date_time
+  if (statusDateTime) {
+    const eventTime = Date.parse(statusDateTime)
+    if (!Number.isNaN(eventTime)) {
+      const skew = Date.now() - eventTime
+      if (skew > MAX_TIMESTAMP_SKEW_MS) {
+        console.warn(
+          `[cdek-webhook] rejecting stale event, skew=${Math.round(skew / 1000)}s for uuid=${carrierOrderId}`
+        )
+        return NextResponse.json({ error: "Event too old" }, { status: 400 })
+      }
+      if (skew < -MAX_TIMESTAMP_SKEW_MS) {
+        // Clock skew или spoofed future timestamp
+        console.warn(
+          `[cdek-webhook] rejecting future-dated event, skew=${Math.round(skew / 1000)}s`
+        )
+        return NextResponse.json({ error: "Event timestamp in future" }, { status: 400 })
+      }
+    }
+  }
+
+  // Idempotency: композитный ключ uuid + status_code + status_date_time.
+  // CDEK шлёт несколько событий на один uuid (разные статусы), но одно
+  // конкретное событие (uuid+status+time) должно обрабатываться ровно раз.
+  const eventId = [
+    carrierOrderId,
+    body.attributes?.status_code || "_",
+    statusDateTime || "_",
+  ].join(":")
+
+  const already = await prisma.processedInboundEvent.findUnique({
+    where: { source_eventId: { source: SOURCE, eventId } },
+  })
+  if (already) {
+    return NextResponse.json({ status: "duplicate" }, { status: 200 })
+  }
+
   const order = await prisma.order.findFirst({
     where: { carrierOrderId },
   })
 
   if (!order) {
     console.warn(`CDEK webhook: order not found for carrierOrderId ${carrierOrderId}`)
+    // Записываем как обработанный, чтобы повтор не флудил логи
+    await prisma.processedInboundEvent.create({
+      data: { source: SOURCE, eventId },
+    }).catch(() => { /* race-insert ok, unique constraint защитит */ })
     return NextResponse.json({}, { status: 200 })
   }
 
@@ -82,30 +129,54 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Атомарно: update + status log + идемпотентность-маркер в одной транзакции,
+  // чтобы повторная доставка webhook'а при падении на полпути не делала update
+  // дважды и не писала дубль в лог.
   if (Object.keys(updateData).length > 0) {
-    await prisma.order.update({
-      where: { id: order.id },
-      data: updateData,
-    })
+    try {
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
+          where: { id: order.id },
+          data: updateData,
+        })
 
-    // Log status change for audit trail
-    if (updateData.status && updateData.status !== order.status) {
-      await prisma.orderStatusLog.create({
-        data: {
-          orderId: order.id,
-          fromStatus: order.status,
-          toStatus: updateData.status as string,
-          changedBy: "cdek-webhook",
-        },
+        if (updateData.status && updateData.status !== order.status) {
+          await tx.orderStatusLog.create({
+            data: {
+              orderId: order.id,
+              fromStatus: order.status,
+              toStatus: updateData.status as string,
+              changedBy: "cdek-webhook",
+            },
+          })
+        }
+
+        await tx.processedInboundEvent.create({
+          data: { source: SOURCE, eventId },
+        })
       })
-
-      // Credit bonuses on delivery — same as admin panel updateOrderStatus path
-      if (updateData.status === "delivered" && order.userId) {
-        creditBonusesForOrder(order.userId, order.id, order.total).catch((e) =>
-          console.error("CDEK webhook: failed to credit bonuses for order", order.id, e)
-        )
+    } catch (err) {
+      // Unique-constraint на processedInboundEvent — значит параллельный webhook
+      // уже проскочил. Это ок, отвечаем 200 duplicate.
+      const e = err as { code?: string }
+      if (e?.code === "P2002") {
+        return NextResponse.json({ status: "duplicate" }, { status: 200 })
       }
+      throw err
     }
+
+    // Credit bonuses на delivery — вне транзакции, т.к. creditBonusesForOrder
+    // сам атомарен и не должен блокировать webhook-response.
+    if (updateData.status === "delivered" && updateData.status !== order.status && order.userId) {
+      creditBonusesForOrder(order.userId, order.id, order.total).catch((e) =>
+        console.error("CDEK webhook: failed to credit bonuses for order", order.id, e)
+      )
+    }
+  } else {
+    // Update-полей нет, но событие мы обработали — записываем idempotency-маркер.
+    await prisma.processedInboundEvent.create({
+      data: { source: SOURCE, eventId },
+    }).catch(() => { /* concurrent insert ok */ })
   }
 
   return NextResponse.json({}, { status: 200 })
