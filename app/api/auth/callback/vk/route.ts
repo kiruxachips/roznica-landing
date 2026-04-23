@@ -266,10 +266,11 @@ async function handleCallback(request: NextRequest, origin: string, proto: strin
     }
   }
 
-  // Issue NextAuth-compatible session JWT — cookie name + salt depend on HTTPS
+  // Issue NextAuth-compatible session JWT — cookie name + salt depend on HTTPS.
+  // maxAge синхронизирован с session.maxAge в lib/auth.ts (7 дней, P1-5).
   const useSecure = proto === "https"
   const cookieName = useSecure ? "__Secure-authjs.session-token" : "authjs.session-token"
-  const maxAge = 30 * 24 * 60 * 60
+  const maxAge = 7 * 24 * 60 * 60
 
   const sessionToken = await encode({
     token: {

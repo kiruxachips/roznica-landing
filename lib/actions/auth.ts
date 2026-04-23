@@ -18,6 +18,32 @@ function normalizeEmail(raw: string): string {
   return raw.toLowerCase().trim()
 }
 
+/**
+ * P1-4: глобальный лимит неудачных попыток ввода кода по email.
+ *
+ * Стандартная защита (5 attempts per code) позволяла перебор: юзер ловил 5
+ * неудач → запрашивал новый код (до 3 кодов/час) → снова 5 неудач → итого
+ * 15 попыток за час на один email. Добавляем счётчик неудачных попыток
+ * независимо от того, какой код использовался: после 10 неудач — блок
+ * на 1 час. Успешная валидация сбрасывает счётчик.
+ *
+ * Счёт ведётся по verificationCode.attempts агрегированно за последний час.
+ */
+const MAX_ATTEMPTS_PER_HOUR = 10
+
+async function getRecentFailedAttempts(email: string, type: string): Promise<number> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+  const codes = await prisma.verificationCode.findMany({
+    where: { email, type, createdAt: { gte: oneHourAgo } },
+    select: { attempts: true, used: true },
+  })
+  // Считаем только attempts у неиспользованных кодов (used=true значит
+  // кто-то успешно прошёл валидацию, сбрасываем прошлые неудачи).
+  const anySuccess = codes.some((c) => c.used)
+  if (anySuccess) return 0
+  return codes.reduce((sum, c) => sum + c.attempts, 0)
+}
+
 export async function registerUser({
   email: rawEmail,
   password,
@@ -74,6 +100,14 @@ export async function registerUser({
 
 export async function verifyEmailCode(rawEmail: string, code: string) {
   const email = normalizeEmail(rawEmail)
+
+  // Global attempts lock (P1-4) — защищает от перебора через последовательные
+  // запросы новых кодов.
+  const totalFailed = await getRecentFailedAttempts(email, "email_verify")
+  if (totalFailed >= MAX_ATTEMPTS_PER_HOUR) {
+    return { error: "Слишком много попыток ввода кода. Попробуйте через час." }
+  }
+
   const verification = await prisma.verificationCode.findFirst({
     where: {
       email,
@@ -186,6 +220,12 @@ export async function requestPasswordReset(rawEmail: string) {
 
 export async function resetPassword(rawEmail: string, code: string, newPassword: string) {
   const email = normalizeEmail(rawEmail)
+
+  const totalFailed = await getRecentFailedAttempts(email, "password_reset")
+  if (totalFailed >= MAX_ATTEMPTS_PER_HOUR) {
+    return { error: "Слишком много попыток ввода кода. Попробуйте через час." }
+  }
+
   const verification = await prisma.verificationCode.findFirst({
     where: {
       email,

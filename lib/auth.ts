@@ -228,6 +228,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
+    // P1-5: default NextAuth — 30 дней; слишком долго для финсистемы.
+    // 7 дней — реалистичный trade-off между UX (не разлогинивать юзера
+    // каждый день) и риском при утечке JWT/устройства.
+    maxAge: 7 * 24 * 60 * 60,
   },
   trustHost: true,
 })
