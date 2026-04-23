@@ -2,6 +2,7 @@ import { cookies, headers } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
 import { encode } from "@auth/core/jwt"
 import { prisma } from "@/lib/prisma"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 // VK ID callback — overrides NextAuth catch-all for /api/auth/callback/vk.
 // Performs token exchange (with device_id which @auth/core can't pass), creates/links user,
@@ -22,6 +23,20 @@ export async function GET(request: NextRequest) {
 }
 
 async function handleCallback(request: NextRequest, origin: string, proto: string) {
+  // Rate-limit по IP, чтобы атакующий не мог перебирать state/code-комбинации.
+  // Порог щедрее чем для login (20/5min) — у одного юзера может быть несколько
+  // попыток при сетевых сбоях, а легитимный трафик через VK невелик.
+  const h = await headers()
+  const clientIp =
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown"
+  const rl = checkRateLimit(`vk-callback:${clientIp}`, RATE_LIMITS.oauthCallback)
+  if (!rl.allowed) {
+    console.warn(`[vk-callback] rate-limited IP ${clientIp}`)
+    return NextResponse.redirect(`${origin}/auth/login?error=vk_rate_limited`)
+  }
+
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get("code")
   const deviceId = searchParams.get("device_id")

@@ -4,9 +4,25 @@ import Google from "next-auth/providers/google"
 import Yandex from "next-auth/providers/yandex"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import bcrypt from "bcryptjs"
+import { headers } from "next/headers"
 import { prisma } from "@/lib/prisma"
+import { checkRateLimit, resetRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 // Dynamic import to avoid Edge Runtime issues with Node.js crypto module
 const getTelegramModule = () => import("@/lib/telegram-auth")
+
+/**
+ * Извлекает IP клиента из заголовков reverse-proxy.
+ * На Beget-deploy'е фронт прокси (nginx или cloudflare) проставляет
+ * X-Forwarded-For первым адресом — его и берём.
+ */
+async function getClientIp(): Promise<string> {
+  const h = await headers()
+  const forwarded = h.get("x-forwarded-for")
+  if (forwarded) return forwarded.split(",")[0]!.trim()
+  return h.get("x-real-ip") || "unknown"
+}
+
+class AuthError extends Error {}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
@@ -22,8 +38,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
+        const email = String(credentials.email).toLowerCase().trim()
+        const ip = await getClientIp()
+        const rlKey = `admin-login:${email}:${ip}`
+        const rl = checkRateLimit(rlKey, RATE_LIMITS.login)
+        if (!rl.allowed) {
+          throw new AuthError(
+            `Слишком много попыток входа. Попробуйте через ${Math.ceil((rl.retryAfter || 60) / 60)} мин.`
+          )
+        }
+
         const user = await prisma.adminUser.findUnique({
-          where: { email: (credentials.email as string).toLowerCase().trim() },
+          where: { email },
         })
         if (!user) return null
 
@@ -33,12 +59,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Блокируем pending (не одобрен) и blocked (заблокирован админом).
         // Активный статус — единственный, при котором можно войти.
         if (user.status !== "active") {
-          throw new Error(
+          throw new AuthError(
             user.status === "pending"
               ? "Аккаунт ожидает одобрения администратором"
               : "Аккаунт заблокирован"
           )
         }
+
+        // Успешный логин — сбрасываем счётчик попыток
+        resetRateLimit(rlKey)
 
         return {
           id: user.id,
@@ -66,12 +95,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // Без .toLowerCase().trim() "John@X.com" и "john@x.com" для БД
         // разные адреса → пользователь не находится, ошибка логина.
         const email = String(credentials.email).toLowerCase().trim()
+        const ip = await getClientIp()
+        const rlKey = `customer-login:${email}:${ip}`
+        const rl = checkRateLimit(rlKey, RATE_LIMITS.login)
+        if (!rl.allowed) {
+          throw new AuthError(
+            `Слишком много попыток входа. Попробуйте через ${Math.ceil((rl.retryAfter || 60) / 60)} мин.`
+          )
+        }
+
         const user = await prisma.user.findUnique({ where: { email } })
         if (!user || !user.passwordHash) return null
         if (!user.emailVerified) return null
 
         const isValid = await bcrypt.compare(credentials.password as string, user.passwordHash)
         if (!isValid) return null
+
+        resetRateLimit(rlKey)
 
         return {
           id: user.id,

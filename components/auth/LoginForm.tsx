@@ -18,6 +18,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   vk_missing_params: "Неполный ответ от VK. Попробуйте ещё раз.",
   vk_missing_cookies: "Потерялись cookies сессии. Попробуйте ещё раз.",
   vk_unexpected: "Ошибка при входе через VK. Попробуйте ещё раз или войдите паролем.",
+  vk_rate_limited: "Слишком много попыток входа через VK. Подождите несколько минут.",
 }
 
 export function LoginForm() {
