@@ -190,9 +190,11 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       <div className="bg-primary/5 rounded-2xl p-4 sm:p-8 mb-6 sm:mb-8">
         <h2 className="font-semibold mb-3">Что дальше?</h2>
         <ul className="space-y-2 text-sm text-muted-foreground">
-          <li>Мы свяжемся с вами в течение 1-2 часов для подтверждения заказа</li>
-          <li>После подтверждения обжарим и отправим ваш кофе на следующий рабочий день</li>
-          <li>Вы получите трек-номер для отслеживания посылки</li>
+          {order.customerEmail && (
+            <li>Мы отправили подтверждение заказа на <span className="text-foreground font-medium">{order.customerEmail}</span></li>
+          )}
+          <li>Свежий кофе обжарим специально под ваш заказ и отправим в ближайший рабочий день</li>
+          <li>О каждом изменении статуса вы получите письмо — подтверждение оплаты, передача в доставку, вручение</li>
         </ul>
       </div>
 
