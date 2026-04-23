@@ -9,6 +9,7 @@ import { getArticleBySlug, getArticleSlugs, getRelatedArticles, incrementArticle
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { ArticleCard } from "@/components/blog/ArticleCard"
+import { sanitizeArticleHtml } from "@/lib/sanitize-html"
 
 export async function generateStaticParams() {
   try {
@@ -149,10 +150,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
               {article.title}
             </h1>
 
-            {/* Content */}
+            {/* Content — HTML из TipTap-редактора санитизирован через DOMPurify,
+                чтобы скомпрометированный админ или баг редактора не могли вкинуть
+                script/iframe/on*-хендлеры через article.content. */}
             <div
               className="prose prose-base sm:prose-lg max-w-none prose-headings:font-sans prose-a:text-primary prose-img:rounded-lg break-words"
-              dangerouslySetInnerHTML={{ __html: article.content }}
+              dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(article.content) }}
             />
 
             {/* Tags */}
