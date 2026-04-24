@@ -58,7 +58,10 @@ services:
       - internal
       - millor-backbone
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      # Проверяем /api/health — он дёргает DB через Prisma,
+      # а не просто TCP-порт. Если БД отвалилась, контейнер
+      # перезапустится через restart policy.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

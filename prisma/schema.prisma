@@ -455,16 +455,25 @@ model Address {
 
 model BonusTransaction {
   id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // userId nullable + onDelete SetNull — при удалении/анонимизации юзера
+  // сохраняем финансовую историю. Физическое удаление транзакций делает
+  // невозможным аудит баланса и compliance-проверки. 152-ФЗ допускает
+  // хранение обезличенных данных для бухгалтерского учёта.
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   amount      Int
   type        String // "earned" | "spent" | "admin_adjustment"
   description String
   orderId     String?
+  // Idempotency для денежных операций — одна и та же транзакция не должна
+  // дублироваться при retry webhook/cron. Используется в webhook ЮKassa,
+  // cron-начислениях и refund-flow.
+  idempotencyKey String? @unique
   createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([orderId])
+  @@index([userId, type, createdAt])
 }
 
 model ProductCollection {

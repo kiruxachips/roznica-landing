@@ -64,4 +64,27 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 })
 
-module.exports = withBundleAnalyzer(nextConfig)
+// Sentry wrap — добавляется только если @sentry/nextjs установлен и
+// SENTRY_DSN задан в env. Если источник-мапы не нужны, SENTRY_AUTH_TOKEN
+// можно не задавать — ошибки всё равно трекаются, только стек минифицирован.
+let finalConfig = withBundleAnalyzer(nextConfig)
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { withSentryConfig } = require('@sentry/nextjs')
+  finalConfig = withSentryConfig(finalConfig, {
+    silent: true,
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    hideSourceMaps: true,
+    disableLogger: true,
+    // Tunnel-route обходит adblock'и, блокирующие запросы к sentry.io.
+    // Без этого теряется 20-30% клиентских ошибок.
+    tunnelRoute: '/monitoring',
+  })
+} catch {
+  // @sentry/nextjs не установлен — работаем без Sentry.
+}
+
+module.exports = finalConfig
