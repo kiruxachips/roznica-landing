@@ -125,6 +125,7 @@ model ProductVariant {
   stockHistory         StockHistory[]
   linkedGifts          Gift[]          @relation("ProductVariantGifts")
   priceListItems       PriceListItem[]
+  subscriptions        Subscription[]  @relation("SubscriptionVariant")
 
   @@index([isActive, productId])
   @@index([stock])
@@ -201,6 +202,41 @@ model AdminActivityLog {
   @@index([createdAt])
   // Compliance audit: «все действия типа X над объектами типа Y за период».
   @@index([action, entityType, createdAt])
+}
+
+/// G4: регулярная доставка кофе. Юзер выбирает товар+вес+периодичность,
+/// cron раз в день находит подписки с `nextDeliveryDate <= today` и
+/// создаёт НОВЫЙ Order в статусе pending. Email клиенту со ссылкой
+/// на оплату — он сам решает платить или нет (рекуррентные платежи
+/// через ЮKassa требуют отдельного договора, поэтому так проще).
+///
+/// Статусы:
+///   - active: идёт по расписанию
+///   - paused: временно приостановлен (юзер в отпуске), с pausedUntil
+///   - cancelled: отменён (terminal, запись остаётся для audit)
+model Subscription {
+  id                 String    @id @default(cuid())
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId          String
+  variant            ProductVariant @relation("SubscriptionVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  quantity           Int       @default(1)
+  intervalDays       Int       // 14, 21, 30
+  discountPercent    Int       @default(5) // бонус за подписку
+  status             String    @default("active") // active | paused | cancelled
+  nextDeliveryDate   DateTime
+  pausedUntil        DateTime?
+  cancelledAt        DateTime?
+  // Снапшот доставки — замороженные адрес/метод при создании. Юзер
+  // может менять через UI, но для стабильности recurring-flow
+  // храним как JSON.
+  deliveryAddressSnapshot Json?
+  lastOrderId        String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([status, nextDeliveryDate])
 }
 
 /// G2: реферальная программа. Каждый юзер получает персональный код
@@ -356,6 +392,7 @@ model User {
   consents          UserConsent[]
   newsletterSubscriptions NewsletterSubscriber[]
   referralCode      ReferralCode?
+  subscriptions     Subscription[]
   // Welcome-discount: время первой оплаченной покупки. Пока null — юзер
   // имеет право на welcome-скидку (% настраивается через DeliverySetting).
   // Проставляется в createOrder при отсутствии. Даже если заказ потом
