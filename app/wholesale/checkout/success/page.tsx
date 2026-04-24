@@ -24,22 +24,23 @@ export default async function WholesaleCheckoutSuccessPage({
             <div className="inline-flex mx-auto mb-4 p-3 rounded-full bg-green-50 text-green-600">
               <CheckCircle2 className="w-10 h-10" />
             </div>
-            <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Заказ принят</h1>
+            <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-2">Заявка отправлена</h1>
             {order && (
               <p className="text-muted-foreground mb-4">
-                Номер заказа: <strong className="text-foreground">{order}</strong>
+                Номер: <strong className="text-foreground">{order}</strong>
               </p>
             )}
             <p className="text-sm text-muted-foreground mb-6">
-              Мы отправили подтверждение на почту. Ответственный менеджер свяжется с вами для
-              подтверждения деталей и оплаты.
+              Товар зарезервирован на складе. Менеджер проверяет вашу заявку
+              и в ближайшее время пришлёт PDF-счёт с учётом доставки на вашу почту.
+              Оплата — 100% предоплата по платёжному поручению.
             </p>
             <div className="flex gap-3 justify-center">
               <Link
                 href="/wholesale/orders"
                 className="rounded-xl bg-primary text-primary-foreground font-medium px-6 py-2.5 hover:bg-primary/90 transition-colors"
               >
-                Мои заказы
+                Мои заявки
               </Link>
               <Link
                 href="/wholesale/catalog"

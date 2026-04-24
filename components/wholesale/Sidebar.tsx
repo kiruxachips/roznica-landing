@@ -10,7 +10,7 @@ const navItems = [
   { name: "Дашборд", href: "/wholesale", icon: LayoutDashboard, exact: true },
   { name: "Каталог", href: "/wholesale/catalog", icon: Package },
   { name: "Корзина", href: "/wholesale/cart", icon: ShoppingBag },
-  { name: "Мои заказы", href: "/wholesale/orders", icon: FileText },
+  { name: "Мои заявки", href: "/wholesale/orders", icon: FileText },
   { name: "Компания", href: "/wholesale/company", icon: Building2, exact: true },
   { name: "Сотрудники", href: "/wholesale/company/users", icon: Users },
 ]

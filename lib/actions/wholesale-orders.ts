@@ -128,20 +128,13 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
     }
   }
 
-  // 5) Net-terms: проверить кредитный лимит
-  const paymentTerms = ctx.company.paymentTerms
-  const isNetTerms = paymentTerms !== "prepay"
-  const approvalStatus = isNetTerms ? "pending_approval" : null
-
-  if (isNetTerms) {
-    const available = ctx.company.creditLimit - ctx.company.creditUsed
-    if (subtotal > available) {
-      throw new Error(
-        `Превышен лимит отсрочки. Доступно: ${available}₽, сумма заказа: ${subtotal}₽. ` +
-          `Оплатите предыдущие счета или свяжитесь с менеджером.`
-      )
-    }
-  }
+  // 5) Любой оптовый заказ обязательно проходит через подтверждение менеджера.
+  //    Никакой ЮKassa-оплаты, никаких кредит-лимитов. Схема:
+  //    submit → pending_approval (товар зарезервирован) → менеджер approve →
+  //    автогенерация счёта (с доставкой отдельной строкой) → клиент оплачивает
+  //    по платёжному поручению → менеджер помечает paid → отгрузка.
+  const paymentTerms = "invoice"
+  const approvalStatus = "pending_approval"
 
   // 6) Загружаем snapshot реквизитов компании
   const company = await prisma.wholesaleCompany.findUnique({
@@ -185,7 +178,7 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
       tariffCode: input.tariffCode,
       postalCode: input.postalCode,
       notes: input.notes,
-      paymentMethod: isNetTerms ? "postpay" : "online",
+      paymentMethod: "invoice",
       wholesaleCompanyId: ctx.companyId,
       wholesaleUserId: ctx.userId,
       paymentTerms,
@@ -206,14 +199,14 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
         kind: "wholesale.order.confirmation",
         recipient: ctx.email,
         render: () => ({
-          subject: `Заказ ${orderNumber} принят`,
+          subject: `Заявка ${orderNumber} принята на рассмотрение`,
           html: `
-            <h2>Ваш оптовый заказ принят</h2>
+            <h2>Ваша заявка принята</h2>
             <p>Здравствуйте, ${ctx.name}!</p>
-            <p>Мы зарегистрировали заказ <strong>${orderNumber}</strong> на сумму <strong>${total}₽</strong>.</p>
-            <p><strong>Условия оплаты:</strong> ${paymentTerms === "prepay" ? "Предоплата" : `Отсрочка ${PAYMENT_TERM_DAYS[paymentTerms]} дней`}</p>
-            ${approvalStatus === "pending_approval" ? "<p>Заказ ожидает подтверждения менеджером.</p>" : ""}
-            <p>Мы свяжемся с вами для уточнения деталей.</p>
+            <p>Заявка <strong>${orderNumber}</strong> на сумму <strong>${total.toLocaleString("ru")}₽</strong> (без учёта доставки) передана нашему менеджеру.</p>
+            <p>Товар зарезервирован на складе. После подтверждения менеджером мы сформируем
+            счёт с учётом доставки и вышлем вам PDF на ${ctx.email}. Оплата — по платёжному поручению.</p>
+            <p>Менеджер свяжется с вами в течение рабочего дня.</p>
           `,
         }),
         send: (email) => sendRenderedEmail(email),
@@ -226,15 +219,16 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
           kind: "wholesale.admin.new_order",
           recipient: adminEmail,
           render: () => ({
-            subject: `[ОПТ] Новый заказ ${orderNumber} от ${company?.legalName ?? ctx.name}`,
+            subject: `[ОПТ] Новая заявка ${orderNumber} от ${company?.legalName ?? ctx.name}`,
             html: `
-              <h2>Новый оптовый заказ</h2>
+              <h2>Новая заявка — требует подтверждения</h2>
               <p><strong>Компания:</strong> ${company?.legalName ?? "—"} (ИНН ${company?.inn ?? "—"})</p>
-              <p><strong>Номер:</strong> ${orderNumber}</p>
-              <p><strong>Сумма:</strong> ${total}₽${tier.discountPct > 0 ? ` (применена скидка по весу ${tier.discountPct}%, вес ${(totalWeightGrams / 1000).toFixed(1)} кг)` : ""}</p>
-              <p><strong>Условия:</strong> ${paymentTerms}</p>
-              <p><strong>Доставка:</strong> ${input.deliveryAddress}</p>
-              <p><a href="${process.env.NEXTAUTH_URL || ""}/admin/orders/${order.id}">Открыть в админке</a></p>
+              <p><strong>Контакт:</strong> ${ctx.name}, ${input.contactPhone || company?.contactPhone || "—"}, ${ctx.email}</p>
+              <p><strong>Номер заявки:</strong> ${orderNumber}</p>
+              <p><strong>Сумма товаров:</strong> ${total.toLocaleString("ru")}₽${tier.discountPct > 0 ? ` (применена скидка по весу ${tier.discountPct}%, вес ${(totalWeightGrams / 1000).toFixed(1)} кг)` : ""}</p>
+              <p><strong>Доставка:</strong> ${input.deliveryMethod ?? "—"}${input.deliveryType ? ` (${input.deliveryType})` : ""}, ${input.destinationCity ?? input.deliveryAddress}</p>
+              <p><strong>Товар зарезервирован на складе до вашего решения.</strong></p>
+              <p><a href="${process.env.NEXTAUTH_URL || ""}/admin/orders/${order.id}">Открыть заявку в админке</a> — подтвердить / отклонить.</p>
             `,
           }),
           send: (email) => sendRenderedEmail(email),
@@ -300,7 +294,7 @@ export async function approveWholesaleOrder(orderId: string) {
   if (!order) throw new Error("Заказ не найден")
   if (order.channel !== "wholesale") throw new Error("Это не оптовый заказ")
   if (order.approvalStatus !== "pending_approval") {
-    throw new Error("Заказ не требует подтверждения")
+    throw new Error("Заявка не требует подтверждения")
   }
 
   const updated = await prisma.order.update({
@@ -309,7 +303,8 @@ export async function approveWholesaleOrder(orderId: string) {
       approvalStatus: "approved",
       approvedById: admin.userId,
       approvedAt: new Date(),
-      status: order.status === "pending" ? "confirmed" : order.status,
+      // Заказ переходит в confirmed — товар резервируется, ждём оплату по счёту.
+      status: "confirmed",
     },
   })
 
@@ -321,35 +316,62 @@ export async function approveWholesaleOrder(orderId: string) {
     payload: { orderNumber: order.orderNumber, total: order.total },
   })
 
-  // Notify клиента + Millorbot
-  if (order.customerEmail) {
-    after(async () => {
+  // Автогенерация PDF-счёта и email клиенту. Импорт динамический — модуль
+  // тяжёлый (react-pdf), не нужен при других подобных actions.
+  after(async () => {
+    let invoicePdfUrl: string | null = null
+    let invoiceNumber: string | null = null
+    try {
+      const mod = await import("@/lib/actions/wholesale-invoices")
+      const invoice = await mod.generateInvoiceForOrder(orderId, { kind: "invoice" })
+      invoicePdfUrl = invoice.pdfUrl
+      invoiceNumber = invoice.number
+    } catch (e) {
+      console.error("[approve] auto-generate invoice failed:", e)
+    }
+
+    if (order.customerEmail) {
+      const nextAuthUrl = process.env.NEXTAUTH_URL || ""
       await dispatchEmail({
         orderId,
         kind: "wholesale.order.approved",
-        recipient: order.customerEmail!,
+        recipient: order.customerEmail,
         render: () => ({
-          subject: `Заказ ${order.orderNumber} одобрен к отгрузке`,
-          html: `<p>Ваш заказ <strong>${order.orderNumber}</strong> одобрен и готовится к отправке.</p>`,
+          subject: `Счёт на оплату — заявка ${order.orderNumber}`,
+          html: `
+            <h2>Заявка подтверждена, счёт готов</h2>
+            <p>Ваша заявка <strong>${order.orderNumber}</strong> подтверждена менеджером.</p>
+            <p><strong>К оплате: ${order.total.toLocaleString("ru")}₽</strong> (товары + доставка ${order.deliveryPrice.toLocaleString("ru")}₽).</p>
+            ${invoicePdfUrl ? `<p><a href="${nextAuthUrl}${invoicePdfUrl}">📄 Скачать счёт ${invoiceNumber} (PDF)</a></p>` : "<p>Счёт формируется, скоро придёт отдельным письмом.</p>"}
+            <p>После поступления 100% оплаты по этому счёту мы сформируем доставку.</p>
+            <p><a href="${nextAuthUrl}/wholesale/orders/${orderId}">Открыть заявку в кабинете</a></p>
+          `,
         }),
         send: (email) => sendRenderedEmail(email),
       }).catch(() => {})
+    }
 
-      await enqueueOutbox(
-        "wholesale.order.approved",
-        {
-          event_id: `wh_order_approved_${orderId}`,
-          event: "wholesale.order.approved",
-          occurred_at: new Date().toISOString(),
-          order: { id: orderId, number: order.orderNumber, total: order.total },
+    await enqueueOutbox(
+      "wholesale.order.approved",
+      {
+        event_id: `wh_order_approved_${orderId}`,
+        event: "wholesale.order.approved",
+        occurred_at: new Date().toISOString(),
+        order: {
+          id: orderId,
+          number: order.orderNumber,
+          total: order.total,
+          invoice_url: invoicePdfUrl,
+          invoice_number: invoiceNumber,
         },
-        { eventId: `wh_order_approved_${orderId}` }
-      ).catch(() => {})
-    })
-  }
+      },
+      { eventId: `wh_order_approved_${orderId}` }
+    ).catch(() => {})
+  })
 
   revalidatePath("/admin/wholesale/orders")
   revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath(`/wholesale/orders/${orderId}`)
   return updated
 }
 
@@ -360,7 +382,8 @@ export async function rejectWholesaleOrder(orderId: string, reason: string) {
   if (!order) throw new Error("Заказ не найден")
   if (order.channel !== "wholesale") throw new Error("Это не оптовый заказ")
 
-  // Отмена через общий updateOrderStatus: он вернёт stock + credit reversal
+  // Отмена через общий updateOrderStatus — возвращает stock.
+  // Credit-reverse тут уже не нужен (кредит-механика убрана).
   await updateOrderStatus(orderId, "cancelled", admin.userId)
   await prisma.order.update({
     where: { id: orderId },
@@ -375,49 +398,56 @@ export async function rejectWholesaleOrder(orderId: string, reason: string) {
     payload: { orderNumber: order.orderNumber, reason },
   })
 
+  // Email клиенту — отказ
+  if (order.customerEmail) {
+    after(async () => {
+      await dispatchEmail({
+        orderId,
+        kind: "wholesale.order.approved",
+        recipient: order.customerEmail!,
+        render: () => ({
+          subject: `Заявка ${order.orderNumber} отклонена`,
+          html: `
+            <h2>Заявка отклонена</h2>
+            <p>К сожалению, мы не можем подтвердить заявку <strong>${order.orderNumber}</strong>.</p>
+            ${reason ? `<p><strong>Причина:</strong> ${reason}</p>` : ""}
+            <p>Товар возвращён на склад. Если есть вопросы — напишите менеджеру.</p>
+          `,
+        }),
+        send: (email) => sendRenderedEmail(email),
+      }).catch(() => {})
+    })
+  }
+
   revalidatePath("/admin/wholesale/orders")
   revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath(`/wholesale/orders/${orderId}`)
   return { ok: true }
 }
 
+/**
+ * Менеджер получил оплату по счёту → помечает заказ paid → переходит к отгрузке.
+ * Никаких credit-транзакций — кредит-механика убрана.
+ */
 export async function markWholesaleOrderPaid(orderId: string) {
-  const admin = await requireAdmin("wholesale.credit.adjust")
+  const admin = await requireAdmin("wholesale.orders.updateStatus")
 
   const order = await prisma.order.findUnique({ where: { id: orderId } })
   if (!order) throw new Error("Заказ не найден")
   if (order.channel !== "wholesale") throw new Error("Это не оптовый заказ")
-  if (!order.wholesaleCompanyId) throw new Error("Заказ не привязан к компании")
-
-  const idempotencyKey = `credit:payment:order:${orderId}`
-
-  // Проверим, был ли уже зафиксирован платёж по этому orderId
-  const existing = await prisma.wholesaleCreditTransaction.findUnique({
-    where: { idempotencyKey },
-  })
-  if (existing) {
-    throw new Error("Оплата по этому заказу уже зарегистрирована")
+  if (order.paymentStatus === "succeeded") {
+    throw new Error("Оплата уже зафиксирована")
+  }
+  if (order.approvalStatus !== "approved") {
+    throw new Error("Сначала подтвердите заявку")
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.wholesaleCreditTransaction.create({
-      data: {
-        companyId: order.wholesaleCompanyId!,
-        amount: -order.total,
-        type: "payment_received",
-        orderId,
-        description: `Оплата заказа ${order.orderNumber}`,
-        idempotencyKey,
-        createdBy: admin.userId,
-      },
-    })
-    await tx.wholesaleCompany.update({
-      where: { id: order.wholesaleCompanyId! },
-      data: { creditUsed: { decrement: order.total } },
-    })
-    await tx.order.update({
-      where: { id: orderId },
-      data: { paymentStatus: "succeeded" },
-    })
+  await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentStatus: "succeeded",
+      paymentMethod: "invoice",
+    },
   })
 
   void logAdminAction({
@@ -428,7 +458,29 @@ export async function markWholesaleOrderPaid(orderId: string) {
     payload: { orderNumber: order.orderNumber, amount: order.total },
   })
 
+  // Email клиенту: оплата получена, формируется доставка
+  if (order.customerEmail) {
+    after(async () => {
+      await dispatchEmail({
+        orderId,
+        kind: "wholesale.order.approved",
+        recipient: order.customerEmail!,
+        render: () => ({
+          subject: `Оплата по заказу ${order.orderNumber} получена`,
+          html: `
+            <h2>Оплата получена — формируем доставку</h2>
+            <p>Подтверждаем получение оплаты по заказу <strong>${order.orderNumber}</strong> на сумму <strong>${order.total.toLocaleString("ru")}₽</strong>.</p>
+            <p>Готовим отгрузку. Ожидайте трек-номер.</p>
+          `,
+        }),
+        send: (email) => sendRenderedEmail(email),
+      }).catch(() => {})
+    })
+  }
+
   revalidatePath("/admin/wholesale/orders")
   revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath(`/wholesale/orders/${orderId}`)
   return { ok: true }
 }
+

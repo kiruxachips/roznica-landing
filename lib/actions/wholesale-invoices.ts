@@ -94,6 +94,7 @@ export async function generateInvoiceForOrder(
   const filename = `${invoice.number}-${secretSuffix}.pdf`
 
   // Render PDF после commit — тяжёлая операция, не держим транзакцию
+  const stampUrl = process.env.SELLER_STAMP_URL || null
   const { url, size } = await renderAndSavePDF(
     InvoicePDF({
       kind,
@@ -103,12 +104,19 @@ export async function generateInvoiceForOrder(
       buyer,
       seller,
       items,
+      delivery: {
+        carrier: order.deliveryMethod ?? null,
+        type: order.deliveryType ?? null,
+        address: order.deliveryAddress ?? null,
+        price: order.deliveryPrice,
+      },
       subtotal: order.subtotal,
       discount: order.discount,
       total: order.total,
       vatRate,
       vatAmount,
       paymentTerms: order.paymentTerms,
+      stampUrl,
     }),
     `wholesale/invoices/${order.wholesaleCompanyId}`,
     filename

@@ -1,4 +1,4 @@
-import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer"
+import { Document, Page, Text, View, StyleSheet, Font, Image } from "@react-pdf/renderer"
 import type {
   InvoiceBuyerSnapshot,
   InvoiceSellerSnapshot,
@@ -95,6 +95,7 @@ const styles = StyleSheet.create({
     marginTop: 30,
     flexDirection: "row",
     justifyContent: "space-between",
+    position: "relative",
   },
   signBox: { width: 180 },
   signUnderline: {
@@ -102,6 +103,14 @@ const styles = StyleSheet.create({
     height: 18,
   },
   signLabel: { fontSize: 8, marginTop: 2, color: "#555" },
+  stamp: {
+    position: "absolute",
+    right: 10,
+    top: -30,
+    width: 110,
+    height: 110,
+    opacity: 0.9,
+  },
 })
 
 export interface InvoicePDFProps {
@@ -112,12 +121,19 @@ export interface InvoicePDFProps {
   buyer: InvoiceBuyerSnapshot
   seller: InvoiceSellerSnapshot
   items: InvoiceLineItem[]
+  delivery: {
+    carrier: string | null
+    type: string | null
+    address: string | null
+    price: number
+  }
   subtotal: number
   discount: number
   total: number
   vatRate: number | null
   vatAmount: number | null
   paymentTerms: string | null
+  stampUrl?: string | null
 }
 
 function formatRub(v: number): string {
@@ -218,6 +234,19 @@ export function InvoicePDF(props: InvoicePDFProps) {
               <Text style={styles.colSum}>{formatRub(item.total)}</Text>
             </View>
           ))}
+          {props.delivery.price > 0 && (
+            <View style={styles.tableRow}>
+              <Text style={styles.colNum}>{props.items.length + 1}</Text>
+              <Text style={styles.colName}>
+                Доставка
+                {props.delivery.carrier ? ` (${props.delivery.carrier.toUpperCase()}${props.delivery.type ? ", " + props.delivery.type : ""})` : ""}
+                {props.delivery.address ? `, ${props.delivery.address}` : ""}
+              </Text>
+              <Text style={styles.colQty}>1</Text>
+              <Text style={styles.colPrice}>{formatRub(props.delivery.price)}</Text>
+              <Text style={styles.colSum}>{formatRub(props.delivery.price)}</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.summary}>
@@ -267,6 +296,10 @@ export function InvoicePDF(props: InvoicePDFProps) {
             <View style={styles.signUnderline} />
             <Text style={styles.signLabel}>Главный бухгалтер</Text>
           </View>
+          {props.stampUrl && (
+            /* eslint-disable-next-line jsx-a11y/alt-text */
+            <Image src={props.stampUrl} style={styles.stamp} />
+          )}
         </View>
       </Page>
     </Document>

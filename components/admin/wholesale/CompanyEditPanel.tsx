@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import {
   updateWholesaleCompany,
   setWholesaleCompanyStatus,
-  adjustCreditLimit,
-  recordCreditPayment,
 } from "@/lib/actions/wholesale-companies"
 
 interface Props {
@@ -40,7 +38,6 @@ export function CompanyEditPanel({ company, priceLists, managers }: Props) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
-  const [credit, setCredit] = useState<"adjust" | "payment" | null>(null)
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -61,7 +58,6 @@ export function CompanyEditPanel({ company, priceLists, managers }: Props) {
         contactName: (form.get("contactName") as string) || null,
         contactPhone: (form.get("contactPhone") as string) || null,
         contactEmail: (form.get("contactEmail") as string) || null,
-        paymentTerms: form.get("paymentTerms") as string,
         priceListId: (form.get("priceListId") as string) || null,
         managerAdminId: (form.get("managerAdminId") as string) || null,
         notes: (form.get("notes") as string) || null,
@@ -81,44 +77,6 @@ export function CompanyEditPanel({ company, priceLists, managers }: Props) {
       router.refresh()
     } catch (e) {
       alert(e instanceof Error ? e.message : "Ошибка")
-    }
-  }
-
-  async function handleAdjustLimit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setSaving(true)
-    const form = new FormData(e.currentTarget)
-    try {
-      await adjustCreditLimit(
-        company.id,
-        Number(form.get("newLimit") || 0),
-        String(form.get("reason") || "")
-      )
-      router.refresh()
-      setCredit(null)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка")
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handlePayment(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setSaving(true)
-    const form = new FormData(e.currentTarget)
-    try {
-      await recordCreditPayment({
-        companyId: company.id,
-        amount: Number(form.get("amount") || 0),
-        description: String(form.get("description") || ""),
-      })
-      router.refresh()
-      setCredit(null)
-    } catch (e) {
-      alert(e instanceof Error ? e.message : "Ошибка")
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -150,79 +108,8 @@ export function CompanyEditPanel({ company, priceLists, managers }: Props) {
             >
               Отклонить
             </button>
-            <button
-              onClick={() => setCredit("adjust")}
-              className="text-sm rounded-lg border border-border px-3 py-1.5 hover:bg-muted"
-            >
-              Изменить лимит
-            </button>
-            <button
-              onClick={() => setCredit("payment")}
-              className="text-sm rounded-lg border border-border px-3 py-1.5 hover:bg-muted"
-            >
-              Оплата получена
-            </button>
           </div>
         </div>
-
-        {credit === "adjust" && (
-          <form onSubmit={handleAdjustLimit} className="flex gap-2 items-end mb-3">
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">Новый лимит, ₽</label>
-              <input
-                name="newLimit"
-                type="number"
-                min={0}
-                defaultValue={company.creditLimit}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm"
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs text-muted-foreground mb-1">Причина</label>
-              <input
-                name="reason"
-                className="w-full rounded-lg border border-border px-3 py-1.5 text-sm"
-                required
-              />
-            </div>
-            <button type="submit" disabled={saving} className="rounded-lg bg-primary text-primary-foreground px-4 py-1.5 text-sm">
-              Сохранить
-            </button>
-            <button type="button" onClick={() => setCredit(null)} className="text-sm text-muted-foreground">
-              Отмена
-            </button>
-          </form>
-        )}
-
-        {credit === "payment" && (
-          <form onSubmit={handlePayment} className="flex gap-2 items-end mb-3">
-            <div>
-              <label className="block text-xs text-muted-foreground mb-1">Сумма оплаты, ₽</label>
-              <input
-                name="amount"
-                type="number"
-                min={1}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm"
-                required
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs text-muted-foreground mb-1">Комментарий (№ п/п, заказ)</label>
-              <input
-                name="description"
-                className="w-full rounded-lg border border-border px-3 py-1.5 text-sm"
-                required
-              />
-            </div>
-            <button type="submit" disabled={saving} className="rounded-lg bg-primary text-primary-foreground px-4 py-1.5 text-sm">
-              Зафиксировать
-            </button>
-            <button type="button" onClick={() => setCredit(null)} className="text-sm text-muted-foreground">
-              Отмена
-            </button>
-          </form>
-        )}
       </div>
 
       <form onSubmit={handleSave} className="bg-white rounded-xl shadow-sm p-5 space-y-4">
@@ -258,20 +145,6 @@ export function CompanyEditPanel({ company, priceLists, managers }: Props) {
                   {p.name}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Условия оплаты</label>
-            <select
-              name="paymentTerms"
-              defaultValue={company.paymentTerms}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            >
-              <option value="prepay">Предоплата</option>
-              <option value="net7">Отсрочка 7 дней</option>
-              <option value="net14">Отсрочка 14 дней</option>
-              <option value="net30">Отсрочка 30 дней</option>
-              <option value="net60">Отсрочка 60 дней</option>
             </select>
           </div>
           <div className="md:col-span-2">

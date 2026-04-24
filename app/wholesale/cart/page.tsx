@@ -21,7 +21,7 @@ export default async function WholesaleCartPage() {
         <WholesaleSidebar />
         <div className="flex-1 min-w-0">
           <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-5">Корзина</h1>
-          <WholesaleCart paymentTerms={ctx.company.paymentTerms} />
+          <WholesaleCart />
         </div>
       </div>
     </div>

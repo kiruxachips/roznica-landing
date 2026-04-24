@@ -24,7 +24,7 @@ interface TierState {
   discountPct: number
 }
 
-export function WholesaleCart({ paymentTerms }: { paymentTerms: string }) {
+export function WholesaleCart() {
   const items = useWholesaleCart((s) => s.items)
   const updateQuantity = useWholesaleCart((s) => s.updateQuantity)
   const removeItem = useWholesaleCart((s) => s.removeItem)
@@ -237,12 +237,8 @@ export function WholesaleCart({ paymentTerms }: { paymentTerms: string }) {
         )}
 
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Условия оплаты</span>
-          <span>
-            {paymentTerms === "prepay"
-              ? "Предоплата"
-              : `Отсрочка ${paymentTerms.replace("net", "")} дн.`}
-          </span>
+          <span className="text-muted-foreground">Оплата</span>
+          <span>по счёту, 100% предоплата</span>
         </div>
         {tierDiscount > 0 && (
           <div className="flex justify-between text-xs text-muted-foreground">

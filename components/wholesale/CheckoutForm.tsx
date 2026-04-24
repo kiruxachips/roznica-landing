@@ -22,8 +22,6 @@ interface TierState {
 }
 
 interface Props {
-  paymentTerms: string
-  creditAvailable: number
   defaultAddress: string
   defaultPhone: string
   defaultName: string
@@ -69,8 +67,6 @@ export function WholesaleCheckout(props: Props) {
   const subtotal = gross - tierDiscount
   const deliveryPrice = delivery.selected?.priceWithMarkup ?? 0
   const total = subtotal + deliveryPrice
-  const isNetTerms = props.paymentTerms !== "prepay"
-  const exceedsCredit = isNetTerms && total > props.creditAvailable
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -80,10 +76,6 @@ export function WholesaleCheckout(props: Props) {
     }
     if (!delivery.selected) {
       setError("Выберите тариф доставки")
-      return
-    }
-    if (exceedsCredit) {
-      setError(`Превышен кредитный лимит. Доступно: ${props.creditAvailable.toLocaleString("ru")}₽`)
       return
     }
     setError("")
@@ -250,37 +242,24 @@ export function WholesaleCheckout(props: Props) {
           </span>
         </div>
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">Условия оплаты</span>
-          <span className="font-medium">
-            {props.paymentTerms === "prepay"
-              ? "Предоплата"
-              : `Отсрочка ${props.paymentTerms.replace("net", "")} дн.`}
-          </span>
+          <span className="text-muted-foreground">Оплата</span>
+          <span className="font-medium">По счёту (100% предоплата)</span>
         </div>
-        {isNetTerms && (
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Свободный лимит отсрочки</span>
-            <span className={exceedsCredit ? "text-red-600 font-medium" : ""}>
-              {props.creditAvailable.toLocaleString("ru")}₽
-            </span>
-          </div>
-        )}
         <div className="flex justify-between text-lg font-bold pt-2 border-t">
-          <span>К оплате</span>
+          <span>Итого в счёт</span>
           <span>{total.toLocaleString("ru")}₽</span>
         </div>
         <button
           type="submit"
-          disabled={loading || exceedsCredit}
+          disabled={loading}
           className="w-full rounded-xl bg-primary text-primary-foreground font-medium py-2.5 hover:bg-primary/90 transition-colors disabled:opacity-60"
         >
-          {loading ? "Отправляем..." : isNetTerms ? "Отправить на одобрение" : "Оформить заказ"}
+          {loading ? "Отправляем..." : "Отправить заявку менеджеру"}
         </button>
-        {isNetTerms && (
-          <p className="text-xs text-muted-foreground">
-            Заказ уйдёт менеджеру на подтверждение. После одобрения мы подготовим счёт.
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          После подтверждения менеджером вы получите PDF-счёт на оплату. Товар
+          зарезервируется, пока менеджер рассматривает заявку.
+        </p>
       </aside>
     </form>
   )

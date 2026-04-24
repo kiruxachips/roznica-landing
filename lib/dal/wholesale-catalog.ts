@@ -50,9 +50,18 @@ export interface WholesaleProductDetail extends WholesaleProductCard {
   images: { url: string; alt: string | null }[]
 }
 
+// В оптовом каталоге показываем только кофе по 1кг. Всё остальное
+// (чай, растворимка, цикорий, 250г-пачки) — розничный ассортимент, опт
+// с ним не работает. Параметр weight может быть "1кг", "1 кг", "1000г", "1000 г"
+// — покрываем case-insensitive префиксом «1» перед «кг» или «1000» перед «г».
+function isWholesaleCoffeeKg(weight: string): boolean {
+  const w = weight.toLowerCase().replace(/\s+/g, "")
+  return w === "1кг" || w === "1kg" || w === "1000г" || w === "1000g"
+}
+
 export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleProductCard[]> {
   const products = await prisma.product.findMany({
-    where: { isActive: true },
+    where: { isActive: true, productType: "coffee" },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
     select: {
       id: true,
@@ -79,12 +88,15 @@ export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleP
     },
   })
 
-  const allVariantIds = products.flatMap((p) => p.variants.map((v) => v.id))
+  const allVariantIds = products.flatMap((p) =>
+    p.variants.filter((v) => isWholesaleCoffeeKg(v.weight)).map((v) => v.id)
+  )
   const priceMap = await resolvePrices(allVariantIds, ctx)
 
   return products
     .map((p) => {
       const variants: WholesaleProductCardVariant[] = p.variants
+        .filter((v) => isWholesaleCoffeeKg(v.weight))
         .map((v) => {
           const priced = priceMap.get(v.id)
           if (!priced) return null
@@ -163,14 +175,16 @@ export async function getWholesaleProductBySlug(
     },
   })
 
-  if (!product || !product.isActive) return null
+  if (!product || !product.isActive || product.productType !== "coffee") return null
 
+  // В опте только 1кг кофе — 250г и прочее режем.
+  const coffeeKgVariants = product.variants.filter((v) => isWholesaleCoffeeKg(v.weight))
   const priceMap = await resolvePrices(
-    product.variants.map((v) => v.id),
+    coffeeKgVariants.map((v) => v.id),
     ctx
   )
 
-  const variants: WholesaleProductCardVariant[] = product.variants
+  const variants: WholesaleProductCardVariant[] = coffeeKgVariants
     .map((v) => {
       const priced = priceMap.get(v.id)
       if (!priced) return null
@@ -229,7 +243,11 @@ export async function getVariantPricesForRefresh(
   ctx: PriceContext
 ): Promise<Map<string, { price: number; stock: number; minQuantity: number; name: string; weight: string; slug: string; image: string | null }>> {
   const variants = await prisma.productVariant.findMany({
-    where: { id: { in: variantIds }, isActive: true },
+    where: {
+      id: { in: variantIds },
+      isActive: true,
+      product: { isActive: true, productType: "coffee" },
+    },
     select: {
       id: true,
       weight: true,
@@ -240,6 +258,7 @@ export async function getVariantPricesForRefresh(
           name: true,
           slug: true,
           isActive: true,
+          productType: true,
           smallImage: true,
           images: {
             where: { isPrimary: true },
@@ -264,6 +283,7 @@ export async function getVariantPricesForRefresh(
 
   for (const v of variants) {
     if (!v.product.isActive) continue
+    if (!isWholesaleCoffeeKg(v.weight)) continue
     const p = priceMap.get(v.id)
     if (!p) continue
     result.set(v.id, {

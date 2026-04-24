@@ -27,7 +27,7 @@ export default async function WholesaleOrdersPage() {
       <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
         <WholesaleSidebar />
         <div className="flex-1 min-w-0">
-          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-5">Мои заказы</h1>
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-5">Мои заявки</h1>
 
           {orders.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-sm p-8 text-center">

@@ -27,15 +27,67 @@ export default async function WholesaleOrderDetailPage({
         <div className="flex-1 min-w-0 space-y-5">
           <div>
             <Link href="/wholesale/orders" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Все заказы
+              ← Все заявки
             </Link>
             <h1 className="font-serif text-2xl sm:text-3xl font-bold mt-1">
-              Заказ {order.orderNumber}
+              Заявка {order.orderNumber}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
               {new Date(order.createdAt).toLocaleString("ru")}
             </p>
           </div>
+
+          {(() => {
+            const stage =
+              order.status === "cancelled"
+                ? { kind: "rejected" as const }
+                : order.approvalStatus === "pending_approval"
+                  ? { kind: "pending_approval" as const }
+                  : order.paymentStatus !== "succeeded"
+                    ? { kind: "awaiting_payment" as const }
+                    : order.status === "shipped" || order.status === "delivered"
+                      ? { kind: "in_delivery" as const }
+                      : { kind: "paid" as const }
+
+            const map = {
+              pending_approval: {
+                color: "bg-amber-50 border-amber-200 text-amber-900",
+                title: "Заявка на рассмотрении",
+                text: "Менеджер изучает вашу заявку. Товар зарезервирован на складе. Обычно ответ приходит в течение рабочего дня — мы свяжемся с вами.",
+              },
+              awaiting_payment: {
+                color: "bg-blue-50 border-blue-200 text-blue-900",
+                title: invoice ? `Счёт ${invoice.number} выставлен — ждём оплату` : "Счёт готовится",
+                text: invoice?.pdfUrl
+                  ? "Скачайте PDF-счёт ниже, оплатите 100% по платёжному поручению. После поступления оплаты мы сформируем доставку."
+                  : "Менеджер формирует счёт. Он придёт отдельным письмом в ближайшее время.",
+              },
+              paid: {
+                color: "bg-green-50 border-green-200 text-green-900",
+                title: "Оплата получена — формируем доставку",
+                text: "Спасибо! Готовим отгрузку, скоро пришлём трек-номер.",
+              },
+              in_delivery: {
+                color: "bg-primary/10 border-primary/30 text-primary",
+                title: "Заказ в доставке",
+                text: order.trackingNumber
+                  ? `Трек-номер: ${order.trackingNumber}`
+                  : "Ожидайте трек-номер.",
+              },
+              rejected: {
+                color: "bg-red-50 border-red-200 text-red-800",
+                title: "Заявка отклонена",
+                text: "Товар возвращён на склад. Если нужна помощь — напишите менеджеру.",
+              },
+            } as const
+            const s = map[stage.kind]
+            return (
+              <div className={`rounded-2xl border p-4 ${s.color}`}>
+                <div className="font-semibold">{s.title}</div>
+                <div className="text-sm mt-1 opacity-90">{s.text}</div>
+              </div>
+            )
+          })()}
 
           <div className="grid md:grid-cols-2 gap-5">
             <section className="bg-white rounded-2xl shadow-sm p-5">

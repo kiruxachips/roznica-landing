@@ -51,63 +51,47 @@ export default async function AdminWholesaleCompaniesPage({
               <th className="px-4 py-3 text-left">ИНН</th>
               <th className="px-4 py-3 text-left">Статус</th>
               <th className="px-4 py-3 text-left">Прайс</th>
-              <th className="px-4 py-3 text-left">Условия</th>
-              <th className="px-4 py-3 text-right">Лимит отсрочки</th>
               <th className="px-4 py-3 text-right">Заказы</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {companies.map((c) => {
-              const available = c.creditLimit - c.creditUsed
-              return (
-                <tr key={c.id}>
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{c.legalName}</div>
-                    {c.managerName && (
-                      <div className="text-xs text-muted-foreground">
-                        менеджер: {c.managerName}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">{c.inn}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs ${
-                        c.status === "active"
-                          ? "bg-green-50 text-green-800 border border-green-200"
-                          : c.status === "suspended"
-                            ? "bg-amber-50 text-amber-800 border border-amber-200"
-                            : "bg-red-50 text-red-800 border border-red-200"
-                      }`}
-                    >
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs">{c.priceListName ?? "—"}</td>
-                  <td className="px-4 py-3 text-xs">{c.paymentTerms}</td>
-                  <td className="px-4 py-3 text-right text-xs">
-                    {c.paymentTerms === "prepay" ? (
-                      "—"
-                    ) : (
-                      <>
-                        <div>{available.toLocaleString("ru")}₽</div>
-                        <div className="text-muted-foreground">из {c.creditLimit.toLocaleString("ru")}₽</div>
-                      </>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">{c.ordersCount}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/admin/wholesale/companies/${c.id}`} className="text-primary hover:underline">
-                      Открыть →
-                    </Link>
-                  </td>
-                </tr>
-              )
-            })}
+            {companies.map((c) => (
+              <tr key={c.id}>
+                <td className="px-4 py-3">
+                  <div className="font-medium">{c.legalName}</div>
+                  {c.managerName && (
+                    <div className="text-xs text-muted-foreground">
+                      менеджер: {c.managerName}
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3">{c.inn}</td>
+                <td className="px-4 py-3">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs ${
+                      c.status === "active"
+                        ? "bg-green-50 text-green-800 border border-green-200"
+                        : c.status === "suspended"
+                          ? "bg-amber-50 text-amber-800 border border-amber-200"
+                          : "bg-red-50 text-red-800 border border-red-200"
+                    }`}
+                  >
+                    {c.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-xs">{c.priceListName ?? "—"}</td>
+                <td className="px-4 py-3 text-right">{c.ordersCount}</td>
+                <td className="px-4 py-3 text-right">
+                  <Link href={`/admin/wholesale/companies/${c.id}`} className="text-primary hover:underline">
+                    Открыть →
+                  </Link>
+                </td>
+              </tr>
+            ))}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                   Компаний нет
                 </td>
               </tr>

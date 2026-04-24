@@ -29,8 +29,6 @@ export default async function AdminWholesaleCompanyDetailPage({
   ])
   if (!company) notFound()
 
-  const available = company.creditLimit - company.creditUsed
-
   return (
     <div className="p-6 space-y-5 max-w-5xl">
       <div className="flex items-start justify-between">
@@ -40,33 +38,12 @@ export default async function AdminWholesaleCompanyDetailPage({
           </Link>
           <h1 className="text-2xl font-bold mt-1">{company.legalName}</h1>
           <p className="text-sm text-muted-foreground">
-            ИНН {company.inn} · {company.status} · {company.paymentTerms}
+            ИНН {company.inn} · {company.status}
           </p>
         </div>
       </div>
 
       <CompanyEditPanel company={company} priceLists={priceLists} managers={managers} />
-
-      <div className="grid md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="text-xs text-muted-foreground">Лимит отсрочки платежа</div>
-          <div className="text-xl font-semibold mt-1">
-            {company.creditLimit.toLocaleString("ru")}₽
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="text-xs text-muted-foreground">Использовано</div>
-          <div className="text-xl font-semibold mt-1">
-            {company.creditUsed.toLocaleString("ru")}₽
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="text-xs text-muted-foreground">Доступно</div>
-          <div className={`text-xl font-semibold mt-1 ${available < 0 ? "text-red-600" : ""}`}>
-            {available.toLocaleString("ru")}₽
-          </div>
-        </div>
-      </div>
 
       <section className="bg-white rounded-xl shadow-sm p-5">
         <h2 className="font-semibold mb-3">Сотрудники ({company.users.length})</h2>
@@ -116,31 +93,6 @@ export default async function AdminWholesaleCompanyDetailPage({
                 </div>
                 <div className="font-semibold">{o.total.toLocaleString("ru")}₽</div>
               </Link>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="bg-white rounded-xl shadow-sm p-5">
-        <h2 className="font-semibold mb-3">История кредита</h2>
-        {company.creditTx.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Операций нет</p>
-        ) : (
-          <div className="divide-y text-sm">
-            {company.creditTx.map((t) => (
-              <div key={t.id} className="py-2 flex justify-between">
-                <div>
-                  <div className="font-medium">{t.type}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(t.createdAt).toLocaleString("ru")}
-                    {t.description && ` · ${t.description}`}
-                  </div>
-                </div>
-                <div className={`font-semibold ${t.amount > 0 ? "text-red-600" : "text-green-600"}`}>
-                  {t.amount > 0 ? "+" : ""}
-                  {t.amount.toLocaleString("ru")}₽
-                </div>
-              </div>
             ))}
           </div>
         )}

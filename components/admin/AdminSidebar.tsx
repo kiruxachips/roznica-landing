@@ -59,7 +59,6 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { name: "Опт: Компании", href: "/admin/wholesale/companies", icon: Building2, permission: "wholesale.companies.view" },
   { name: "Опт: Прайс-листы", href: "/admin/wholesale/price-lists", icon: FileText, permission: "wholesale.priceLists.view" },
   { name: "Опт: Заказы", href: "/admin/wholesale/orders", icon: ShoppingCart, permission: "wholesale.orders.view" },
-  { name: "Опт: Лимиты отсрочки", href: "/admin/wholesale/credit", icon: Wallet, permission: "wholesale.credit.view" },
 ]
 
 export function AdminSidebar() {

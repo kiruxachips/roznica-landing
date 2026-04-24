@@ -1,12 +1,18 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { Package, FileText, Building2, Wallet } from "lucide-react"
+import { Package, FileText, Building2, Truck } from "lucide-react"
 import { getWholesaleContext } from "@/lib/wholesale-guard"
 import { WholesaleSidebar } from "@/components/wholesale/Sidebar"
 import { getWholesaleOrdersForCompany } from "@/lib/dal/wholesale-orders"
 import { prisma } from "@/lib/prisma"
 
 export const dynamic = "force-dynamic"
+
+const APPROVAL_LABEL: Record<string, string> = {
+  pending_approval: "на рассмотрении",
+  approved: "одобрена",
+  rejected: "отклонена",
+}
 
 export default async function WholesaleDashboardPage() {
   const ctx = await getWholesaleContext()
@@ -20,8 +26,6 @@ export default async function WholesaleDashboardPage() {
     getWholesaleOrdersForCompany(ctx.companyId, { take: 5 }),
   ])
 
-  const creditAvailable = company ? company.creditLimit - company.creditUsed : 0
-
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col lg:flex-row gap-5 lg:gap-8">
@@ -32,8 +36,6 @@ export default async function WholesaleDashboardPage() {
             <p className="text-muted-foreground text-sm mt-1">{company?.legalName}</p>
           </div>
 
-          {/* Опциональный prompt: если ИНН ещё не заполнен — предлагаем дать реквизиты
-              для счёта УПД + отсрочки. Работе каталога не мешает, компания уже active. */}
           {(!company?.inn || company.inn.startsWith("TMP")) && (
             <Link
               href="/wholesale/company/info"
@@ -43,11 +45,11 @@ export default async function WholesaleDashboardPage() {
                 <div className="text-xl">📄</div>
                 <div>
                   <div className="font-semibold">
-                    Хотите счёт УПД или оплату по отсрочке? (опционально)
+                    Заполните реквизиты для корректного счёта
                   </div>
                   <div className="text-sm text-muted-foreground mt-0.5">
-                    Заполните ИНН и реквизиты — менеджер свяжется и выдаст лимит отсрочки.
-                    Каталог и скидки по весу работают уже сейчас, это не обязательно.
+                    ИНН, юр.адрес и банковские реквизиты попадают в платёжку.
+                    Без этих данных менеджер свяжется отдельно для уточнения.
                   </div>
                 </div>
               </div>
@@ -58,42 +60,34 @@ export default async function WholesaleDashboardPage() {
             <InfoCard
               icon={Package}
               title="Прайс-лист"
-              value={company?.priceList?.name ?? "Розничный"}
+              value={company?.priceList?.name ?? "—"}
               sub={company?.priceList?.minOrderSum ? `мин. заказ ${company.priceList.minOrderSum}₽` : null}
             />
             <InfoCard
               icon={FileText}
-              title="Условия оплаты"
-              value={
-                company?.paymentTerms === "prepay"
-                  ? "Предоплата"
-                  : `Отсрочка ${company?.paymentTerms?.replace("net", "")} дн.`
-              }
-              sub={null}
+              title="Порядок работы"
+              value="Заявка → счёт → оплата"
+              sub="100% предоплата по платёжке"
             />
             <InfoCard
-              icon={Wallet}
-              title="Свободный лимит"
-              value={company?.paymentTerms !== "prepay" ? `${creditAvailable.toLocaleString("ru")}₽` : "—"}
-              sub={
-                company?.paymentTerms !== "prepay"
-                  ? `отсрочка ${company?.paymentTerms.replace("net", "")} дн. · из ${company?.creditLimit.toLocaleString("ru")}₽`
-                  : "только предоплата"
-              }
+              icon={Truck}
+              title="Доставка"
+              value="CDEK · Почта России"
+              sub="отдельной строкой в счёте"
             />
-            <InfoCard icon={Building2} title="ИНН" value={company?.inn ?? "—"} sub={null} />
+            <InfoCard icon={Building2} title="ИНН" value={company?.inn && !company.inn.startsWith("TMP") ? company.inn : "—"} sub={null} />
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-lg">Последние заказы</h2>
+              <h2 className="font-semibold text-lg">Последние заявки</h2>
               <Link href="/wholesale/orders" className="text-sm text-primary hover:underline">
-                Все заказы →
+                Все →
               </Link>
             </div>
             {lastOrders.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                Заказов пока нет.{" "}
+                Заявок пока нет.{" "}
                 <Link href="/wholesale/catalog" className="text-primary hover:underline">
                   Перейти в каталог
                 </Link>
@@ -109,9 +103,8 @@ export default async function WholesaleDashboardPage() {
                     <div>
                       <div className="font-medium text-sm">{o.orderNumber}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(o.createdAt).toLocaleDateString("ru")} ·{" "}
-                        {o.status}
-                        {o.approvalStatus === "pending_approval" && " · ждёт одобрения"}
+                        {new Date(o.createdAt).toLocaleDateString("ru")} · {o.status}
+                        {o.approvalStatus && ` · ${APPROVAL_LABEL[o.approvalStatus] ?? o.approvalStatus}`}
                       </div>
                     </div>
                     <div className="font-semibold text-sm">{o.total.toLocaleString("ru")}₽</div>
@@ -143,7 +136,7 @@ function InfoCard({
         <Icon className="w-5 h-5 text-primary" />
       </div>
       <div className="text-xs text-muted-foreground mb-1">{title}</div>
-      <div className="font-semibold text-lg">{value}</div>
+      <div className="font-semibold text-base">{value}</div>
       {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   )

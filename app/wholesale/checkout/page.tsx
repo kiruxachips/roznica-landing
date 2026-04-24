@@ -29,8 +29,6 @@ export default async function WholesaleCheckoutPage() {
         <div className="flex-1 min-w-0">
           <h1 className="font-serif text-2xl sm:text-3xl font-bold mb-5">Оформление</h1>
           <WholesaleCheckout
-            paymentTerms={ctx.company.paymentTerms}
-            creditAvailable={ctx.company.creditLimit - ctx.company.creditUsed}
             defaultAddress={company?.postalAddress ?? ""}
             defaultPhone={company?.contactPhone ?? ""}
             defaultName={company?.contactName ?? ctx.name}
