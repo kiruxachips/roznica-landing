@@ -381,9 +381,19 @@ export async function rejectWholesaleOrder(orderId: string, reason: string) {
   const order = await prisma.order.findUnique({ where: { id: orderId } })
   if (!order) throw new Error("Заказ не найден")
   if (order.channel !== "wholesale") throw new Error("Это не оптовый заказ")
+  // Отклонить можно только заявку, которая ещё не обработана.
+  // После approve счёт уже сформирован и, возможно, отправлен клиенту —
+  // нельзя тихо отменять такой заказ этим флоу. Для отмены после approve
+  // менеджер должен использовать обычный updateOrderStatus → cancelled,
+  // что задокументирует отмену с полным audit trail.
+  if (order.approvalStatus !== "pending_approval") {
+    throw new Error(
+      "Отклонить можно только заявку в статусе «ожидает подтверждения». " +
+        "Для отмены уже одобренного заказа используйте смену статуса → Отменён."
+    )
+  }
 
   // Отмена через общий updateOrderStatus — возвращает stock.
-  // Credit-reverse тут уже не нужен (кредит-механика убрана).
   await updateOrderStatus(orderId, "cancelled", admin.userId)
   await prisma.order.update({
     where: { id: orderId },
@@ -403,7 +413,7 @@ export async function rejectWholesaleOrder(orderId: string, reason: string) {
     after(async () => {
       await dispatchEmail({
         orderId,
-        kind: "wholesale.order.approved",
+        kind: "wholesale.order.rejected",
         recipient: order.customerEmail!,
         render: () => ({
           subject: `Заявка ${order.orderNumber} отклонена`,
@@ -463,7 +473,7 @@ export async function markWholesaleOrderPaid(orderId: string) {
     after(async () => {
       await dispatchEmail({
         orderId,
-        kind: "wholesale.order.approved",
+        kind: "wholesale.order.paid",
         recipient: order.customerEmail!,
         render: () => ({
           subject: `Оплата по заказу ${order.orderNumber} получена`,

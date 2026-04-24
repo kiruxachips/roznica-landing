@@ -18,7 +18,6 @@ import {
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
-import { recordCreditTransaction } from "@/lib/dal/wholesale-credit"
 
 function parseItemWeightGrams(w: string): number {
   const lower = w.toLowerCase().trim()
@@ -280,35 +279,8 @@ export async function createOrder(data: OrderData) {
       }
     }
 
-    // Atomic credit-limit check для B2B net-terms заказов.
-    // SELECT ... FOR UPDATE блокирует строку компании до конца транзакции,
-    // предотвращая race: два одновременных заказа от разных сотрудников не
-    // смогут вместе превысить лимит.
-    if (
-      isWholesale &&
-      data.wholesaleCompanyId &&
-      data.paymentTerms &&
-      data.paymentTerms !== "prepay"
-    ) {
-      const locked = await tx.$queryRaw<
-        { creditLimit: number; creditUsed: number }[]
-      >`
-        SELECT "creditLimit", "creditUsed"
-        FROM "WholesaleCompany"
-        WHERE id = ${data.wholesaleCompanyId}
-        FOR UPDATE
-      `
-      if (!locked.length) {
-        throw new Error("Компания не найдена")
-      }
-      const { creditLimit, creditUsed } = locked[0]
-      if (creditUsed + total > creditLimit) {
-        throw new Error(
-          `Превышен кредитный лимит. Доступно: ${(creditLimit - creditUsed).toLocaleString("ru")}₽, ` +
-            `сумма заказа: ${total.toLocaleString("ru")}₽.`
-        )
-      }
-    }
+    // Кредит-механика убрана: все оптовые заказы идут по счёту (100%
+    // предоплата) через approve-flow. Проверок лимита больше нет.
 
     const created = await tx.order.create({
       data: {
@@ -439,24 +411,8 @@ export async function createOrder(data: OrderData) {
       await deductBonusesInTx(tx, data.userId, created.id, bonusUsed)
     }
 
-    // B2B: зафиксировать рост задолженности для net-terms заказов.
-    // prepay в momenter оплаты — никакой credit-ledger не тронут.
-    if (
-      isWholesale &&
-      data.wholesaleCompanyId &&
-      data.paymentTerms &&
-      data.paymentTerms !== "prepay"
-    ) {
-      await recordCreditTransaction(tx, {
-        companyId: data.wholesaleCompanyId,
-        amount: total,
-        type: "order_placed",
-        orderId: created.id,
-        description: `Заказ ${created.orderNumber}: отсрочка ${data.paymentTerms}`,
-        idempotencyKey: `credit:order_placed:${created.id}`,
-        createdBy: data.wholesaleUserId ?? "system",
-      })
-    }
+    // Credit-ledger полностью убран — все оптовые заказы идут по счёту
+    // (100% предоплата), долги не копятся.
 
     // G1-1: firstOrderCompletedAt — ставим при ЛЮБОМ первом заказе (не только
     // когда welcome applied). Это корректный маркер «был ли вообще first order»,
@@ -632,12 +588,6 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
   })
   if (!order) throw new Error("Заказ не найден")
 
-  const isWholesaleNetTerms =
-    order.channel === "wholesale" &&
-    !!order.wholesaleCompanyId &&
-    !!order.paymentTerms &&
-    order.paymentTerms !== "prepay"
-
   const allowed = ALLOWED_TRANSITIONS[order.status] || []
   if (!allowed.includes(status)) {
     throw new Error(`Нельзя перевести заказ из "${order.status}" в "${status}"`)
@@ -692,19 +642,6 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
         })
       }
 
-      // B2B: отмена заказа на отсрочке → reverse credit (negative amount).
-      // Идемпотентный ключ предотвращает двойное уменьшение при повторном вызове.
-      if (isWholesaleNetTerms && order.wholesaleCompanyId) {
-        await recordCreditTransaction(tx, {
-          companyId: order.wholesaleCompanyId,
-          amount: -order.total,
-          type: "order_cancelled",
-          orderId: id,
-          description: `Отмена заказа ${order.orderNumber}`,
-          idempotencyKey: `credit:order_cancelled:${id}`,
-          createdBy: changedBy ?? "system",
-        })
-      }
     }
 
     const upd = await tx.order.update({

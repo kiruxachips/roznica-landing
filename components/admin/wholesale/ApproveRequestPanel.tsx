@@ -88,37 +88,16 @@ export function ApproveRequestPanel(props: Props) {
           <div>
             <label className="block text-sm font-medium mb-1">Прайс-лист</label>
             <select name="priceListId" className="w-full rounded-lg border border-border px-3 py-2 text-sm">
-              <option value="">— Розничный (не назначать опт) —</option>
+              <option value="">— Дефолтный прайс-лист —</option>
               {props.priceLists.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
               ))}
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Условия оплаты</label>
-            <select
-              name="paymentTerms"
-              defaultValue="prepay"
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            >
-              <option value="prepay">Предоплата</option>
-              <option value="net7">Отсрочка 7 дней</option>
-              <option value="net14">Отсрочка 14 дней</option>
-              <option value="net30">Отсрочка 30 дней</option>
-              <option value="net60">Отсрочка 60 дней</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Лимит отсрочки платежа, ₽</label>
-            <input
-              type="number"
-              name="creditLimit"
-              defaultValue={0}
-              min={0}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Скидки по весу применяются автоматически из прайса.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">Ответственный менеджер</label>
@@ -132,6 +111,13 @@ export function ApproveRequestPanel(props: Props) {
             </select>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          Все оптовые заказы обрабатываются через счёт с 100% предоплатой —
+          отсрочки и кредитные лимиты не предусмотрены.
+        </p>
+        {/* Скрытые поля для обратной совместимости с approveWholesaleAccessRequest */}
+        <input type="hidden" name="paymentTerms" value="prepay" />
+        <input type="hidden" name="creditLimit" value="0" />
         <div className="flex gap-3">
           <button
             type="submit"

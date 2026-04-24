@@ -18,6 +18,8 @@ export async function generateInvoiceForOrder(
   orderId: string,
   opts?: { kind?: "invoice" | "upd" | "act"; vatRate?: number | null }
 ) {
+  // Генерация счёта доступна любому, кто может менять статус заказа (admin + manager).
+  // Автоматически вызывается из approveWholesaleOrder (только admin) — permission совместим.
   const admin = await requireAdmin("wholesale.orders.updateStatus")
   const kind = opts?.kind ?? "invoice"
 
@@ -93,8 +95,11 @@ export async function generateInvoiceForOrder(
   const secretSuffix = crypto.randomBytes(16).toString("hex")
   const filename = `${invoice.number}-${secretSuffix}.pdf`
 
-  // Render PDF после commit — тяжёлая операция, не держим транзакцию
-  const stampUrl = process.env.SELLER_STAMP_URL || null
+  // Render PDF после commit — тяжёлая операция, не держим транзакцию.
+  // Валидируем SELLER_STAMP_URL: только http/https (защита от data:/file:/javascript:
+  // схем, которые react-pdf Image может попытаться загрузить).
+  const rawStamp = process.env.SELLER_STAMP_URL ?? ""
+  const stampUrl = /^https?:\/\//i.test(rawStamp) ? rawStamp : null
   const { url, size } = await renderAndSavePDF(
     InvoicePDF({
       kind,

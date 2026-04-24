@@ -72,7 +72,7 @@ export function WholesaleOrderPanel(props: Props) {
   }
 
   const isPending = props.approvalStatus === "pending_approval"
-  const isNetTerms = props.paymentTerms && props.paymentTerms !== "prepay"
+  const isApproved = props.approvalStatus === "approved"
   const isPaid = props.paymentStatus === "succeeded"
 
   return (
@@ -103,22 +103,26 @@ export function WholesaleOrderPanel(props: Props) {
           </div>
         </div>
         <div>
-          <div className="text-xs text-muted-foreground">Условия оплаты</div>
-          <div className="font-medium">
-            {props.paymentTerms === "prepay"
-              ? "Предоплата"
-              : `Отсрочка ${props.paymentTerms?.replace("net", "")} дн.`}
-          </div>
+          <div className="text-xs text-muted-foreground">Оплата</div>
+          <div className="font-medium">По счёту, 100% предоплата</div>
         </div>
         <div>
-          <div className="text-xs text-muted-foreground">Статус апрува</div>
+          <div className="text-xs text-muted-foreground">Статус заявки</div>
           <div className="font-medium">
             {props.approvalStatus === "pending_approval" ? (
               <span className="inline-flex rounded-full bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 text-xs">
                 ждёт одобрения
               </span>
+            ) : props.approvalStatus === "approved" ? (
+              <span className="inline-flex rounded-full bg-green-50 text-green-800 border border-green-200 px-2 py-0.5 text-xs">
+                одобрена
+              </span>
+            ) : props.approvalStatus === "rejected" ? (
+              <span className="inline-flex rounded-full bg-red-50 text-red-800 border border-red-200 px-2 py-0.5 text-xs">
+                отклонена
+              </span>
             ) : (
-              props.approvalStatus ?? "не требуется (предоплата)"
+              "—"
             )}
           </div>
         </div>
@@ -148,16 +152,16 @@ export function WholesaleOrderPanel(props: Props) {
             </button>
           </>
         )}
-        {isNetTerms && !isPaid && !isPending && (
+        {isApproved && !isPaid && (
           <button
             onClick={handleMarkPaid}
             disabled={loading !== null}
             className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-medium disabled:opacity-60"
           >
-            {loading === "paid" ? "..." : "Зафиксировать оплату"}
+            {loading === "paid" ? "..." : "Зафиксировать оплату по счёту"}
           </button>
         )}
-        {isNetTerms && isPaid && (
+        {isPaid && (
           <span className="rounded-lg bg-green-50 text-green-700 border border-green-200 px-4 py-2 text-sm">
             Оплата зафиксирована
           </span>

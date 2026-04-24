@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma"
-import { resolvePrice, resolvePrices, type PriceContext, type ResolvedPrice } from "@/lib/dal/pricing"
+import {
+  parseWeightGrams,
+  resolvePrice,
+  resolvePrices,
+  type PriceContext,
+  type ResolvedPrice,
+} from "@/lib/dal/pricing"
 import type { ProductType } from "@/lib/types"
 
 /**
@@ -50,13 +56,12 @@ export interface WholesaleProductDetail extends WholesaleProductCard {
   images: { url: string; alt: string | null }[]
 }
 
-// В оптовом каталоге показываем только кофе по 1кг. Всё остальное
-// (чай, растворимка, цикорий, 250г-пачки) — розничный ассортимент, опт
-// с ним не работает. Параметр weight может быть "1кг", "1 кг", "1000г", "1000 г"
-// — покрываем case-insensitive префиксом «1» перед «кг» или «1000» перед «г».
+// В оптовом каталоге показываем только кофе ровно по 1кг. Всё остальное
+// (чай, растворимка, цикорий, 250г/500г-пачки) — розничный ассортимент,
+// опт с ним не работает. Единая точка парсинга веса — parseWeightGrams
+// из pricing.ts: покрывает "1кг", "1 кг", "1КГ", "1000г", "1,0кг", "1.0kg" и т.д.
 function isWholesaleCoffeeKg(weight: string): boolean {
-  const w = weight.toLowerCase().replace(/\s+/g, "")
-  return w === "1кг" || w === "1kg" || w === "1000г" || w === "1000g"
+  return parseWeightGrams(weight) === 1000
 }
 
 export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleProductCard[]> {

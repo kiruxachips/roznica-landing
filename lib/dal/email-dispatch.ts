@@ -39,6 +39,8 @@ export type EmailDispatchKind =
   | "wholesale.password_reset"
   | "wholesale.order.confirmation"
   | "wholesale.order.approved"
+  | "wholesale.order.rejected"
+  | "wholesale.order.paid"
   | "wholesale.order.shipped"
   | "wholesale.order.delivered"
   | "wholesale.admin.new_order"
