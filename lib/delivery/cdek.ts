@@ -166,6 +166,22 @@ async function getAccessToken(
   return data.access_token
 }
 
+// Circuit breaker защищает от cascade-timeout'ов когда CDEK API лежит.
+// Без breaker'а каждый запрос ждёт fetchWithTimeout 10с — при 20 юзерах
+// на checkout получаем 200с суммарной задержки и UX деградирует.
+// С breaker'ом после 5 подряд фейлов в 60-секундном окне все запросы
+// мгновенно падают с 5-минутным cooldown'ом.
+import { createCircuitBreaker, CircuitBreakerOpenError } from "@/lib/circuit-breaker"
+
+const cdekBreaker = createCircuitBreaker({
+  name: "cdek",
+  failureThreshold: 5,
+  windowMs: 60_000,
+  cooldownMs: 5 * 60_000,
+})
+
+export { CircuitBreakerOpenError as CdekBreakerOpen }
+
 async function cdekFetch(
   path: string,
   options: {
@@ -176,24 +192,26 @@ async function cdekFetch(
     testMode: boolean
   }
 ) {
-  const token = await getAccessToken(options.clientId, options.clientSecret, options.testMode)
-  const apiUrl = getApiUrl(options.testMode)
+  return cdekBreaker.run(async () => {
+    const token = await getAccessToken(options.clientId, options.clientSecret, options.testMode)
+    const apiUrl = getApiUrl(options.testMode)
 
-  const res = await fetchWithTimeout(`${apiUrl}${path}`, {
-    method: options.method || "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    const res = await fetchWithTimeout(`${apiUrl}${path}`, {
+      method: options.method || "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`CDEK API error ${res.status}: ${text}`)
+    }
+
+    return res.json()
   })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`CDEK API error ${res.status}: ${text}`)
-  }
-
-  return res.json()
 }
 
 /** Shared CDEK fetch with auth + timeout. Exported for city-search. */

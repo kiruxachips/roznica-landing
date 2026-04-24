@@ -409,11 +409,12 @@ export async function createOrder(data: OrderData) {
   return order.created
 }
 
-export async function getOrders(filters: { status?: string; search?: string; page?: number; limit?: number } = {}) {
-  const { status, search, page = 1, limit = 20 } = filters
+export async function getOrders(filters: { status?: string; search?: string; channel?: string; page?: number; limit?: number } = {}) {
+  const { status, search, channel, page = 1, limit = 20 } = filters
 
   const conditions: Record<string, unknown>[] = []
   if (status) conditions.push({ status })
+  if (channel && channel !== "all") conditions.push({ channel })
   if (search) {
     conditions.push({
       OR: [
@@ -421,6 +422,8 @@ export async function getOrders(filters: { status?: string; search?: string; pag
         { customerPhone: { contains: search } },
         { customerEmail: { contains: search, mode: "insensitive" as const } },
         { customerName: { contains: search, mode: "insensitive" as const } },
+        { b2bLegalName: { contains: search, mode: "insensitive" as const } },
+        { b2bInn: { contains: search } },
       ],
     })
   }

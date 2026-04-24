@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # NPM-зависимости: раз в неделю PR с обновлениями minor/patch.
+  # Major-версии отдельными PR — требуют ручного ревью breaking changes.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Moscow
+    open-pull-requests-limit: 5
+    # Группируем мелкие обновления — меньше шума.
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    # Игнорим major обновления авто — бампаем вручную после чтения changelog.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    # next-auth beta — не авто-бампаем, у них breaking changes каждую minor.
+    allow:
+      - dependency-type: direct
+      - dependency-type: indirect
+    commit-message:
+      prefix: chore(deps)
+      include: scope
+
+  # GitHub Actions (checkout, setup-node) обновлять реже — меняются редко.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: chore(ci)

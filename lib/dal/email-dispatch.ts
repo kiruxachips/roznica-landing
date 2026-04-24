@@ -32,6 +32,16 @@ export type EmailDispatchKind =
   | `admin.stock_low:${string}`
   // N-2: уведомление суперадминам о pending-менеджере
   | `admin.pending_manager:${string}`
+  // Wholesale (B2B) — отдельные шаблоны под опт
+  | "wholesale.access_request.submitted"
+  | "wholesale.access_request.approved"
+  | "wholesale.access_request.rejected"
+  | "wholesale.order.confirmation"
+  | "wholesale.order.approved"
+  | "wholesale.order.shipped"
+  | "wholesale.order.delivered"
+  | "wholesale.admin.new_order"
+  | "wholesale.admin.new_request"
 
 export interface RenderedEmail {
   subject: string
