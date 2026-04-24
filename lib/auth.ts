@@ -107,6 +107,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const user = await prisma.user.findUnique({ where: { email } })
         if (!user || !user.passwordHash) return null
         if (!user.emailVerified) return null
+        // Soft-deleted юзер не должен иметь возможность войти. Email у него
+        // анонимизирован (deleted-{id}-{ts}@anon.local), но на всякий случай
+        // двойная проверка.
+        if (user.deletedAt) return null
 
         const isValid = await bcrypt.compare(credentials.password as string, user.passwordHash)
         if (!isValid) return null
@@ -118,6 +122,64 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: user.email,
           name: user.name,
           userType: "customer" as const,
+        }
+      },
+    }),
+    // Wholesale (B2B) email+password
+    Credentials({
+      id: "wholesale-credentials",
+      name: "Wholesale",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null
+
+        const email = String(credentials.email).toLowerCase().trim()
+        const ip = await getClientIp()
+        const rlKey = `wholesale-login:${email}:${ip}`
+        const rl = checkRateLimit(rlKey, RATE_LIMITS.login)
+        if (!rl.allowed) {
+          throw new AuthError(
+            `Слишком много попыток входа. Попробуйте через ${Math.ceil((rl.retryAfter || 60) / 60)} мин.`
+          )
+        }
+
+        const user = await prisma.wholesaleUser.findUnique({
+          where: { email },
+          include: { company: { select: { id: true, status: true } } },
+        })
+        if (!user || !user.passwordHash) return null
+        // Email подтверждается в момент апрува заявки — unverified не должен входить
+        if (!user.emailVerified) {
+          throw new AuthError("Email не подтверждён. Проверьте почту или задайте пароль по ссылке из письма.")
+        }
+        if (user.status !== "active") {
+          throw new AuthError("Учётная запись заблокирована. Свяжитесь с менеджером.")
+        }
+        if (user.company.status === "rejected") {
+          throw new AuthError("Компания отклонена в доступе к оптовому кабинету.")
+        }
+
+        const isValid = await bcrypt.compare(credentials.password as string, user.passwordHash)
+        if (!isValid) return null
+
+        resetRateLimit(rlKey)
+
+        // Обновляем lastLoginAt (не блокирующе)
+        prisma.wholesaleUser.update({
+          where: { id: user.id },
+          data: { lastLoginAt: new Date() },
+        }).catch(() => {})
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          userType: "wholesale" as const,
+          companyId: user.company.id,
+          companyStatus: user.company.status,
         }
       },
     }),
@@ -267,12 +329,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async jwt({ token, user, account }) {
       if (user) {
-        token.userType = (user as Record<string, unknown>).userType as string || "customer"
-        if ((user as Record<string, unknown>).role) {
-          token.role = (user as Record<string, unknown>).role as string
+        const u = user as Record<string, unknown>
+        token.userType = (u.userType as "admin" | "customer" | "wholesale") || "customer"
+        if (u.role) {
+          token.role = u.role as string
         }
-        if ((user as Record<string, unknown>).status) {
-          token.status = (user as Record<string, unknown>).status as string
+        if (u.status) {
+          token.status = u.status as string
+        }
+        if (u.companyId) {
+          token.companyId = u.companyId as string
+        }
+        if (u.companyStatus) {
+          token.companyStatus = u.companyStatus as string
         }
       }
       // For OAuth, always set customer
@@ -291,6 +360,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         if (token.status) {
           user.status = token.status
+        }
+        if (token.companyId) {
+          user.companyId = token.companyId
+        }
+        if (token.companyStatus) {
+          user.companyStatus = token.companyStatus
         }
       }
       return session

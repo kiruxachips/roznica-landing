@@ -12,12 +12,26 @@ const ADMIN_ONLY_PREFIXES = [
   "/admin/activity",
 ]
 
+/**
+ * Публичные страницы оптового кабинета — доступны без логина.
+ * login + register + success + password reset.
+ */
+const WHOLESALE_PUBLIC_PATHS = new Set([
+  "/wholesale/login",
+  "/wholesale/register",
+  "/wholesale/register/success",
+  "/wholesale/password/reset",
+  "/wholesale/password/reset/confirm",
+  "/wholesale/suspended",
+])
+
 export default auth((req) => {
   const { pathname } = req.nextUrl
   const isAuthenticated = !!req.auth
   const user = req.auth?.user as Record<string, unknown> | undefined
   const userType = user?.userType as string | undefined
   const role = user?.role as string | undefined
+  const companyStatus = user?.companyStatus as string | undefined
 
   // Admin routes
   if (pathname.startsWith("/admin")) {
@@ -64,9 +78,38 @@ export default auth((req) => {
     }
   }
 
+  // Wholesale routes
+  if (pathname.startsWith("/wholesale")) {
+    const isPublic = WHOLESALE_PUBLIC_PATHS.has(pathname)
+
+    // Публичные: если уже залогинен как wholesale — отправляем в кабинет
+    if (isPublic) {
+      if (isAuthenticated && userType === "wholesale") {
+        // Исключение — /wholesale/suspended показываем залогиненному с suspended-статусом
+        if (pathname === "/wholesale/suspended" && companyStatus === "suspended") {
+          return NextResponse.next()
+        }
+        return NextResponse.redirect(new URL("/wholesale", req.url))
+      }
+      return NextResponse.next()
+    }
+
+    // Приватные: требуют wholesale-сессии
+    if (!isAuthenticated || userType !== "wholesale") {
+      const loginUrl = new URL("/wholesale/login", req.url)
+      loginUrl.searchParams.set("callbackUrl", pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    // Если компания приостановлена — только страница /wholesale/suspended
+    if (companyStatus === "suspended" && pathname !== "/wholesale/suspended") {
+      return NextResponse.redirect(new URL("/wholesale/suspended", req.url))
+    }
+  }
+
   return NextResponse.next()
 })
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/auth/:path*"],
+  matcher: ["/admin/:path*", "/account/:path*", "/auth/:path*", "/wholesale/:path*"],
 }

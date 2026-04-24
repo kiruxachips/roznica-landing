@@ -63,15 +63,31 @@ export async function registerUser({
   const passwordHash = await bcrypt.hash(password, 10)
 
   // Create or update unverified user
+  let user
   if (existing) {
-    await prisma.user.update({
+    user = await prisma.user.update({
       where: { email },
       data: { passwordHash, name },
     })
   } else {
-    await prisma.user.create({
+    user = await prisma.user.create({
       data: { email, passwordHash, name },
     })
+  }
+
+  // 152-ФЗ: фиксируем согласие при регистрации. Чекбокс "Согласен с
+  // политикой" на форме /auth/register. Без этой записи compliance-аудит
+  // не может подтвердить момент и IP.
+  try {
+    const { recordConsent } = await import("@/lib/consent")
+    await recordConsent({
+      userId: user.id,
+      emailSnapshot: email,
+      type: "privacy",
+      source: "register",
+    })
+  } catch (e) {
+    console.error("[register] failed to record consent:", e)
   }
 
   // Rate limit: max 3 codes per hour

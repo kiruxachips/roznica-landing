@@ -126,6 +126,24 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
   const order = await createOrderDAL(data)
   revalidatePath("/admin/orders")
 
+  // 152-ФЗ: фиксируем согласие на обработку ПД. Чекбокс оферты на шаге
+  // оплаты checkout'а — явное подтверждение. Без этой записи при проверке
+  // Роскомнадзором мы не можем предъявить evidence.
+  try {
+    const { recordConsent } = await import("@/lib/consent")
+    await recordConsent({
+      userId: data.userId ?? null,
+      emailSnapshot: data.customerEmail?.toLowerCase() ?? null,
+      type: "privacy",
+      source: "checkout",
+      orderId: order.id,
+    })
+  } catch (e) {
+    // Не блокируем оформление заказа если consent-запись упала — но логируем
+    // чтобы админ знал. Compliance-риск приемлем для отдельного заказа.
+    console.error("[createOrder] failed to record consent:", e)
+  }
+
   // Update user taste profile non-blocking — enriches future recommendations
   if (data.userId) {
     const productIds = data.items.map((i) => i.productId)

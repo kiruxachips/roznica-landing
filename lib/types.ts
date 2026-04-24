@@ -117,6 +117,15 @@ export interface OrderData {
   /** G5: выбранный юзером подарок (если доступен при cartTotal). Опциональный;
    *  валидация и привязка происходят на сервере в createOrder. */
   selectedGiftId?: string | null
+  // B2B channel (опциональное расширение). Для retail — не указывать.
+  channel?: "retail" | "wholesale"
+  wholesaleCompanyId?: string
+  wholesaleUserId?: string
+  paymentTerms?: string
+  approvalStatus?: string | null
+  b2bLegalName?: string
+  b2bInn?: string
+  b2bKpp?: string
   items: {
     productId: string
     variantId: string

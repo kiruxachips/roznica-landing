@@ -8,6 +8,7 @@ import { refundGiftStock, areGiftsEnabled } from "@/lib/dal/gifts"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
+import { recordCreditTransaction } from "@/lib/dal/wholesale-credit"
 
 function parseItemWeightGrams(w: string): number {
   const lower = w.toLowerCase().trim()
@@ -55,9 +56,12 @@ export class UnavailableItemsError extends Error {
 }
 
 export async function createOrder(data: OrderData) {
-  // Validate prices and stock availability before proceeding.
-  // Собираем ВСЕ недоступные сразу, чтобы клиент увидел полный список
-  // (а не только первую проблему), и смог единым кликом убрать их все.
+  const channel: "retail" | "wholesale" = data.channel === "wholesale" ? "wholesale" : "retail"
+  const isWholesale = channel === "wholesale"
+
+  // Для wholesale валидация цен делается вызывающим кодом (через resolvePrice),
+  // а в orders.ts мы принимаем финальные price в items и только сверяем stock + isActive.
+  // Для retail — как раньше, сверяем с variant.price.
   const unavailable: UnavailableItemDetail[] = []
   for (const item of data.items) {
     const variant = await prisma.productVariant.findUnique({
@@ -75,7 +79,7 @@ export async function createOrder(data: OrderData) {
       })
       continue
     }
-    if (variant.price !== item.price) {
+    if (!isWholesale && variant.price !== item.price) {
       unavailable.push({
         variantId: item.variantId,
         productId: item.productId,
@@ -107,7 +111,9 @@ export async function createOrder(data: OrderData) {
   let discount = 0
   let promoCodeId: string | null = null
 
-  if (data.promoCode) {
+  // Promo: только для retail (B2B использует собственное ценообразование через прайс-листы).
+  // Если в будущем появятся B2B-промо, гейт PromoCode.channel разрешит их — но в MVP не трогаем.
+  if (!isWholesale && data.promoCode) {
     const result = await validatePromoCode(data.promoCode, subtotal, data.userId)
     if (result.valid && result.promo && result.discount) {
       discount = result.discount
@@ -117,9 +123,9 @@ export async function createOrder(data: OrderData) {
 
   const afterDiscount = subtotal - discount
 
-  // Bonus deduction: validate and cap at 50%
+  // Bonus: только для retail.
   let bonusUsed = 0
-  if (data.bonusAmount && data.bonusAmount > 0 && data.userId) {
+  if (!isWholesale && data.bonusAmount && data.bonusAmount > 0 && data.userId) {
     const user = await prisma.user.findUnique({
       where: { id: data.userId },
       select: { bonusBalance: true },
@@ -185,7 +191,7 @@ export async function createOrder(data: OrderData) {
   // Kill-switch: если админ выключил программу между рендером checkout
   // и submit'ом, игнорируем selectedGiftId без ошибки — юзер получит обычный
   // заказ, подарка не будет. Это лучше чем ронять оформление.
-  const giftsProgramEnabled = await areGiftsEnabled()
+  const giftsProgramEnabled = !isWholesale && (await areGiftsEnabled())
   if (giftsProgramEnabled && data.selectedGiftId) {
     const gift = await prisma.gift.findUnique({
       where: { id: data.selectedGiftId },
@@ -278,6 +284,15 @@ export async function createOrder(data: OrderData) {
         packageWeight: totalPackageWeight ?? undefined,
         selectedGiftId: giftToAttach?.id ?? null,
         giftNameSnapshot: giftToAttach?.name ?? null,
+        // B2B разметка
+        channel,
+        wholesaleCompanyId: isWholesale ? data.wholesaleCompanyId ?? null : null,
+        wholesaleUserId: isWholesale ? data.wholesaleUserId ?? null : null,
+        paymentTerms: isWholesale ? data.paymentTerms ?? null : null,
+        approvalStatus: isWholesale ? data.approvalStatus ?? null : null,
+        b2bLegalName: isWholesale ? data.b2bLegalName ?? null : null,
+        b2bInn: isWholesale ? data.b2bInn ?? null : null,
+        b2bKpp: isWholesale ? data.b2bKpp ?? null : null,
         // Пометка для склада в adminNotes — чтобы упаковщик увидел когда
         // раскроет заказ в админке. Если юзер также оставил комментарий — не
         // затираем, а добавляем сверху.
@@ -364,6 +379,25 @@ export async function createOrder(data: OrderData) {
     // Deduct bonuses with real orderId (after order is created)
     if (bonusUsed > 0 && data.userId) {
       await deductBonusesInTx(tx, data.userId, created.id, bonusUsed)
+    }
+
+    // B2B: зафиксировать рост задолженности для net-terms заказов.
+    // prepay в momenter оплаты — никакой credit-ledger не тронут.
+    if (
+      isWholesale &&
+      data.wholesaleCompanyId &&
+      data.paymentTerms &&
+      data.paymentTerms !== "prepay"
+    ) {
+      await recordCreditTransaction(tx, {
+        companyId: data.wholesaleCompanyId,
+        amount: total,
+        type: "order_placed",
+        orderId: created.id,
+        description: `Заказ ${created.orderNumber}: отсрочка ${data.paymentTerms}`,
+        idempotencyKey: `credit:order_placed:${created.id}`,
+        createdBy: data.wholesaleUserId ?? "system",
+      })
     }
 
     return { created, stockResults }
@@ -481,6 +515,12 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
   })
   if (!order) throw new Error("Заказ не найден")
 
+  const isWholesaleNetTerms =
+    order.channel === "wholesale" &&
+    !!order.wholesaleCompanyId &&
+    !!order.paymentTerms &&
+    order.paymentTerms !== "prepay"
+
   const allowed = ALLOWED_TRANSITIONS[order.status] || []
   if (!allowed.includes(status)) {
     throw new Error(`Нельзя перевести заказ из "${order.status}" в "${status}"`)
@@ -532,6 +572,20 @@ export async function updateOrderStatus(id: string, status: string, changedBy?: 
         await tx.order.update({
           where: { id },
           data: { selectedGiftId: null },
+        })
+      }
+
+      // B2B: отмена заказа на отсрочке → reverse credit (negative amount).
+      // Идемпотентный ключ предотвращает двойное уменьшение при повторном вызове.
+      if (isWholesaleNetTerms && order.wholesaleCompanyId) {
+        await recordCreditTransaction(tx, {
+          companyId: order.wholesaleCompanyId,
+          amount: -order.total,
+          type: "order_cancelled",
+          orderId: id,
+          description: `Отмена заказа ${order.orderNumber}`,
+          idempotencyKey: `credit:order_cancelled:${id}`,
+          createdBy: changedBy ?? "system",
         })
       }
     }

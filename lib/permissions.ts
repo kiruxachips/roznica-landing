@@ -94,6 +94,22 @@ export const ALL_PERMISSIONS = [
   "users.approve",
   "users.block",
   "users.delete",
+
+  // Wholesale (B2B) management
+  "wholesale.requests.view",
+  "wholesale.requests.approve", // admin only
+  "wholesale.companies.view",
+  "wholesale.companies.edit",
+  "wholesale.companies.delete", // admin only
+  "wholesale.priceLists.view",
+  "wholesale.priceLists.edit", // admin only
+  "wholesale.priceLists.delete", // admin only
+  "wholesale.orders.view",
+  "wholesale.orders.updateStatus",
+  "wholesale.orders.approve", // admin only — одобряет net-terms заказы к отгрузке
+  "wholesale.credit.view",
+  "wholesale.credit.adjust", // admin only
+  "wholesale.notes.edit",
 ] as const
 
 export type Permission = (typeof ALL_PERMISSIONS)[number]
@@ -182,6 +198,22 @@ const ROLES_FOR_PERMISSION: Record<Permission, AdminRole[]> = {
   "users.approve": ["admin"],
   "users.block": ["admin"],
   "users.delete": ["admin"],
+
+  // --- Wholesale (B2B) ---
+  "wholesale.requests.view": ["admin", "manager"],
+  "wholesale.requests.approve": ["admin"],
+  "wholesale.companies.view": ["admin", "manager"],
+  "wholesale.companies.edit": ["admin", "manager"],
+  "wholesale.companies.delete": ["admin"],
+  "wholesale.priceLists.view": ["admin", "manager"],
+  "wholesale.priceLists.edit": ["admin"],
+  "wholesale.priceLists.delete": ["admin"],
+  "wholesale.orders.view": ["admin", "manager"],
+  "wholesale.orders.updateStatus": ["admin", "manager"],
+  "wholesale.orders.approve": ["admin"],
+  "wholesale.credit.view": ["admin", "manager"],
+  "wholesale.credit.adjust": ["admin"],
+  "wholesale.notes.edit": ["admin", "manager"],
 }
 
 /** Проверка: имеет ли роль указанный permission. */
@@ -217,4 +249,9 @@ export const NAV_PERMISSIONS = {
   emailDispatch: "email.view" as Permission,
   users: "users.view" as Permission,
   activity: "users.view" as Permission,
+  wholesaleRequests: "wholesale.requests.view" as Permission,
+  wholesaleCompanies: "wholesale.companies.view" as Permission,
+  wholesalePriceLists: "wholesale.priceLists.view" as Permission,
+  wholesaleOrders: "wholesale.orders.view" as Permission,
+  wholesaleCredit: "wholesale.credit.view" as Permission,
 }

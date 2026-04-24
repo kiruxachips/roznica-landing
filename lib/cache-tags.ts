@@ -15,4 +15,8 @@ export const CACHE_TAGS = {
   collections: "collections",
   sitemap: "sitemap",
   gifts: "gifts",
+  // Wholesale — отдельные теги, чтобы инвалидация розницы не перебивала оптовый кеш и наоборот.
+  wholesaleCatalog: (priceListId: string) => `wholesale:catalog:${priceListId}`,
+  wholesaleCompany: (companyId: string) => `wholesale:company:${companyId}`,
+  wholesalePriceList: (priceListId: string) => `wholesale:pricelist:${priceListId}`,
 } as const

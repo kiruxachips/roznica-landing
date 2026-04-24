@@ -90,27 +90,30 @@ model ProductImage {
 }
 
 model ProductVariant {
-  id                String         @id @default(cuid())
-  productId         String
-  product           Product        @relation(fields: [productId], references: [id], onDelete: Restrict)
-  weight            String // "250г", "500г", "1кг"
-  price             Int // price in rubles
-  oldPrice          Int?
-  sku               String?
-  stock             Int            @default(0)
-  lowStockThreshold Int? // null = не отслеживать; при переходе stock ≤ threshold → уведомление в бот
-  isActive          Boolean        @default(true)
-  sortOrder         Int            @default(0)
-  orderItems        OrderItem[]
-  stockHistory      StockHistory[]
-  linkedGifts       Gift[]         @relation("ProductVariantGifts")
+  id                   String          @id @default(cuid())
+  productId            String
+  product              Product         @relation(fields: [productId], references: [id], onDelete: Restrict)
+  weight               String // "250г", "500г", "1кг"
+  price                Int // price in rubles
+  oldPrice             Int?
+  sku                  String?
+  stock                Int             @default(0)
+  lowStockThreshold    Int? // null = не отслеживать; при переходе stock ≤ threshold → уведомление в бот
+  isActive             Boolean         @default(true)
+  sortOrder            Int             @default(0)
+  // B2B: минимальный оптовый заказ по SKU (null = без ограничения)
+  wholesaleMinQuantity Int?
+  orderItems           OrderItem[]
+  stockHistory         StockHistory[]
+  linkedGifts          Gift[]          @relation("ProductVariantGifts")
+  priceListItems       PriceListItem[]
 
   @@index([isActive, productId])
   @@index([stock])
 }
 
 model StockHistory {
-  id          String         @id @default(cuid())
+  id          String          @id @default(cuid())
   // variantId nullable + SetNull — история должна пережить удаление варианта.
   // Если админ удалил variant, записи остаются для аудита «куда ушёл stock».
   // Pages которые ищут историю по конкретному variant фильтруют `variantId: id`,
@@ -122,9 +125,9 @@ model StockHistory {
   stockAfter  Int
   reason      String // order_placed | order_cancelled | order_restored | supplier_received | inventory_correction | write_off
   orderId     String? // связанный заказ, если применимо
-  notes       String?        @db.Text
+  notes       String?         @db.Text
   changedBy   String? // AdminUser.id | "customer" | "system"
-  createdAt   DateTime       @default(now())
+  createdAt   DateTime        @default(now())
 
   @@index([variantId, createdAt])
   @@index([orderId])
@@ -182,6 +185,33 @@ model AdminActivityLog {
   @@index([action, entityType, createdAt])
 }
 
+/// Хранение согласия на обработку ПД (152-ФЗ требует письменного
+/// согласия + документирование для предъявления Роскомнадзору).
+/// Создаётся при submit checkout / регистрации с IP + User-Agent +
+/// version текста оферты на момент клика. Не удаляется — только revokedAt.
+model UserConsent {
+  id         String   @id @default(cuid())
+  // userId nullable — гостевой заказ тоже даёт согласие (по email).
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  // Email+name снимок — если юзер удалён, согласие остаётся anonymized.
+  emailSnapshot String?
+  // Тип согласия: privacy (обязательное), marketing (subscribe),
+  // cookies (для будущего cookie-banner).
+  type       String   // "privacy" | "marketing" | "cookies"
+  version    Int      @default(1) // версия текста на момент согласия
+  acceptedAt DateTime @default(now())
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?  @db.Text
+  // Контекст: при каком действии было дано согласие.
+  source     String   // "checkout" | "register" | "settings" | "cookie_banner"
+  orderId    String?  // если источник — checkout
+
+  @@index([userId, type])
+  @@index([type, acceptedAt])
+}
+
 /// User DELETE policy (см. F1-3 в master-roadmap-2026-04-23.md):
 /// НИКОГДА не вызываем `prisma.user.delete()` в коде или вручную. Вместо
 /// этого — soft-delete через `deletedAt + анонимизация email/name/phone`.
@@ -209,6 +239,7 @@ model User {
   favorites         Favorite[]
   addresses         Address[]
   bonusTransactions BonusTransaction[]
+  consents          UserConsent[]
   // Soft-delete: при удалении аккаунта через /account/delete проставляем
   // deletedAt и анонимизируем email/name/phone. БД-связи (Order, BonusTransaction)
   // сохраняются для бухучёта и compliance. Физическое удаление — никогда.
@@ -274,6 +305,8 @@ model PromoCode {
   maxPerCustomer Int?
   minOrderSum    Int?
   isActive       Boolean  @default(true)
+  // B2B: на какой канал действует промокод
+  channel        String   @default("retail") // "retail" | "wholesale" | "both"
   orders         Order[]
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -326,10 +359,26 @@ model Order {
   // Gift-интеграция: выбранный клиентом подарок (nullable; заполняется только
   // если cartTotal >= Gift.minCartTotal на момент оформления).
   // onDelete: SetNull — удаление подарка из каталога не роняет исторические заказы.
-  selectedGiftId String?
-  selectedGift   Gift?   @relation(fields: [selectedGiftId], references: [id], onDelete: SetNull)
+  selectedGiftId   String?
+  selectedGift     Gift?   @relation(fields: [selectedGiftId], references: [id], onDelete: SetNull)
   // Снапшот имени — чтобы даже при удалении Gift клиент/админ видели что клали.
   giftNameSnapshot String?
+
+  // B2B-канал: обычный розничный заказ или оптовый.
+  // Отдельной таблицы не заводим — общий склад, общий админ-UI, общий webhook-flow.
+  // Специфика опта хранится в опциональных полях ниже + снапшоте реквизитов компании.
+  channel            String            @default("retail") // "retail" | "wholesale"
+  wholesaleCompanyId String?
+  wholesaleCompany   WholesaleCompany? @relation(fields: [wholesaleCompanyId], references: [id], onDelete: SetNull)
+  wholesaleUserId    String? // WholesaleUser.id — кто из компании оформил (без FK, чтобы не ломать историю при удалении юзера)
+  paymentTerms       String? // "prepay" | "net7" | "net14" | "net30" | "net60" — снапшот условий на момент заказа
+  approvalStatus     String? // "pending_approval" | "approved" | "rejected" — для net-terms заказов, null для prepay
+  approvedById       String? // AdminUser.id
+  approvedAt         DateTime?
+  // Юридические реквизиты снапшот — компания может изменить реквизиты, заказ останется с оригинальными
+  b2bLegalName       String?
+  b2bInn             String?
+  b2bKpp             String?
 
   statusLogs OrderStatusLog[]
   createdAt  DateTime         @default(now())
@@ -346,6 +395,10 @@ model Order {
   @@index([selectedGiftId])
   // Профиль клиента: заказы юзера в конкретном статусе за период.
   @@index([userId, status, createdAt])
+  // B2B: разделение каналов в админских списках и отчётах.
+  @@index([channel, status, createdAt])
+  @@index([wholesaleCompanyId, createdAt])
+  @@index([approvalStatus])
 }
 
 // Подарок, который кладётся в заказ бесплатно когда сумма заказа достигла
@@ -353,24 +406,24 @@ model Order {
 // Клиент на checkout видит все активные подарки со своим cartTotal >= minCartTotal
 // и выбирает один (radio).
 model Gift {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   // Название для клиента. Для linked-gift можно оставить свой маркетинговый
   // текст («Образец Эфиопия в подарок») — он покажется клиенту вместо
   // product.name, но на складе/адмике показан линк на реальный ProductVariant.
   name         String
-  description  String?  @db.Text
-  imageUrl     String?  // /uploads/gifts/{id}/xxx.webp — custom или копия product image
+  description  String? @db.Text
+  imageUrl     String? // /uploads/gifts/{id}/xxx.webp — custom или копия product image
   imageAlt     String?
   // Порог cartTotal (после скидки, до бонусов) — от какой суммы подарок доступен.
-  minCartTotal Int      @default(0)
+  minCartTotal Int     @default(0)
   // Stock-логика:
   //   - productVariantId задан → stock НЕ используется; читаем ProductVariant.stock,
   //     декрементим его через adjustStock(reason="gifted"). Это кейс «дарим неликвид».
   //   - productVariantId NULL + stock NULL → unlimited custom gift (открытка, наклейка).
   //   - productVariantId NULL + stock=число → custom gift с ограниченным запасом.
   stock        Int?
-  isActive     Boolean  @default(true)
-  sortOrder    Int      @default(0)
+  isActive     Boolean @default(true)
+  sortOrder    Int     @default(0)
 
   // Линк на вариант товара из каталога — использовать для дарения неликвида.
   // onDelete: SetNull — удаление товара не роняет Gift-запись; админ увидит
@@ -378,9 +431,9 @@ model Gift {
   productVariantId String?
   productVariant   ProductVariant? @relation("ProductVariantGifts", fields: [productVariantId], references: [id], onDelete: SetNull)
 
-  orders       Order[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([isActive, minCartTotal])
   @@index([productVariantId])
@@ -476,22 +529,22 @@ model Address {
 }
 
 model BonusTransaction {
-  id          String   @id @default(cuid())
+  id             String   @id @default(cuid())
   // userId nullable + onDelete SetNull — при удалении/анонимизации юзера
   // сохраняем финансовую историю. Физическое удаление транзакций делает
   // невозможным аудит баланса и compliance-проверки. 152-ФЗ допускает
   // хранение обезличенных данных для бухгалтерского учёта.
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  amount      Int
-  type        String // "earned" | "spent" | "admin_adjustment"
-  description String
-  orderId     String?
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  amount         Int
+  type           String // "earned" | "spent" | "admin_adjustment"
+  description    String
+  orderId        String?
   // Idempotency для денежных операций — одна и та же транзакция не должна
   // дублироваться при retry webhook/cron. Используется в webhook ЮKassa,
   // cron-начислениях и refund-flow.
-  idempotencyKey String? @unique
-  createdAt   DateTime @default(now())
+  idempotencyKey String?  @unique
+  createdAt      DateTime @default(now())
 
   @@index([userId])
   @@index([orderId])
@@ -645,4 +698,189 @@ model IntegrationLog {
   @@index([source, event, createdAt])
   @@index([eventId])
   @@index([createdAt])
+}
+
+// ========================================================================
+// Wholesale (B2B) — Кабинет оптовика
+// ========================================================================
+
+// Юридическое лицо — контрагент оптовой торговли. Может иметь несколько
+// пользователей (закупщики, бухгалтер), один активный прайс-лист, один
+// кредитный лимит. Статус "pending" — только что одобренная заявка,
+// ожидает завершения настройки админом; "active" — работает; "suspended" —
+// временно приостановлена (долг, нарушение); "rejected" — не активна.
+model WholesaleCompany {
+  id             String                       @id @default(cuid())
+  legalName      String // ООО "Ромашка"
+  brandName      String? // публичное название (может совпадать)
+  inn            String                       @unique // основной идентификатор
+  kpp            String?
+  ogrn           String?
+  legalAddress   String?                      @db.Text
+  postalAddress  String?                      @db.Text
+  // Банковские реквизиты (для генерации счетов, Фаза 5)
+  bankName       String?
+  bankBic        String?
+  bankAccount    String?
+  corrAccount    String?
+  // Контактные данные
+  contactName    String?
+  contactPhone   String?
+  contactEmail   String?
+  // Статус аккаунта
+  status         String                       @default("active") // "active" | "suspended" | "rejected"
+  // Бизнес-условия
+  paymentTerms   String                       @default("prepay") // "prepay" | "net7" | "net14" | "net30" | "net60"
+  creditLimit    Int                          @default(0) // в рублях
+  creditUsed     Int                          @default(0) // неоплаченные заказы
+  // Ценообразование
+  priceListId    String?
+  priceList      PriceList?                   @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+  // Кто одобрил заявку
+  approvedById   String? // AdminUser.id
+  approvedAt     DateTime?
+  // Ответственный менеджер (CRM)
+  managerAdminId String? // AdminUser.id
+  notes          String?                      @db.Text // внутренние заметки
+  // Связи
+  users          WholesaleUser[]
+  accessRequests WholesaleAccessRequest[]
+  creditTx       WholesaleCreditTransaction[]
+  documents      WholesaleDocument[]
+  orders         Order[]
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
+
+  @@index([status])
+  @@index([managerAdminId])
+  @@index([priceListId])
+}
+
+// Пользователь B2B-кабинета. В MVP каждый WholesaleUser принадлежит одной
+// компании; в будущем (Фаза 7) — через таблицу WholesaleMembership
+// многие-ко-многим с ролями.
+model WholesaleUser {
+  id            String           @id @default(cuid())
+  email         String           @unique
+  emailVerified DateTime?
+  passwordHash  String
+  name          String
+  phone         String?
+  role          String           @default("buyer") // "owner" | "buyer" | "accountant" — в MVP только buyer
+  status        String           @default("active") // "active" | "blocked"
+  companyId     String
+  company       WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lastLoginAt   DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([companyId])
+}
+
+// Заявка на оптовый доступ — создаётся на публичной странице /wholesale/register.
+// После апрува админом создаются связанные WholesaleCompany + WholesaleUser.
+// До этого момента заявитель не может залогиниться.
+model WholesaleAccessRequest {
+  id             String            @id @default(cuid())
+  // Что ввёл заявитель
+  legalName      String
+  inn            String
+  contactName    String
+  contactPhone   String
+  contactEmail   String
+  expectedVolume String?           @db.Text // «~500кг/мес», произвольный текст
+  comment        String?           @db.Text
+  // Привязка после апрува (companyId становится не-null)
+  companyId      String?
+  company        WholesaleCompany? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  status         String            @default("pending") // "pending" | "approved" | "rejected"
+  reviewedById   String? // AdminUser.id
+  reviewedAt     DateTime?
+  reviewerNote   String?           @db.Text
+  // Аудит для защиты от спама
+  ipAddress      String?
+  userAgent      String?           @db.Text
+  createdAt      DateTime          @default(now())
+
+  @@index([status, createdAt])
+  @@index([inn])
+  @@index([contactEmail])
+}
+
+// Прайс-лист — коллекция кастомных цен. Привязывается к нулю или
+// нескольким WholesaleCompany. kind="fixed" — items задают точные цены;
+// kind="discount_pct" — к розничной цене применяется discountPct, items
+// (если есть) переопределяют для отдельных SKU.
+model PriceList {
+  id          String             @id @default(cuid())
+  name        String // "Базовый опт" | "Сеть Х" | "VIP"
+  description String?            @db.Text
+  isActive    Boolean            @default(true)
+  kind        String             @default("fixed") // "fixed" | "discount_pct"
+  discountPct Int? // 20 = -20% к розничной; только для kind="discount_pct"
+  minOrderSum Int? // минимальная сумма заказа для использования этого прайса
+  items       PriceListItem[]
+  companies   WholesaleCompany[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([isActive])
+}
+
+// Позиция прайс-листа — оверрайд цены для конкретного варианта товара.
+// minQuantity=1 — применяется всегда. Для tier pricing (Фаза 5) будет
+// несколько записей с разным minQuantity для одного варианта.
+model PriceListItem {
+  id          String         @id @default(cuid())
+  priceListId String
+  priceList   PriceList      @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  price       Int // финальная цена за единицу в рублях
+  minQuantity Int            @default(1)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([priceListId, variantId, minQuantity])
+  @@index([priceListId])
+  @@index([variantId])
+}
+
+// Журнал операций по кредиту компании (финансовый ledger).
+// Положительный amount увеличивает долг (новый заказ с отсрочкой),
+// отрицательный — уменьшает (оплата или отмена). idempotencyKey
+// защищает от дублей при retry webhook/cron.
+model WholesaleCreditTransaction {
+  id             String           @id @default(cuid())
+  companyId      String
+  company        WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  amount         Int // +N заказ, -N оплата/отмена
+  type           String // "order_placed" | "order_cancelled" | "payment_received" | "adjustment"
+  orderId        String?
+  description    String?
+  idempotencyKey String?          @unique
+  createdBy      String? // AdminUser.id | "system"
+  createdAt      DateTime         @default(now())
+
+  @@index([companyId, createdAt])
+  @@index([orderId])
+}
+
+// Документы компании — договор, карточка компании, счета/УПД/акты.
+// В MVP только модель и базовый upload через админку. Полноценная
+// генерация PDF — Фаза 5.
+model WholesaleDocument {
+  id           String           @id @default(cuid())
+  companyId    String
+  company      WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  kind         String // "contract" | "company_card" | "invoice" | "upd" | "act"
+  orderId      String? // для invoice/upd/act
+  fileUrl      String // /uploads/wholesale/{companyId}/...
+  fileName     String
+  fileSize     Int
+  uploadedById String? // AdminUser.id
+  createdAt    DateTime         @default(now())
+
+  @@index([companyId, kind, createdAt])
+  @@index([orderId])
 }
