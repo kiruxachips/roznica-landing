@@ -49,7 +49,7 @@ export default async function AdminWholesaleCompanyDetailPage({
 
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl shadow-sm p-5">
-          <div className="text-xs text-muted-foreground">Кредитный лимит</div>
+          <div className="text-xs text-muted-foreground">Лимит отсрочки платежа</div>
           <div className="text-xl font-semibold mt-1">
             {company.creditLimit.toLocaleString("ru")}₽
           </div>

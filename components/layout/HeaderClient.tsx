@@ -18,6 +18,7 @@ const CartDrawer = dynamic(
 
 const navigation = [
   { name: "Каталог", href: "/catalog" },
+  { name: "Для юр.лиц", href: "/wholesale", highlight: true },
   { name: "Блог", href: "/blog" },
   { name: "О нас", href: "/#about" },
   { name: "Отзывы", href: "/#testimonials" },
@@ -53,12 +54,17 @@ export function HeaderClient({ user }: HeaderClientProps) {
               />
             </Link>
 
-            <div className="hidden md:flex md:items-center md:gap-8">
+            <div className="hidden md:flex md:items-center md:gap-6 lg:gap-8">
               {navigation.map((item) => (
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                  className={cn(
+                    "text-sm font-medium transition-colors",
+                    item.highlight
+                      ? "text-primary hover:text-primary/80 border border-primary/30 rounded-full px-3 py-1 hover:bg-primary/5"
+                      : "text-muted-foreground hover:text-primary"
+                  )}
                 >
                   {item.name}
                 </Link>
@@ -68,12 +74,6 @@ export function HeaderClient({ user }: HeaderClientProps) {
             <div className="hidden md:flex md:items-center gap-1.5 lg:gap-2">
               <UserMenu user={user} />
               <CartButton onClick={openCart} />
-              <Link
-                href="/catalog"
-                className={cn(buttonVariants({ size: "lg" }), "ml-2")}
-              >
-                В каталог
-              </Link>
             </div>
 
             <div className="md:hidden flex items-center gap-1">
@@ -101,7 +101,12 @@ export function HeaderClient({ user }: HeaderClientProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="text-base font-medium text-muted-foreground hover:text-primary py-2 transition-colors"
+                  className={cn(
+                    "text-base font-medium py-2 transition-colors",
+                    item.highlight
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-primary"
+                  )}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.name}

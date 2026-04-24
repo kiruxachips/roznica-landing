@@ -39,6 +39,22 @@ export function getAdminNotificationEmails(): string[] {
 }
 
 /**
+ * Список email'ов для B2B-уведомлений: админы + специальный адрес оптового
+ * менеджера (WHOLESALE_NOTIFICATION_EMAIL — по умолчанию tradeagent@kldrefine.com).
+ * Дедуплицируем на случай совпадения с ADMIN_NOTIFICATION_EMAILS.
+ */
+const WHOLESALE_EXTRA_EMAILS = (
+  process.env.WHOLESALE_NOTIFICATION_EMAILS || "tradeagent@kldrefine.com"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean)
+
+export function getWholesaleNotificationEmails(): string[] {
+  return Array.from(new Set([...ADMIN_NOTIFICATION_EMAILS, ...WHOLESALE_EXTRA_EMAILS]))
+}
+
+/**
  * Извлекает messageId + response из результата nodemailer.sendMail.
  * Нормализует shape для EmailDispatch.
  */

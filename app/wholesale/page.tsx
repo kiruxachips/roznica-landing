@@ -32,6 +32,36 @@ export default async function WholesaleDashboardPage() {
             <p className="text-muted-foreground text-sm mt-1">{company?.legalName}</p>
           </div>
 
+          {company?.status === "pending_info" && (
+            <Link
+              href="/wholesale/company/info"
+              className="block rounded-2xl bg-amber-50 border border-amber-200 p-4 hover:bg-amber-100 transition-colors"
+            >
+              <div className="flex items-start gap-3">
+                <div className="text-xl">📝</div>
+                <div>
+                  <div className="font-semibold text-amber-900">
+                    Заполните данные компании
+                  </div>
+                  <div className="text-sm text-amber-800 mt-0.5">
+                    Укажите ИНН, реквизиты и юр.адрес — после одобрения менеджером в каталоге
+                    активируются скидки по весу (от 3% до 20%) и доступ к отсрочке оплаты.
+                  </div>
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {company?.status === "pending_approval" && (
+            <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4">
+              <div className="font-semibold text-blue-900">Заявка на рассмотрении</div>
+              <div className="text-sm text-blue-800 mt-0.5">
+                Мы получили ваши реквизиты и проверяем их. Обычно это занимает 1 рабочий день.
+                Вы получите уведомление на {ctx.email}.
+              </div>
+            </div>
+          )}
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <InfoCard
               icon={Package}
@@ -51,9 +81,13 @@ export default async function WholesaleDashboardPage() {
             />
             <InfoCard
               icon={Wallet}
-              title="Свободный кредит"
+              title="Свободный лимит"
               value={company?.paymentTerms !== "prepay" ? `${creditAvailable.toLocaleString("ru")}₽` : "—"}
-              sub={company?.paymentTerms !== "prepay" ? `из ${company?.creditLimit.toLocaleString("ru")}₽` : null}
+              sub={
+                company?.paymentTerms !== "prepay"
+                  ? `отсрочка ${company?.paymentTerms.replace("net", "")} дн. · из ${company?.creditLimit.toLocaleString("ru")}₽`
+                  : "только предоплата"
+              }
             />
             <InfoCard icon={Building2} title="ИНН" value={company?.inn ?? "—"} sub={null} />
           </div>

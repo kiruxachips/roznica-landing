@@ -6,10 +6,16 @@ import { prisma } from "@/lib/prisma"
 import { requireWholesale } from "@/lib/wholesale-guard"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 import { createOrder, UnavailableItemsError, updateOrderStatus } from "@/lib/dal/orders"
-import { resolvePrices } from "@/lib/dal/pricing"
+import {
+  resolvePrices,
+  resolveTierDiscount,
+  parseWeightGrams,
+  getWeightTiers,
+  pickTier,
+} from "@/lib/dal/pricing"
 import { getVariantPricesForRefresh } from "@/lib/dal/wholesale-catalog"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
-import { sendRenderedEmail, getAdminNotificationEmails } from "@/lib/email"
+import { sendRenderedEmail, getWholesaleNotificationEmails } from "@/lib/email"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 
 const PAYMENT_TERM_DAYS: Record<string, number> = {
@@ -46,8 +52,9 @@ export interface WholesaleCheckoutInput {
 }
 
 /**
- * Refresh корзины — пересчёт цен, stock, валидация минимумов.
+ * Refresh корзины — пересчёт базовых цен, stock, валидация минимумов.
  * Клиент вызывает перед открытием checkout и при смене количества.
+ * Tier-скидка считается отдельно через getCartTierPreview на базе весов.
  */
 export async function refreshWholesaleCart(variantIds: string[]) {
   const ctx = await requireWholesale()
@@ -57,6 +64,18 @@ export async function refreshWholesaleCart(variantIds: string[]) {
     companyId: ctx.companyId,
   })
   return Object.fromEntries(prices)
+}
+
+/**
+ * Возвращает все тиры прайс-листа компании + применённый/следующий для
+ * заданного веса корзины. Используется в /wholesale/catalog, /cart и /checkout
+ * для визуализации «до -5% осталось 3.2 кг».
+ */
+export async function getCartTierPreview(totalWeightGrams: number) {
+  const ctx = await requireWholesale()
+  const tiers = ctx.company.priceListId ? await getWeightTiers(ctx.company.priceListId) : []
+  const picked = pickTier(tiers, totalWeightGrams)
+  return { tiers, ...picked }
 }
 
 export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
@@ -80,12 +99,23 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
     }
   }
 
-  // 2) Проверка minOrderSum прайс-листа
-  const subtotal = input.items.reduce((sum, item) => {
+  // 2) Субтотал по базовым (розничным для weight_tier) ценам
+  const grossSubtotal = input.items.reduce((sum, item) => {
     const priced = priceMap.get(item.variantId)!
     return sum + priced.price * item.quantity
   }, 0)
 
+  // 3) Tier-скидка от суммарного веса корзины. Для non-weight_tier прайс-листов
+  // applied=null, скидки нет (цены уже в priceMap с учётом item-override).
+  const totalWeightGrams = input.items.reduce(
+    (sum, item) => sum + parseWeightGrams(item.weight) * item.quantity,
+    0
+  )
+  const tier = await resolveTierDiscount(ctx.company.priceListId, totalWeightGrams)
+  const tierDiscountValue = Math.round((grossSubtotal * tier.discountPct) / 100)
+  const subtotal = grossSubtotal - tierDiscountValue
+
+  // 4) Проверка minOrderSum прайс-листа
   if (ctx.company.priceListId) {
     const priceList = await prisma.priceList.findUnique({
       where: { id: ctx.company.priceListId },
@@ -98,7 +128,7 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
     }
   }
 
-  // 3) Net-terms: проверить кредитный лимит
+  // 5) Net-terms: проверить кредитный лимит
   const paymentTerms = ctx.company.paymentTerms
   const isNetTerms = paymentTerms !== "prepay"
   const approvalStatus = isNetTerms ? "pending_approval" : null
@@ -107,27 +137,36 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
     const available = ctx.company.creditLimit - ctx.company.creditUsed
     if (subtotal > available) {
       throw new Error(
-        `Превышен кредитный лимит. Доступно: ${available}₽, сумма заказа: ${subtotal}₽. ` +
+        `Превышен лимит отсрочки. Доступно: ${available}₽, сумма заказа: ${subtotal}₽. ` +
           `Оплатите предыдущие счета или свяжитесь с менеджером.`
       )
     }
   }
 
-  // 4) Загружаем snapshot реквизитов компании
+  // 6) Загружаем snapshot реквизитов компании
   const company = await prisma.wholesaleCompany.findUnique({
     where: { id: ctx.companyId },
     select: { legalName: true, inn: true, kpp: true, contactPhone: true, contactName: true },
   })
 
-  // 5) Собираем OrderData и делегируем в общий createOrder
-  const orderItems = input.items.map((item) => ({
-    productId: item.productId,
-    variantId: item.variantId,
-    name: item.name,
-    weight: item.weight,
-    price: priceMap.get(item.variantId)!.price,
-    quantity: item.quantity,
-  }))
+  // 7) Собираем OrderData. Для weight_tier — применяем процент к каждой
+  // позиции пропорционально (round-down на копейках идёт в пользу компании —
+  // клиент видит чуть более мягкое снижение).
+  const applyTier = tier.discountPct > 0
+  const orderItems = input.items.map((item) => {
+    const basePrice = priceMap.get(item.variantId)!.price
+    const finalPrice = applyTier
+      ? Math.round(basePrice * (1 - tier.discountPct / 100))
+      : basePrice
+    return {
+      productId: item.productId,
+      variantId: item.variantId,
+      name: item.name,
+      weight: item.weight,
+      price: finalPrice,
+      quantity: item.quantity,
+    }
+  })
 
   try {
     const order = await createOrder({
@@ -180,8 +219,8 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
         send: (email) => sendRenderedEmail(email),
       }).catch(() => {})
 
-      // Админам
-      for (const adminEmail of getAdminNotificationEmails()) {
+      // Админы + оптовый менеджер (tradeagent@kldrefine.com)
+      for (const adminEmail of getWholesaleNotificationEmails()) {
         await dispatchEmail({
           orderId: order.id,
           kind: "wholesale.admin.new_order",
@@ -192,7 +231,7 @@ export async function submitWholesaleOrder(input: WholesaleCheckoutInput) {
               <h2>Новый оптовый заказ</h2>
               <p><strong>Компания:</strong> ${company?.legalName ?? "—"} (ИНН ${company?.inn ?? "—"})</p>
               <p><strong>Номер:</strong> ${orderNumber}</p>
-              <p><strong>Сумма:</strong> ${total}₽</p>
+              <p><strong>Сумма:</strong> ${total}₽${tier.discountPct > 0 ? ` (применена скидка по весу ${tier.discountPct}%, вес ${(totalWeightGrams / 1000).toFixed(1)} кг)` : ""}</p>
               <p><strong>Условия:</strong> ${paymentTerms}</p>
               <p><strong>Доставка:</strong> ${input.deliveryAddress}</p>
               <p><a href="${process.env.NEXTAUTH_URL || ""}/admin/orders/${order.id}">Открыть в админке</a></p>

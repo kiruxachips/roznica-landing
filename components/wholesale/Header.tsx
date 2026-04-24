@@ -31,13 +31,14 @@ export async function WholesaleHeader() {
               </span>
               {showCredit && (
                 <span
+                  title="Максимальная сумма неоплаченных заказов по отсрочке. Оплачиваете прошлые — лимит высвобождается."
                   className={`hidden md:inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
                     creditAvailable > 0
                       ? "bg-green-50 text-green-700 border border-green-200"
                       : "bg-red-50 text-red-700 border border-red-200"
                   }`}
                 >
-                  Кредит: {creditAvailable.toLocaleString("ru")}₽ из {company.creditLimit.toLocaleString("ru")}₽
+                  Лимит отсрочки: {creditAvailable.toLocaleString("ru")}₽ из {company.creditLimit.toLocaleString("ru")}₽
                 </span>
               )}
             </>

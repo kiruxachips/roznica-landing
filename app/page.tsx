@@ -12,6 +12,7 @@ import { CategoryTiles } from "@/components/home/CategoryTiles"
 import { TasteQuiz } from "@/components/home/TasteQuiz"
 import { FeaturedBlog } from "@/components/home/FeaturedBlog"
 import { StickyMobileCTA } from "@/components/home/StickyMobileCTA"
+import { WholesaleCTA } from "@/components/sections/WholesaleCTA"
 
 export default function Home() {
   return (
@@ -19,11 +20,12 @@ export default function Home() {
       <Header />
       <main className="pb-20 md:pb-0">
         <Hero />
-<CategoryTiles />
+        <CategoryTiles />
         <Features />
         <Products />
         <TasteQuiz />
         <About />
+        <WholesaleCTA />
         <Testimonials />
         <FeaturedBlog />
         <Contact />

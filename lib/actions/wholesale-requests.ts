@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 import { createAccessRequest } from "@/lib/dal/wholesale-requests"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
-import { sendRenderedEmail } from "@/lib/email"
+import { sendRenderedEmail, getWholesaleNotificationEmails } from "@/lib/email"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { findPartyByInn } from "@/lib/integrations/dadata"
@@ -70,6 +70,27 @@ export async function submitWholesaleAccessRequest(input: {
     }),
     send: (email) => sendRenderedEmail(email),
   }).catch(() => {})
+
+  // Email админам + оптовому менеджеру (tradeagent@kldrefine.com)
+  for (const adminEmail of getWholesaleNotificationEmails()) {
+    await dispatchEmail({
+      orderId: null,
+      kind: "wholesale.admin.new_request",
+      recipient: adminEmail,
+      render: () => ({
+        subject: `[ОПТ] Новая заявка от ${req.legalName}`,
+        html: `
+          <h2>Новая заявка на оптовый доступ</h2>
+          <p><strong>Компания:</strong> ${req.legalName} (ИНН ${req.inn})</p>
+          <p><strong>Контакт:</strong> ${req.contactName}, ${req.contactPhone}, ${req.contactEmail}</p>
+          ${req.expectedVolume ? `<p><strong>Ожидаемый объём:</strong> ${req.expectedVolume}</p>` : ""}
+          ${req.comment ? `<p><strong>Комментарий:</strong> ${req.comment}</p>` : ""}
+          <p><a href="${process.env.NEXTAUTH_URL || ""}/admin/wholesale/requests/${req.id}">Открыть в админке</a></p>
+        `,
+      }),
+      send: (e) => sendRenderedEmail(e),
+    }).catch(() => {})
+  }
 
   // Event в Millorbot — новая заявка от оптовика
   await enqueueOutbox(

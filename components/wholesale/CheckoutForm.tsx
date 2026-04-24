@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useWholesaleCart } from "@/lib/store/wholesale-cart"
-import { submitWholesaleOrder } from "@/lib/actions/wholesale-orders"
+import { submitWholesaleOrder, getCartTierPreview } from "@/lib/actions/wholesale-orders"
 import { WholesaleDeliveryPicker, type DeliveryPickerValue } from "./DeliveryPicker"
 
 function parseWeightGrams(w: string): number {
@@ -14,6 +14,11 @@ function parseWeightGrams(w: string): number {
   if (isNaN(n)) return 0
   const unit = m[2] || "г"
   return unit === "кг" || unit === "kg" ? Math.round(n * 1000) : Math.round(n)
+}
+
+interface TierState {
+  applied: { minWeightGrams: number; discountPct: number } | null
+  discountPct: number
 }
 
 interface Props {
@@ -46,8 +51,22 @@ export function WholesaleCheckout(props: Props) {
         .filter((i) => i.weightGrams > 0 && i.quantity > 0),
     [items]
   )
+  const totalWeightGrams = itemsForPacking.reduce(
+    (s, i) => s + i.weightGrams * i.quantity,
+    0
+  )
 
-  const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const [tier, setTier] = useState<TierState>({ applied: null, discountPct: 0 })
+  useEffect(() => {
+    if (items.length === 0) return
+    getCartTierPreview(totalWeightGrams)
+      .then((data) => setTier({ applied: data.applied, discountPct: data.discountPct }))
+      .catch(() => {})
+  }, [totalWeightGrams, items.length])
+
+  const gross = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const tierDiscount = Math.round((gross * tier.discountPct) / 100)
+  const subtotal = gross - tierDiscount
   const deliveryPrice = delivery.selected?.priceWithMarkup ?? 0
   const total = subtotal + deliveryPrice
   const isNetTerms = props.paymentTerms !== "prepay"
@@ -213,9 +232,15 @@ export function WholesaleCheckout(props: Props) {
           ))}
         </div>
         <div className="flex justify-between text-sm pt-2 border-t">
-          <span className="text-muted-foreground">Подытог</span>
-          <span>{subtotal.toLocaleString("ru")}₽</span>
+          <span className="text-muted-foreground">Товары</span>
+          <span>{gross.toLocaleString("ru")}₽</span>
         </div>
+        {tierDiscount > 0 && (
+          <div className="flex justify-between text-sm text-primary">
+            <span>Скидка {tier.discountPct}% (от {((tier.applied?.minWeightGrams ?? 0) / 1000).toFixed(0)} кг)</span>
+            <span className="font-medium">−{tierDiscount.toLocaleString("ru")}₽</span>
+          </div>
+        )}
         <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Доставка</span>
           <span>
@@ -234,7 +259,7 @@ export function WholesaleCheckout(props: Props) {
         </div>
         {isNetTerms && (
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Свободный кредит</span>
+            <span className="text-muted-foreground">Свободный лимит отсрочки</span>
             <span className={exceedsCredit ? "text-red-600 font-medium" : ""}>
               {props.creditAvailable.toLocaleString("ru")}₽
             </span>

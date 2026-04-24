@@ -49,6 +49,7 @@ services:
       - MILLORBOT_URL=${MILLORBOT_URL:-}
       - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
       - ADMIN_NOTIFICATION_EMAILS=${ADMIN_NOTIFICATION_EMAILS:-newrefining@yandex.ru}
+      - WHOLESALE_NOTIFICATION_EMAILS=${WHOLESALE_NOTIFICATION_EMAILS:-tradeagent@kldrefine.com}
       - CRON_SECRET=${CRON_SECRET:-}
       # Wholesale Phase 5: реквизиты продавца для PDF-счетов
       - SELLER_LEGAL_NAME=${SELLER_LEGAL_NAME:-}

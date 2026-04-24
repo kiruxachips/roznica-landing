@@ -62,7 +62,7 @@ export default async function WholesaleCompanyPage() {
               />
               {company.paymentTerms !== "prepay" && (
                 <>
-                  <Field label="Кредитный лимит" value={`${company.creditLimit.toLocaleString("ru")}₽`} />
+                  <Field label="Лимит отсрочки платежа" value={`${company.creditLimit.toLocaleString("ru")}₽`} />
                   <Field
                     label="Использовано"
                     value={`${company.creditUsed.toLocaleString("ru")}₽`}

@@ -52,7 +52,7 @@ export default async function AdminWholesaleCompaniesPage({
               <th className="px-4 py-3 text-left">Статус</th>
               <th className="px-4 py-3 text-left">Прайс</th>
               <th className="px-4 py-3 text-left">Условия</th>
-              <th className="px-4 py-3 text-right">Кредит</th>
+              <th className="px-4 py-3 text-right">Лимит отсрочки</th>
               <th className="px-4 py-3 text-right">Заказы</th>
               <th className="px-4 py-3"></th>
             </tr>

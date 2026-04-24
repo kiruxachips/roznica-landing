@@ -15,7 +15,13 @@ export default async function AdminWholesaleCreditPage() {
 
   return (
     <div className="p-6 space-y-5">
-      <h1 className="text-2xl font-bold">Кредитные лимиты</h1>
+      <div>
+        <h1 className="text-2xl font-bold">Лимиты отсрочки платежа</h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Это МАКСИМАЛЬНАЯ сумма неоплаченных заказов компании при работе по отсрочке.
+          Когда клиент закрывает счёт — лимит высвобождается. Новые заказы, превышающие лимит, блокируются.
+        </p>
+      </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <Stat label="Общий лимит" value={`${totalLimit.toLocaleString("ru")}₽`} />

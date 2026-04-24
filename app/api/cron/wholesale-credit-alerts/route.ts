@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
-import { sendRenderedEmail, getAdminNotificationEmails } from "@/lib/email"
+import { sendRenderedEmail, getWholesaleNotificationEmails } from "@/lib/email"
 import { enqueueOutbox } from "@/lib/dal/outbox"
 
 export const runtime = "nodejs"
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
   const reAlertCutoff = new Date(Date.now() - RE_ALERT_AFTER_HOURS * 3600 * 1000)
-  const adminEmails = getAdminNotificationEmails()
+  const adminEmails = getWholesaleNotificationEmails()
 
   let alerted = 0
   let reset = 0
@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
 
     // Шлём алерт
     const available = c.creditLimit - c.creditUsed
-    const subject = `[ОПТ] Кредитный лимит ${c.legalName}: ${pct}% использовано`
+    const subject = `[ОПТ] Лимит отсрочки ${c.legalName}: ${pct}% использовано`
     const html = `
-      <h2>Предупреждение по кредитному лимиту</h2>
+      <h2>Предупреждение по лимиту отсрочки платежа</h2>
       <p><strong>Компания:</strong> ${c.legalName} (ИНН ${c.inn})</p>
       <p><strong>Лимит:</strong> ${c.creditLimit.toLocaleString("ru")}₽</p>
       <p><strong>Использовано:</strong> ${c.creditUsed.toLocaleString("ru")}₽ (${pct}%)</p>

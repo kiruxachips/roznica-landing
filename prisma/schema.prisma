@@ -58,14 +58,14 @@ model Product {
   // G5: Premium coffee attributes — ключевые для позиционирования specialty-кофе.
   // Coffee enthusiasts платят 2-3× больше за прозрачность происхождения.
   // Все nullable, заполняются в админке по мере наличия данных.
-  elevationMin  Int? // метры над уровнем моря (нижняя граница диапазона, если farm на холме)
-  elevationMax  Int?
-  harvestDate   DateTime? // дата урожая (обычно округляем до месяца)
-  roastedAt     DateTime? // дата обжарки — КРИТИЧНАЯ для "свежеобжаренного". Отображается как "2 дня назад".
-  batchId       String? // партия обжарки — трейсабилити ("та же кружка Peru из партии B-048")
-  tasterNotes   String? // ноты от куппера (professional), отдельно от flavorNotes для casual
-  cupper        String? // имя куппера (для доверия и PR)
-  sca           Int? // SCA score 80-100 (specialty если >= 80). null для commercial.
+  elevationMin Int? // метры над уровнем моря (нижняя граница диапазона, если farm на холме)
+  elevationMax Int?
+  harvestDate  DateTime? // дата урожая (обычно округляем до месяца)
+  roastedAt    DateTime? // дата обжарки — КРИТИЧНАЯ для "свежеобжаренного". Отображается как "2 дня назад".
+  batchId      String? // партия обжарки — трейсабилити ("та же кружка Peru из партии B-048")
+  tasterNotes  String? // ноты от куппера (professional), отдельно от flavorNotes для casual
+  cupper       String? // имя куппера (для доверия и PR)
+  sca          Int? // SCA score 80-100 (specialty если >= 80). null для commercial.
 
   // Pack images
   smallImage String? // 250г pack image path, e.g. /images/coffee/Small/Peru.jpg
@@ -215,25 +215,25 @@ model AdminActivityLog {
 ///   - paused: временно приостановлен (юзер в отпуске), с pausedUntil
 ///   - cancelled: отменён (terminal, запись остаётся для audit)
 model Subscription {
-  id                 String    @id @default(cuid())
-  userId             String
-  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  variantId          String
-  variant            ProductVariant @relation("SubscriptionVariant", fields: [variantId], references: [id], onDelete: Restrict)
-  quantity           Int       @default(1)
-  intervalDays       Int       // 14, 21, 30
-  discountPercent    Int       @default(5) // бонус за подписку
-  status             String    @default("active") // active | paused | cancelled
-  nextDeliveryDate   DateTime
-  pausedUntil        DateTime?
-  cancelledAt        DateTime?
+  id                      String         @id @default(cuid())
+  userId                  String
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId               String
+  variant                 ProductVariant @relation("SubscriptionVariant", fields: [variantId], references: [id], onDelete: Restrict)
+  quantity                Int            @default(1)
+  intervalDays            Int // 14, 21, 30
+  discountPercent         Int            @default(5) // бонус за подписку
+  status                  String         @default("active") // active | paused | cancelled
+  nextDeliveryDate        DateTime
+  pausedUntil             DateTime?
+  cancelledAt             DateTime?
   // Снапшот доставки — замороженные адрес/метод при создании. Юзер
   // может менять через UI, но для стабильности recurring-flow
   // храним как JSON.
   deliveryAddressSnapshot Json?
-  lastOrderId        String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  lastOrderId             String?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
 
   @@index([userId, status])
   @@index([status, nextDeliveryDate])
@@ -264,10 +264,10 @@ model ReferralRedemption {
   id             String       @id @default(cuid())
   referralCodeId String
   referralCode   ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
-  referredUserId String       // новый юзер
+  referredUserId String // новый юзер
   orderId        String       @unique // первый оплаченный заказ — trigger
-  referrerReward Int          // бонусы inviter'у (₽)
-  referredReward Int          // бонусы invitee (₽)
+  referrerReward Int // бонусы inviter'у (₽)
+  referredReward Int // бонусы invitee (₽)
   createdAt      DateTime     @default(now())
 
   @@index([referredUserId])
@@ -288,19 +288,19 @@ model ReferralRedemption {
 ///   - recovered: юзер реально оформил заказ после клика по deep-link
 ///   - expired: прошло 72 часа без recovered
 model AbandonedCart {
-  id             String    @id @default(cuid())
-  email          String
-  userId         String?   // если авторизован — полезно для сегментации
-  items          Json      // snapshot [{ variantId, name, weight, price, qty, slug, image }]
-  subtotal       Int       // для template'а и promo-условий (min-threshold)
-  recoveryToken  String    @unique
-  promoCodeId    String?   // one-time промо-код для recovery (опционально)
-  status         String    @default("tracked") // tracked|email_sent|recovered|expired
-  emailSentAt    DateTime?
-  recoveredAt    DateTime?
+  id               String    @id @default(cuid())
+  email            String
+  userId           String? // если авторизован — полезно для сегментации
+  items            Json // snapshot [{ variantId, name, weight, price, qty, slug, image }]
+  subtotal         Int // для template'а и promo-условий (min-threshold)
+  recoveryToken    String    @unique
+  promoCodeId      String? // one-time промо-код для recovery (опционально)
+  status           String    @default("tracked") // tracked|email_sent|recovered|expired
+  emailSentAt      DateTime?
+  recoveredAt      DateTime?
   recoveredOrderId String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   @@index([email, status])
   @@index([status, createdAt])
@@ -321,7 +321,7 @@ model NewsletterSubscriber {
   // Привязка к юзеру (если есть) — необязательно, но полезно для CRM.
   userId             String?
   user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
-  source             String?   // "footer_form" | "checkout" | "register"
+  source             String? // "footer_form" | "checkout" | "register"
   // unsubscribeToken — одноразовый для one-click отписки из письма,
   // без логина. Ротируется при subscribe заново.
   unsubscribeToken   String    @unique
@@ -368,43 +368,43 @@ model UserConsent {
 /// Это защищает связи (Order, BonusTransaction, AdminActivityLog) от
 /// каскадного удаления. Любой новый Cascade FK на User приведёт к data-loss.
 model User {
-  id                String             @id @default(cuid())
-  email             String?            @unique
-  emailVerified     DateTime?
-  passwordHash      String?
-  name              String?
-  image             String?
-  phone             String?
-  avatarUrl         String?
-  defaultAddress    String?            @db.Text
-  telegramId        String?            @unique
-  notifyOrderStatus Boolean            @default(true)
-  notifyPromotions  Boolean            @default(false)
-  notifyNewProducts Boolean            @default(false)
-  bonusBalance      Int                @default(0)
-  tasteProfile      Json? // aggregated taste profile, updated on each order
-  accounts          Account[]
-  orders            Order[]
-  sessions          Session[]
-  favorites         Favorite[]
-  addresses         Address[]
-  bonusTransactions BonusTransaction[]
-  consents          UserConsent[]
+  id                      String                 @id @default(cuid())
+  email                   String?                @unique
+  emailVerified           DateTime?
+  passwordHash            String?
+  name                    String?
+  image                   String?
+  phone                   String?
+  avatarUrl               String?
+  defaultAddress          String?                @db.Text
+  telegramId              String?                @unique
+  notifyOrderStatus       Boolean                @default(true)
+  notifyPromotions        Boolean                @default(false)
+  notifyNewProducts       Boolean                @default(false)
+  bonusBalance            Int                    @default(0)
+  tasteProfile            Json? // aggregated taste profile, updated on each order
+  accounts                Account[]
+  orders                  Order[]
+  sessions                Session[]
+  favorites               Favorite[]
+  addresses               Address[]
+  bonusTransactions       BonusTransaction[]
+  consents                UserConsent[]
   newsletterSubscriptions NewsletterSubscriber[]
-  referralCode      ReferralCode?
-  subscriptions     Subscription[]
+  referralCode            ReferralCode?
+  subscriptions           Subscription[]
   // Welcome-discount: время первой оплаченной покупки. Пока null — юзер
   // имеет право на welcome-скидку (% настраивается через DeliverySetting).
   // Проставляется в createOrder при отсутствии. Даже если заказ потом
   // отменят — welcome не восстанавливается (иначе абуз: оформил → отменил
   // → опять скидка). Для честности — админ может вручную сбросить через SQL.
-  firstOrderCompletedAt DateTime?
+  firstOrderCompletedAt   DateTime?
   // Soft-delete: при удалении аккаунта через /account/delete проставляем
   // deletedAt и анонимизируем email/name/phone. БД-связи (Order, BonusTransaction)
   // сохраняются для бухучёта и compliance. Физическое удаление — никогда.
-  deletedAt         DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  deletedAt               DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
   @@index([deletedAt])
 }
@@ -886,8 +886,14 @@ model WholesaleCompany {
   contactName        String?
   contactPhone       String?
   contactEmail       String?
-  // Статус аккаунта
-  status             String                       @default("active") // "active" | "suspended" | "rejected"
+  // Статус аккаунта:
+  //   pending_info      — юзер зарегистрировался, но ещё не ввёл ИНН/реквизиты
+  //                       → каталог видит с retail-ценами, заказы оформлять нельзя
+  //   pending_approval  — реквизиты заполнены, ждём одобрения менеджером
+  //   active            — менеджер одобрил, работают оптовые цены
+  //   suspended         — приостановлен (просрочка, нарушение)
+  //   rejected          — отклонён
+  status             String                       @default("pending_info") // "pending_info" | "pending_approval" | "active" | "suspended" | "rejected"
   // Бизнес-условия
   paymentTerms       String                       @default("prepay") // "prepay" | "net7" | "net14" | "net30" | "net60"
   creditLimit        Int                          @default(0) // в рублях
@@ -1034,21 +1040,41 @@ model WholesaleAccessRequest {
 // Прайс-лист — коллекция кастомных цен. Привязывается к нулю или
 // нескольким WholesaleCompany. kind="fixed" — items задают точные цены;
 // kind="discount_pct" — к розничной цене применяется discountPct, items
-// (если есть) переопределяют для отдельных SKU.
+// (если есть) переопределяют для отдельных SKU;
+// kind="weight_tier" — скидка от общего веса корзины, задаётся через
+// PriceListWeightTier (6кг=3%, 15кг=5%, 30кг=9%, 60кг=20% — дефолтный набор
+// Millor Coffee). Применяется ко всем позициям корзины одновременно.
 model PriceList {
-  id          String             @id @default(cuid())
+  id          String                @id @default(cuid())
   name        String // "Базовый опт" | "Сеть Х" | "VIP"
-  description String?            @db.Text
-  isActive    Boolean            @default(true)
-  kind        String             @default("fixed") // "fixed" | "discount_pct"
+  description String?               @db.Text
+  isActive    Boolean               @default(true)
+  kind        String                @default("weight_tier") // "fixed" | "discount_pct" | "weight_tier"
   discountPct Int? // 20 = -20% к розничной; только для kind="discount_pct"
   minOrderSum Int? // минимальная сумма заказа для использования этого прайса
   items       PriceListItem[]
+  weightTiers PriceListWeightTier[]
   companies   WholesaleCompany[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([isActive])
+}
+
+// Тир скидки по суммарному весу корзины (в граммах). Для прайс-листа
+// с kind="weight_tier" применяется наибольший из тиров, у которого
+// minWeightGrams ≤ total cart weight.
+model PriceListWeightTier {
+  id             String    @id @default(cuid())
+  priceListId    String
+  priceList      PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  minWeightGrams Int // 6000, 15000, 30000, 60000
+  discountPct    Int // 3, 5, 9, 20
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([priceListId, minWeightGrams])
+  @@index([priceListId])
 }
 
 // Позиция прайс-листа — оверрайд цены для конкретного варианта товара.

@@ -111,7 +111,7 @@ export function ApproveRequestPanel(props: Props) {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Кредитный лимит, ₽</label>
+            <label className="block text-sm font-medium mb-1">Лимит отсрочки платежа, ₽</label>
             <input
               type="number"
               name="creditLimit"

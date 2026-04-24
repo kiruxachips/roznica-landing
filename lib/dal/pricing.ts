@@ -1,14 +1,21 @@
 import { prisma } from "@/lib/prisma"
 
 /**
- * Pricing engine — ЕДИНСТВЕННАЯ функция расчёта цены для любого канала.
+ * Pricing engine для оптового кабинета.
  *
- * КРИТИЧНО: никогда не читай `variant.price` напрямую в коде, который
- * может рендериться для оптового клиента. Всегда через resolvePrice(s).
+ * Millor Coffee использует tier-скидку от ОБЩЕГО веса корзины:
+ *   6 кг  → 3%
+ *   15 кг → 5%
+ *   30 кг → 9%
+ *   60 кг → 20%
  *
- * Защита от утечки оптовых цен в розницу:
- *   - без ctx или с ctx.channel="retail" всегда возвращается розничная цена
- *   - оптовые данные применяются только при ctx.channel="wholesale" + priceListId
+ * Эта скидка применяется ко всей корзине СРАЗУ, не к отдельным позициям.
+ * Поэтому в оптовом каталоге цены показываются розничные (+ индикатор «от 6кг
+ * скидка 3%»), а на checkout считается фактический discount от actual веса.
+ *
+ * Старые схемы (fixed-item и discount_pct) оставлены для совместимости —
+ * они работают через resolvePrice, но дефолт для новых прайс-листов —
+ * weight_tier.
  */
 
 export interface PriceContext {
@@ -22,12 +29,20 @@ export interface ResolvedPrice {
   oldPrice: number | null
   discountPct: number | null
   minQuantity: number
-  source: "retail" | "pricelist_item" | "pricelist_discount" | "retail_fallback"
+  source:
+    | "retail"
+    | "pricelist_item"
+    | "pricelist_discount"
+    | "retail_fallback"
+    | "weight_tier_base"
 }
 
 export const RETAIL_CONTEXT: PriceContext = { channel: "retail" }
 
-function retailResolve(variant: { price: number; oldPrice: number | null }): ResolvedPrice {
+function retailResolve(variant: {
+  price: number
+  oldPrice: number | null
+}): ResolvedPrice {
   const discountPct =
     variant.oldPrice && variant.oldPrice > variant.price
       ? Math.round(((variant.oldPrice - variant.price) / variant.oldPrice) * 100)
@@ -41,17 +56,6 @@ function retailResolve(variant: { price: number; oldPrice: number | null }): Res
   }
 }
 
-/**
- * Одна цена за вариант в заданном контексте.
- *
- * Сценарии:
- *   retail              → variant.price (+ oldPrice)
- *   wholesale, нет priceList → retail fallback
- *   wholesale, priceList=fixed, item есть  → item.price
- *   wholesale, priceList=fixed, item нет   → retail fallback
- *   wholesale, priceList=discount_pct, item есть → item.price (item имеет приоритет)
- *   wholesale, priceList=discount_pct, item нет  → variant.price * (1 - pct/100)
- */
 export async function resolvePrice(
   variantId: string,
   ctx: PriceContext = RETAIL_CONTEXT
@@ -74,7 +78,18 @@ export async function resolvePrice(
     return retailResolve(variant)
   }
 
-  // Ищем override для этого варианта
+  // weight_tier — цены на карточке показываем розничные. Фактическая скидка
+  // применяется в корзине. Но помечаем как "weight_tier_base" чтобы UI знал
+  // что есть тиры (показать индикатор).
+  if (priceList.kind === "weight_tier") {
+    return {
+      ...retailResolve(variant),
+      minQuantity: variant.wholesaleMinQuantity ?? 1,
+      source: "weight_tier_base",
+    }
+  }
+
+  // Legacy: item-override для fixed/discount_pct
   const item = await prisma.priceListItem.findFirst({
     where: { priceListId: ctx.priceListId, variantId, minQuantity: 1 },
     select: { price: true, minQuantity: true },
@@ -93,7 +108,11 @@ export async function resolvePrice(
     }
   }
 
-  if (priceList.kind === "discount_pct" && priceList.discountPct && priceList.discountPct > 0) {
+  if (
+    priceList.kind === "discount_pct" &&
+    priceList.discountPct &&
+    priceList.discountPct > 0
+  ) {
     const price = Math.round(variant.price * (1 - priceList.discountPct / 100))
     return {
       price,
@@ -107,12 +126,6 @@ export async function resolvePrice(
   return { ...retailResolve(variant), source: "retail_fallback" }
 }
 
-/**
- * Батч-расчёт цен для каталога. Один запрос в Prisma для вариантов, один — для PriceListItem.
- * Возвращает Map variantId → ResolvedPrice.
- *
- * Использовать ВСЕГДА когда рендеришь список товаров — один запрос вместо N.
- */
 export async function resolvePrices(
   variantIds: string[],
   ctx: PriceContext = RETAIL_CONTEXT
@@ -144,8 +157,23 @@ export async function resolvePrices(
     return result
   }
 
+  if (priceList.kind === "weight_tier") {
+    for (const v of variants) {
+      result.set(v.id, {
+        ...retailResolve(v),
+        minQuantity: v.wholesaleMinQuantity ?? 1,
+        source: "weight_tier_base",
+      })
+    }
+    return result
+  }
+
   const items = await prisma.priceListItem.findMany({
-    where: { priceListId: ctx.priceListId, variantId: { in: variantIds }, minQuantity: 1 },
+    where: {
+      priceListId: ctx.priceListId,
+      variantId: { in: variantIds },
+      minQuantity: 1,
+    },
     select: { variantId: true, price: true, minQuantity: true },
   })
   const byVariant = new Map(items.map((i) => [i.variantId, i]))
@@ -165,7 +193,11 @@ export async function resolvePrices(
       })
       continue
     }
-    if (priceList.kind === "discount_pct" && priceList.discountPct && priceList.discountPct > 0) {
+    if (
+      priceList.kind === "discount_pct" &&
+      priceList.discountPct &&
+      priceList.discountPct > 0
+    ) {
       const price = Math.round(v.price * (1 - priceList.discountPct / 100))
       result.set(v.id, {
         price,
@@ -180,4 +212,92 @@ export async function resolvePrices(
   }
 
   return result
+}
+
+// ── Weight tier discount ──────────────────────────────────────────────
+
+export interface WeightTier {
+  minWeightGrams: number
+  discountPct: number
+}
+
+/**
+ * Возвращает тиры прайс-листа (отсортированы по весу ASC).
+ * Для прайс-листа не-weight_tier возвращает пустой массив.
+ */
+export async function getWeightTiers(priceListId: string): Promise<WeightTier[]> {
+  const priceList = await prisma.priceList.findUnique({
+    where: { id: priceListId },
+    select: { kind: true, isActive: true },
+  })
+  if (!priceList || !priceList.isActive || priceList.kind !== "weight_tier") return []
+  return prisma.priceListWeightTier.findMany({
+    where: { priceListId },
+    orderBy: { minWeightGrams: "asc" },
+    select: { minWeightGrams: true, discountPct: true },
+  })
+}
+
+export interface TierDiscount {
+  applied: WeightTier | null
+  next: WeightTier | null
+  remainingGramsToNext: number | null
+  discountPct: number
+}
+
+/**
+ * По общему весу корзины (гр) возвращает активный тир + следующий.
+ * applied === null если ни один тир ещё не достигнут.
+ */
+export function pickTier(
+  tiers: WeightTier[],
+  totalWeightGrams: number
+): TierDiscount {
+  if (tiers.length === 0) {
+    return { applied: null, next: null, remainingGramsToNext: null, discountPct: 0 }
+  }
+  const sorted = [...tiers].sort((a, b) => a.minWeightGrams - b.minWeightGrams)
+  let applied: WeightTier | null = null
+  let next: WeightTier | null = null
+  for (const t of sorted) {
+    if (totalWeightGrams >= t.minWeightGrams) {
+      applied = t
+    } else {
+      next = t
+      break
+    }
+  }
+  return {
+    applied,
+    next,
+    remainingGramsToNext: next ? next.minWeightGrams - totalWeightGrams : null,
+    discountPct: applied?.discountPct ?? 0,
+  }
+}
+
+/**
+ * Асинхронная версия: загружает тиры и считает discount по весу.
+ */
+export async function resolveTierDiscount(
+  priceListId: string | null | undefined,
+  totalWeightGrams: number
+): Promise<TierDiscount> {
+  if (!priceListId) {
+    return { applied: null, next: null, remainingGramsToNext: null, discountPct: 0 }
+  }
+  const tiers = await getWeightTiers(priceListId)
+  return pickTier(tiers, totalWeightGrams)
+}
+
+/**
+ * Парсит строку веса (250г, 1кг, 500g, 2.5кг) в граммы. 0 если не распознали.
+ */
+export function parseWeightGrams(w: string): number {
+  const lower = w.toLowerCase().trim()
+  const m = lower.match(/^([\d.,]+)\s*(кг|г|kg|g)?$/)
+  if (!m) return 0
+  const n = parseFloat(m[1].replace(",", "."))
+  if (isNaN(n)) return 0
+  const unit = m[2] || "г"
+  return unit === "кг" || unit === "kg" ? Math.round(n * 1000) : Math.round(n)
 }
