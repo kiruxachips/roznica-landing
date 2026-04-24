@@ -25,6 +25,7 @@ const REQUEST_TIMEOUT_MS = 10_000
 const APP_INTERNAL_URL = process.env.APP_INTERNAL_URL || "http://app:3000"
 const CRON_SECRET = process.env.CRON_SECRET || ""
 const EMAIL_TICK_EVERY_MS = Number(process.env.EMAIL_TICK_EVERY_MS || 30_000)
+const CREDIT_TICK_EVERY_MS = Number(process.env.CREDIT_TICK_EVERY_MS || 6 * 3600 * 1000)
 
 function log(level, message, extra) {
   const line = { ts: new Date().toISOString(), level, message, ...(extra || {}) }
@@ -223,6 +224,40 @@ async function emailTick() {
   }
 }
 
+// ── Wholesale credit-limit алерты: раз в 6 часов дёргаем
+// /api/cron/wholesale-credit-alerts — endpoint сам решает, кому слать.
+let lastCreditTickAt = 0
+async function creditTick() {
+  const now = Date.now()
+  if (now - lastCreditTickAt < CREDIT_TICK_EVERY_MS) return
+  lastCreditTickAt = now
+  if (!CRON_SECRET) return
+
+  const url = `${APP_INTERNAL_URL.replace(/\/$/, "")}/api/cron/wholesale-credit-alerts`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "X-Cron-Secret": CRON_SECRET },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      log("warn", "credit_tick_http_error", { status: res.status })
+      return
+    }
+    const body = await res.json().catch(() => ({}))
+    if (body && (body.alerted > 0 || body.reset > 0)) {
+      log("info", "credit_tick_done", body)
+    }
+  } catch (e) {
+    const msg = e.name === "AbortError" ? "timeout" : e.message || "network_error"
+    log("warn", "credit_tick_failed", { err: msg })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 let running = true
 async function loop() {
   while (running) {
@@ -235,6 +270,11 @@ async function loop() {
       await emailTick()
     } catch (e) {
       log("error", "email_tick_failed", { err: e.message })
+    }
+    try {
+      await creditTick()
+    } catch (e) {
+      log("error", "credit_tick_failed", { err: e.message })
     }
     await new Promise((r) => setTimeout(r, POLL_INTERVAL))
   }
@@ -259,6 +299,7 @@ log("info", "outbox_worker_started", {
   maxAttempts: MAX_ATTEMPTS,
   emailRetryEnabled: !!CRON_SECRET,
   emailTickEveryMs: EMAIL_TICK_EVERY_MS,
+  creditTickEveryMs: CREDIT_TICK_EVERY_MS,
 })
 
 loop()
