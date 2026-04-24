@@ -43,7 +43,7 @@ export async function requestWholesalePasswordReset(email: string) {
 
   await dispatchEmail({
     orderId: null,
-    kind: "wholesale.access_request.submitted", // переиспользуем kind — шаблон отдельный
+    kind: "wholesale.password_reset",
     recipient: normalized,
     render: () => ({
       subject: "Код для сброса пароля — оптовый кабинет Millor Coffee",

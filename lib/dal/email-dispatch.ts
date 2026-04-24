@@ -36,6 +36,7 @@ export type EmailDispatchKind =
   | "wholesale.access_request.submitted"
   | "wholesale.access_request.approved"
   | "wholesale.access_request.rejected"
+  | "wholesale.password_reset"
   | "wholesale.order.confirmation"
   | "wholesale.order.approved"
   | "wholesale.order.shipped"

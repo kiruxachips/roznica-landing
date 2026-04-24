@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { revalidatePath, revalidateTag } from "next/cache"
 import { requireAdmin, logAdminAction } from "@/lib/admin-guard"
 import { CACHE_TAGS } from "@/lib/cache-tags"
+import { recomputeProductRating } from "@/lib/dal/product-rating"
 
 function invalidateReviewsCache() {
   revalidateTag(CACHE_TAGS.products)
@@ -22,6 +23,9 @@ export async function toggleReviewVisibility(id: string) {
     data: { isVisible: !review.isVisible },
   })
 
+  // После изменения видимости — пересчитываем денорм. avgRating/reviewCount.
+  await recomputeProductRating(review.productId)
+
   void logAdminAction({
     admin,
     action: "review.toggle_visibility",
@@ -34,7 +38,13 @@ export async function toggleReviewVisibility(id: string) {
 
 export async function deleteReview(id: string) {
   const admin = await requireAdmin("reviews.delete")
+  const review = await prisma.review.findUnique({
+    where: { id },
+    select: { productId: true },
+  })
   await prisma.review.delete({ where: { id } })
+  if (review) await recomputeProductRating(review.productId)
+
   void logAdminAction({
     admin,
     action: "review.deleted",

@@ -74,7 +74,61 @@ export interface MillorbotStockPayload {
   }
 }
 
-export type MillorbotOutboxPayload = MillorbotOrderPaidPayload | MillorbotStockPayload
+// ── Wholesale (B2B) events ──
+
+export interface MillorbotWholesaleAccessRequestPayload {
+  event_id: string
+  event: "wholesale.access_request.created" | "wholesale.access_request.approved"
+  occurred_at: string
+  request: {
+    id: string
+    legalName: string
+    inn: string
+    contactName?: string
+    contactPhone?: string
+    contactEmail?: string
+    expectedVolume?: string | null
+    comment?: string | null
+    companyId?: string
+    admin_url: string
+  }
+}
+
+export interface MillorbotWholesaleOrderPayload {
+  event_id: string
+  event:
+    | "wholesale.order.created"
+    | "wholesale.order.approved"
+    | "wholesale.order.cancelled"
+    | "wholesale.order.status_changed"
+  occurred_at: string
+  order: {
+    id: string
+    number: string
+    total: number
+    subtotal?: number
+    paymentTerms: string | null
+    approvalStatus: string | null
+    itemsCount?: number
+    admin_url: string
+  }
+  company: {
+    id: string
+    legalName: string | null
+    inn: string | null
+  }
+  user?: {
+    id: string
+    name: string
+    email: string
+  }
+}
+
+export type MillorbotOutboxPayload =
+  | MillorbotOrderPaidPayload
+  | MillorbotStockPayload
+  | MillorbotWholesaleAccessRequestPayload
+  | MillorbotWholesaleOrderPayload
 
 // Inbound from bot
 export type NormalizedTrackingStatus =

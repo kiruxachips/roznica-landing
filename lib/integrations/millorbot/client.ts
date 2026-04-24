@@ -18,6 +18,13 @@ function topicToPath(topic: string): string {
   if (topic === "order.status.changed") return "/api/orders/status"
   if (topic === "product.stock.depleted") return "/api/products/stock/depleted"
   if (topic === "product.stock.low") return "/api/products/stock/low"
+  // Wholesale (B2B) topics — маршрутизация в отдельные bot endpoint'ы.
+  if (topic === "wholesale.access_request.created") return "/api/wholesale/access_requests/created"
+  if (topic === "wholesale.access_request.approved") return "/api/wholesale/access_requests/approved"
+  if (topic === "wholesale.order.created") return "/api/wholesale/orders/created"
+  if (topic === "wholesale.order.approved") return "/api/wholesale/orders/approved"
+  if (topic === "wholesale.order.cancelled") return "/api/wholesale/orders/cancelled"
+  if (topic === "wholesale.order.status_changed") return "/api/wholesale/orders/status"
   // Fallback: dot-to-slash mapping, prefixed with /api/
   return `/api/${topic.replace(/\./g, "/")}`
 }

@@ -27,10 +27,11 @@ export const productCardSelect = {
     orderBy: { price: "asc" },
     select: { id: true, weight: true, price: true, oldPrice: true, stock: true },
   },
-  reviews: {
-    where: { isVisible: true },
-    select: { rating: true },
-  },
+  // F4-2: вместо подгрузки всех reviews — денормализованные поля.
+  // avgRating/reviewCount пересчитываются при мутациях Review через
+  // recomputeProductRating. Экономит 50-80% JSON-трафика на каталоге.
+  avgRating: true,
+  reviewCount: true,
 } satisfies Prisma.ProductSelect
 
 type ProductCardRow = Prisma.ProductGetPayload<{ select: typeof productCardSelect }>
@@ -73,11 +74,8 @@ export function mapToProductCard(p: ProductCardRow): ProductCard {
       oldPrice: v.oldPrice,
       stock: v.stock,
     })),
-    reviewCount: p.reviews.length,
-    averageRating:
-      p.reviews.length > 0
-        ? Math.round((p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length) * 10) / 10
-        : null,
+    reviewCount: p.reviewCount,
+    averageRating: p.avgRating !== null ? Math.round(p.avgRating * 10) / 10 : null,
   }
 }
 

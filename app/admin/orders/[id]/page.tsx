@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { OrderStatusChanger } from "./OrderStatusChanger"
 import { OrderDeliverySection } from "./OrderDeliverySection"
 import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
+import { WholesaleOrderPanel } from "@/components/admin/wholesale/WholesaleOrderPanel"
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,9 +55,32 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
 
   return (
     <div className="max-w-3xl">
-      <h1 className="text-2xl font-bold mb-6">Заказ {order.orderNumber}</h1>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-2xl font-bold">Заказ {order.orderNumber}</h1>
+        {order.channel === "wholesale" && (
+          <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+            Опт
+          </span>
+        )}
+      </div>
 
       <div className="space-y-6">
+        {/* Wholesale panel — только для B2B */}
+        {order.channel === "wholesale" && (
+          <WholesaleOrderPanel
+            orderId={order.id}
+            orderNumber={order.orderNumber}
+            total={order.total}
+            approvalStatus={order.approvalStatus}
+            paymentStatus={order.paymentStatus}
+            paymentTerms={order.paymentTerms}
+            wholesaleCompanyId={order.wholesaleCompanyId}
+            b2bLegalName={order.b2bLegalName}
+            b2bInn={order.b2bInn}
+            b2bKpp={order.b2bKpp}
+          />
+        )}
+
         {/* Status */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-border">
           <h2 className="text-lg font-semibold mb-4">Статус</h2>
