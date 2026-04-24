@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma"
 import { ArticleForm } from "@/components/admin/ArticleForm"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function NewArticlePage() {
+  await requireAdmin("blog.edit")
   const categories = await prisma.articleCategory.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: "asc" },

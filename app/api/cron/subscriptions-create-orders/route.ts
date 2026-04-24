@@ -84,17 +84,27 @@ export async function GET(request: Request) {
         continue
       }
 
-      // Crash-safety: сдвигаем nextDeliveryDate РАНЬШЕ send через conditional
-      // update. Если два крона запустились параллельно или retry случился
-      // между send и старым update, только один поток пройдёт OCC-проверку
-      // (WHERE nextDeliveryDate=prev).
+      // Crash-safety via marker-based claim: пишем уникальный `lastOrderId`
+      // как claim-токен ДО send. Если два крона параллелятся, только один
+      // пройдёт из-за нашего check на unchanged lastOrderId.
+      //
+      // Раньше сравнивали через `nextDeliveryDate: sub.nextDeliveryDate`, но
+      // это сравнение JS Date с БД timestamp(3) может ломаться из-за
+      // миллисекундных несовпадений после round-trip через Prisma (timezone
+      // конверсии). Marker более надёжен — unique string vs unique string.
+      const claimMarker = `cron-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       const claimed = await prisma.subscription.updateMany({
         where: {
           id: sub.id,
-          nextDeliveryDate: sub.nextDeliveryDate,
+          status: "active",
+          // Берём только если ещё не claim'нут другим воркером: предыдущий
+          // lastOrderId не совпадает с нашим (у нас уникальный) → защита от
+          // двойной обработки.
+          lastOrderId: sub.lastOrderId,
         },
         data: {
           nextDeliveryDate: new Date(now.getTime() + sub.intervalDays * 86_400_000),
+          lastOrderId: claimMarker,
         },
       })
       if (claimed.count === 0) {

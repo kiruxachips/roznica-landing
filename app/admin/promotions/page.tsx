@@ -2,8 +2,10 @@ export const dynamic = "force-dynamic"
 
 import { prisma } from "@/lib/prisma"
 import { PromotionManager } from "@/components/admin/PromotionManager"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminPromotionsPage() {
+  await requireAdmin("promos.view")
   const products = await prisma.product.findMany({
     where: {
       isActive: true,

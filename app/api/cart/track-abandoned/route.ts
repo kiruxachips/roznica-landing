@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server"
+import { headers } from "next/headers"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { generateToken } from "@/lib/tokens"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
@@ -39,6 +41,18 @@ export async function POST(request: Request) {
   const email = body.email.trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ ok: false, error: "invalid email" }, { status: 400 })
+  }
+
+  // Anti-spam: 10 попыток в минуту per IP+email. Защищает от массового
+  // tracking чужих email'ов с целью засорить recovery-кампанию.
+  const h = await headers()
+  const ip = (h.get("x-forwarded-for") || "").split(",")[0]?.trim() || h.get("x-real-ip") || "unknown"
+  const rl = checkRateLimit(`track-abandoned:${ip}:${email}`, RATE_LIMITS.publicEmailAction)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: "too_many_requests" },
+      { status: 429 }
+    )
   }
 
   const subtotal = body.items.reduce((s, i) => s + i.price * i.quantity, 0)

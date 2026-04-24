@@ -7,8 +7,10 @@ import { DeliveryRulesManager } from "@/components/admin/DeliveryRulesManager"
 import { DeliveryCalculatorTester } from "@/components/admin/DeliveryCalculatorTester"
 import { IntegrationLogViewer } from "@/components/admin/IntegrationLogViewer"
 import { DeliveryPageTabs } from "@/components/admin/DeliveryPageTabs"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminDeliveryPage() {
+  await requireAdmin("delivery.settings")
   const [settings, rules, deliveryRules, logs] = await Promise.all([
     getDeliverySettings(),
     getMarkupRules(),

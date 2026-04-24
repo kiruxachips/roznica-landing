@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { requireAdmin } from "@/lib/admin-guard"
 import { getCustomerById } from "@/lib/dal/customers"
 import { BonusAdjustForm } from "@/components/admin/customers/BonusAdjustForm"
+import { can } from "@/lib/permissions"
 
 export const dynamic = "force-dynamic"
 
@@ -11,7 +12,8 @@ export default async function AdminCustomerDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireAdmin("customers.view")
+  const admin = await requireAdmin("customers.view")
+  const canEdit = can(admin.role, "customers.edit")
   const { id } = await params
   const data = await getCustomerById(id)
   if (!data) notFound()
@@ -68,8 +70,13 @@ export default async function AdminCustomerDetailPage({
           </span>
         </div>
 
-        {!user.deletedAt && (
+        {!user.deletedAt && canEdit && (
           <BonusAdjustForm userId={user.id} currentBalance={user.bonusBalance} />
+        )}
+        {!user.deletedAt && !canEdit && (
+          <p className="text-xs text-muted-foreground italic">
+            Ручная выдача бонусов доступна только администраторам.
+          </p>
         )}
 
         {user.bonusTransactions.length > 0 && (

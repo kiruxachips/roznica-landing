@@ -307,8 +307,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         try {
           const existing = await prisma.user.findUnique({
             where: { id: user.id },
-            select: { avatarUrl: true, email: true },
+            select: { avatarUrl: true, email: true, deletedAt: true },
           })
+          // Defence-in-depth: запрещаем вход soft-deleted юзерам через OAuth.
+          // Обычно email анонимизирован как deleted-*@anon.local и Google
+          // не вернёт такой же, но на случай race в deletion-flow.
+          if (existing?.deletedAt) {
+            console.warn(`[oauth] blocked signin for soft-deleted user ${user.id}`)
+            return false
+          }
           if (existing) {
             const updates: Record<string, string> = {}
             if (!existing.avatarUrl && user.image) {
@@ -328,6 +335,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (err?.code !== "P2002") throw e
               })
             }
+          }
+
+          // 152-ФЗ: фиксируем согласие на обработку ПД при OAuth-регистрации/
+          // входе. Идемпотентно — если consent уже есть, recordConsent
+          // сам skip'нет. Non-blocking: не роняем signIn если consent-запись
+          // упала (в Sentry уйдёт error).
+          try {
+            const { recordConsent } = await import("@/lib/consent")
+            await recordConsent({
+              userId: user.id,
+              emailSnapshot: user.email?.toLowerCase() ?? null,
+              type: "privacy",
+              source: "register",
+            })
+          } catch (e) {
+            console.error("[oauth] failed to record consent:", e)
           }
         } catch (e) {
           console.error("OAuth post-signin sync failed:", e)

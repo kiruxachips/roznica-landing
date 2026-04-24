@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import { prisma } from "@/lib/prisma"
 import { RetryButton } from "./RetryButton"
+import { requireAdmin } from "@/lib/admin-guard"
 
 const statusStyles: Record<string, string> = {
   pending: "bg-yellow-50 text-yellow-700",
@@ -28,6 +29,7 @@ function trunc(s: string, n = 120): string {
 }
 
 export default async function AdminIntegrationsPage() {
+  await requireAdmin("integrations.view")
   const [outbox, logs, counts] = await Promise.all([
     prisma.outboxEvent.findMany({
       orderBy: { createdAt: "desc" },

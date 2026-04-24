@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { Home, Search, ShoppingBag, User } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
@@ -42,6 +43,12 @@ const items: NavItem[] = [
  */
 export function BottomNav() {
   const pathname = usePathname()
+  // Mount-guard: Zustand persist rehydrates из localStorage на client only.
+  // Без этого badge сначала отрисуется как 0 (server) → потом прыгнет (client)
+  // → hydration mismatch warning + flash в UI.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   const cartCount = useCartStore((s) =>
     s.items.reduce((sum, i) => sum + i.quantity, 0)
   )
@@ -74,7 +81,7 @@ export function BottomNav() {
               >
                 <div className="relative">
                   <Icon className="w-5 h-5 mb-0.5" />
-                  {item.showBadge && cartCount > 0 && (
+                  {item.showBadge && mounted && cartCount > 0 && (
                     <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 bg-primary text-primary-foreground rounded-full text-[10px] font-semibold flex items-center justify-center">
                       {cartCount > 99 ? "99+" : cartCount}
                     </span>

@@ -5,6 +5,7 @@ import Image from "next/image"
 import { prisma } from "@/lib/prisma"
 import { Plus } from "lucide-react"
 import { ArticleActions } from "./ArticleActions"
+import { requireAdmin } from "@/lib/admin-guard"
 
 const PAGE_SIZE = 50
 
@@ -13,6 +14,7 @@ export default async function AdminBlogPage({
 }: {
   searchParams?: Promise<{ page?: string }>
 }) {
+  await requireAdmin("blog.view")
   const sp = (await searchParams) ?? {}
   const page = Math.max(1, Number(sp.page) || 1)
 

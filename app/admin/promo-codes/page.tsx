@@ -2,8 +2,10 @@ export const dynamic = "force-dynamic"
 
 import { getPromoCodes } from "@/lib/dal/promo-codes"
 import { PromoCodeManager } from "@/components/admin/PromoCodeManager"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminPromoCodesPage() {
+  await requireAdmin("promos.view")
   const { promoCodes } = await getPromoCodes()
 
   const serialized = promoCodes.map((p) => ({

@@ -4,8 +4,10 @@ import { notFound } from "next/navigation"
 import { getCollectionById } from "@/lib/dal/collections"
 import { prisma } from "@/lib/prisma"
 import { CollectionForm } from "@/components/admin/CollectionForm"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminCollectionEditPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin("collections.edit")
   const { id } = await params
   const collection = await getCollectionById(id)
   if (!collection) notFound()

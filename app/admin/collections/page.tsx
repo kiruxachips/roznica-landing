@@ -4,8 +4,10 @@ import Link from "next/link"
 import { getAllCollections } from "@/lib/dal/collections"
 import { createCollection, deleteCollection } from "@/lib/actions/collections"
 import { revalidatePath } from "next/cache"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminCollectionsPage() {
+  await requireAdmin("collections.view")
   const collections = await getAllCollections()
 
   async function handleCreate(formData: FormData) {

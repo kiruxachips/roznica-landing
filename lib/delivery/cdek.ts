@@ -250,15 +250,32 @@ export function createCdekProvider(config: {
         })),
       }
 
-      const data = await cdekFetch("/v2/calculator/tarifflist", {
-        ...opts,
-        method: "POST",
-        body,
-      })
+      // Graceful degradation: если circuit breaker открыт или СДЭК отвечает
+      // ошибкой — возвращаем [] вместо throw. Вызывающий код (index.ts)
+      // делает Promise.allSettled и показывает юзеру только Почту.
+      // Это лучше чем показ "ошибка доставки" — хотя бы один способ работает.
+      let data: { tariff_codes?: unknown[] }
+      try {
+        data = await cdekFetch("/v2/calculator/tarifflist", {
+          ...opts,
+          method: "POST",
+          body,
+        })
+      } catch (e) {
+        console.error("[cdek.calculateRates] failed:", e instanceof Error ? e.message : e)
+        return []
+      }
 
       if (!data.tariff_codes) return []
 
-      return data.tariff_codes
+      return (data.tariff_codes as Array<{
+        tariff_code: number
+        tariff_name?: string
+        delivery_mode: number
+        delivery_sum: number
+        period_min: number
+        period_max: number
+      }>)
         .filter((t: { tariff_code: number }) => config.tariffs.includes(t.tariff_code))
         .map((t: { tariff_code: number; tariff_name?: string; delivery_mode: number; delivery_sum: number; period_min: number; period_max: number }) => {
           const price = Math.ceil(t.delivery_sum)
@@ -278,10 +295,16 @@ export function createCdekProvider(config: {
     },
 
     async getPickupPoints(cityCode: string): Promise<PickupPoint[]> {
-      const data = await cdekFetch(
-        `/v2/deliverypoints?city_code=${cityCode}&type=ALL&is_handout=true`,
-        opts
-      )
+      let data: unknown
+      try {
+        data = await cdekFetch(
+          `/v2/deliverypoints?city_code=${cityCode}&type=ALL&is_handout=true`,
+          opts
+        )
+      } catch (e) {
+        console.error("[cdek.getPickupPoints] failed:", e instanceof Error ? e.message : e)
+        return []
+      }
 
       if (!Array.isArray(data)) return []
 

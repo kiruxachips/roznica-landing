@@ -4,6 +4,7 @@ import Link from "next/link"
 import { getAllReviews } from "@/lib/dal/reviews"
 import { ReviewActions } from "./ReviewActions"
 import { Star } from "lucide-react"
+import { requireAdmin } from "@/lib/admin-guard"
 
 const PAGE_SIZE = 50
 
@@ -12,6 +13,7 @@ export default async function AdminReviewsPage({
 }: {
   searchParams?: Promise<{ page?: string }>
 }) {
+  await requireAdmin("reviews.view")
   const sp = (await searchParams) ?? {}
   const page = Math.max(1, Number(sp.page) || 1)
 

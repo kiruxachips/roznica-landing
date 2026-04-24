@@ -2,8 +2,10 @@ import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ProductForm } from "@/components/admin/ProductForm"
 import { getAllCollections, getCollectionIdsForProduct } from "@/lib/dal/collections"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin("products.edit")
   const { id } = await params
 
   const [product, categories, allCollections, productCollectionIds] = await Promise.all([

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { generateToken } from "@/lib/tokens"
 import { recordConsent } from "@/lib/consent"
+import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
 
 function normalizeEmail(v: string): string {
   return v.trim().toLowerCase()
@@ -34,14 +35,27 @@ export async function subscribeToNewsletter(
     return { ok: false, error: "Некорректный email" }
   }
 
+  // Anti-spam: 10 subscribe/мин per IP+email.
+  const h = await headers()
+  const ip =
+    (h.get("x-forwarded-for") || "").split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "unknown"
+  const rl = checkRateLimit(
+    `newsletter-subscribe:${ip}:${email}`,
+    RATE_LIMITS.publicEmailAction
+  )
+  if (!rl.allowed) {
+    return { ok: false, error: "Слишком много попыток, попробуйте позже" }
+  }
+
   const session = await auth()
   const userId =
     (session?.user as Record<string, unknown> | undefined)?.userType === "customer"
       ? session?.user?.id ?? null
       : null
 
-  const h = await headers()
-  const ipAddress = (h.get("x-forwarded-for") || "").split(",")[0]?.trim() || null
+  const ipAddress = ip !== "unknown" ? ip : null
   const userAgent = h.get("user-agent") || null
 
   const existing = await prisma.newsletterSubscriber.findUnique({ where: { email } })

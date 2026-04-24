@@ -13,16 +13,21 @@ const BATCH = 10
  * в status="pending"|"failed" с nextAttemptAt<=now и пытается отправить SMTP.
  * attemptSend сам обновит status=sent или failed с backoff.
  *
- * Защита: X-Cron-Secret header === CRON_SECRET env var. Без секрета endpoint
- * возвращает 401. В docker network доступен только outbox-worker'у.
+ * Защита: `Authorization: Bearer ${CRON_SECRET}` или legacy X-Cron-Secret.
+ * Bearer унифицирован с другими cron-эндпоинтами (abandoned-cart, reviews,
+ * subscriptions). X-Cron-Secret поддержан для обратной совместимости с
+ * outbox-worker.mjs — можно будет убрать когда worker обновится.
  */
 export async function POST(request: NextRequest) {
   const expected = process.env.CRON_SECRET
   if (!expected) {
     return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 503 })
   }
-  const actual = request.headers.get("x-cron-secret")
-  if (actual !== expected) {
+  const bearer = request.headers.get("authorization")
+  const legacy = request.headers.get("x-cron-secret")
+  const authorized =
+    (bearer === `Bearer ${expected}`) || (legacy === expected)
+  if (!authorized) {
     return NextResponse.json({ error: "Forbidden" }, { status: 401 })
   }
 

@@ -1,5 +1,6 @@
 import { getStockSnapshot, getStockMetrics, getStockFacets } from "@/lib/dal/stock"
 import { WarehouseDashboard } from "@/components/admin/WarehouseDashboard"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function WarehousePage({
   searchParams,
@@ -13,6 +14,7 @@ export default async function WarehousePage({
     inactive?: string
   }>
 }) {
+  await requireAdmin("stock.view")
   const params = await searchParams
   const statusFilter = (params.status as "all" | "in_stock" | "low" | "out") || "all"
   const weightGrams = params.weight ? parseInt(params.weight) : undefined

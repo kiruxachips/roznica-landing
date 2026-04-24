@@ -113,4 +113,11 @@ export const RATE_LIMITS = {
   login: { max: 5, windowMs: 5 * 60 * 1000, blockMs: 15 * 60 * 1000 },
   /** OAuth callback per IP — 20 попыток / 5 мин, блок 30 мин */
   oauthCallback: { max: 20, windowMs: 5 * 60 * 1000, blockMs: 30 * 60 * 1000 },
+  /** Публичные email-endpoint'ы (newsletter, abandoned-cart track) —
+   * защита от спама чужих email'ов. 10/мин на IP + email комбинацию. */
+  publicEmailAction: {
+    max: 10,
+    windowMs: 60 * 1000,
+    blockMs: 30 * 60 * 1000,
+  },
 } as const

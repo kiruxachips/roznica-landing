@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic"
 
 import Link from "next/link"
 import { getOrders } from "@/lib/dal/orders"
+import { requireAdmin } from "@/lib/admin-guard"
 
 const statusLabels: Record<string, string> = {
   pending: "Новый",
@@ -24,6 +25,7 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<{ status?: string; page?: string; search?: string; channel?: string }>
 }) {
+  await requireAdmin("orders.view")
   const params = await searchParams
   const status = params.status
   const search = params.search

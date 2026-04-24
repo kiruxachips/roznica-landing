@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation"
 import { prisma } from "@/lib/prisma"
 import { ArticleForm } from "@/components/admin/ArticleForm"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function EditArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin("blog.edit")
   const { id } = await params
 
   const [article, categories] = await Promise.all([

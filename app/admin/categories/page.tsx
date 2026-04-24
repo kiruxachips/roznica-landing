@@ -2,8 +2,10 @@ export const dynamic = "force-dynamic"
 
 import { prisma } from "@/lib/prisma"
 import { CategoryManager } from "./CategoryManager"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminCategoriesPage() {
+  await requireAdmin("categories.view")
   const categories = await prisma.category.findMany({
     orderBy: { sortOrder: "asc" },
     include: {

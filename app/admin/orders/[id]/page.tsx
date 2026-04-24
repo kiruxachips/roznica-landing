@@ -8,8 +8,10 @@ import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
 import { WholesaleOrderPanel } from "@/components/admin/wholesale/WholesaleOrderPanel"
 import { InvoiceGenerator } from "@/components/admin/wholesale/InvoiceGenerator"
 import { getInvoiceByOrderId } from "@/lib/dal/wholesale-invoices"
+import { requireAdmin } from "@/lib/admin-guard"
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin("orders.view")
   const { id } = await params
   const order = await getOrderById(id)
 
