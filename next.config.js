@@ -81,6 +81,10 @@ try {
     disableLogger: true,
     // Tunnel-route обходит adblock'и, блокирующие запросы к sentry.io.
     // Без этого теряется 20-30% клиентских ошибок.
+    // Note: endpoint публичный (нужен для клиентских ошибок), но DSN
+    // тоже публичный (NEXT_PUBLIC_SENTRY_DSN), так что attack-surface
+    // ограничен spam'ом в dashboard. Квоты Sentry + rate-limit на их
+    // стороне защищают от bill-overrun.
     tunnelRoute: '/monitoring',
   })
 } catch {

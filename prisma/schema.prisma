@@ -748,11 +748,22 @@ model WholesaleCompany {
   // Ответственный менеджер (CRM)
   managerAdminId String? // AdminUser.id
   notes          String?                      @db.Text // внутренние заметки
+  // Фаза 6: cron-алерты на превышение кредитного лимита.
+  // creditAlertSentAt — последний раз, когда было уведомление;
+  // cron не отправляет повторно пока creditUsed не упадёт и снова не вырастет.
+  creditAlertSentAt    DateTime?
+  creditAlertPctSent   Int? // 80 | 90 | 100 — последний порог, о котором уведомили
+  // Фаза 8: snapshot DaData для audit-проверки юрлица.
+  dadataStatus         String? // "ACTIVE" | "LIQUIDATING" | "LIQUIDATED" | "REORGANIZING" | "BANKRUPT"
+  dadataCheckedAt      DateTime?
+  dadataPayload        Json?
   // Связи
   users          WholesaleUser[]
+  invitations    WholesaleInvitation[]
   accessRequests WholesaleAccessRequest[]
   creditTx       WholesaleCreditTransaction[]
   documents      WholesaleDocument[]
+  invoices       WholesaleInvoice[]
   orders         Order[]
   createdAt      DateTime                     @default(now())
   updatedAt      DateTime                     @updatedAt
@@ -760,6 +771,58 @@ model WholesaleCompany {
   @@index([status])
   @@index([managerAdminId])
   @@index([priceListId])
+}
+
+// Приглашение сотрудника в оптовый кабинет. Owner компании генерирует
+// инвайт → на email приходит ссылка с одноразовым токеном → сотрудник
+// устанавливает пароль и становится WholesaleUser той же компании.
+model WholesaleInvitation {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email       String
+  role        String   @default("buyer") // "buyer" | "accountant"
+  token       String   @unique // одноразовый, crypto.randomBytes(32)
+  invitedById String? // WholesaleUser.id (owner) или AdminUser.id
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([companyId])
+  @@index([email])
+  @@index([expiresAt])
+}
+
+// Счёт на оплату, сгенерированный для оптового заказа (PDF + номер).
+// Отделён от WholesaleDocument чтобы хранить структурированные данные
+// (для повторной генерации PDF, отчётов бухгалтерии, отправки в ЭДО).
+model WholesaleInvoice {
+  id          String   @id @default(cuid())
+  number      String   @unique // "INV-2026-0001" — сквозная годовая нумерация
+  kind        String   @default("invoice") // "invoice" | "upd" | "act"
+  orderId     String?  @unique // один счёт на заказ (для UPD/invoice)
+  companyId   String
+  company     WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  // Snapshot цен — чтобы при rerender PDF не зависеть от меняющегося каталога
+  subtotal    Int
+  discount    Int      @default(0)
+  total       Int
+  vatRate     Int?     // % НДС (обычно 20 или 0). null = без НДС (УСН).
+  vatAmount   Int?
+  // Snapshot реквизитов плательщика и получателя
+  buyerSnapshot  Json   // { legalName, inn, kpp, address, bankName, bankAccount, bic }
+  sellerSnapshot Json   // { legalName, inn, kpp, address, bankName, bankAccount, bic }
+  itemsSnapshot  Json   // [{ name, weight, quantity, price, total }]
+  // Статус жизненного цикла
+  status      String   @default("draft") // "draft" | "sent" | "paid" | "cancelled"
+  pdfUrl      String? // /uploads/wholesale/invoices/...pdf
+  generatedById String? // AdminUser.id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId, createdAt])
+  @@index([status])
+  @@index([kind, createdAt])
 }
 
 // Пользователь B2B-кабинета. В MVP каждый WholesaleUser принадлежит одной

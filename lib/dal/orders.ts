@@ -512,6 +512,11 @@ export const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 }
 
 export async function updateOrderStatus(id: string, status: string, changedBy?: string) {
+  // Валидация против whitelist — защита от невалидного string попавшего
+  // в БД через случайный API-вызов. Runtime parse + TS-typed throw.
+  const { parseOrderStatus } = await import("@/lib/order-status")
+  const validatedStatus = parseOrderStatus(status)
+  status = validatedStatus
   const order = await prisma.order.findUnique({
     where: { id },
     include: { items: { select: { variantId: true, quantity: true, name: true } } },

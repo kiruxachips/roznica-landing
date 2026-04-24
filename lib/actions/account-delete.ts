@@ -116,8 +116,26 @@ export async function confirmAccountDeletion(
     return { success: false, error: "Токен не соответствует текущему аккаунту" }
   }
 
-  // Атомарно: анонимизация + marking consent revoked + deletedAt.
+  // Порядок операций критичен (см. post-audit fix):
+  // 1) СНАЧАЛА удаляем OAuth Account'ы — после этого невозможен повторный
+  //    вход через Google/Yandex/VK даже если последующие update упадут.
+  // 2) Потом метим токен как used, чтобы ссылка не сработала повторно.
+  // 3) Потом анонимизируем User (email→anon, deletedAt=now) и revoke consents.
+  // Если транзакция упадёт на шаге 3, у нас уже нет OAuth-ссылок → юзер не
+  // может залогиниться (Account нет, email anonymized не даст match в
+  // authorize). Хуже чем полное удаление, но лучше чем несанкционированный
+  // вход в старый аккаунт.
   await prisma.$transaction(async (tx) => {
+    // Step 1: убить OAuth
+    await tx.account.deleteMany({ where: { userId } })
+
+    // Step 2: пометить verification token как использованный
+    await tx.verificationCode.update({
+      where: { id: verif.id },
+      data: { used: true },
+    })
+
+    // Step 3: анонимизировать User
     const anonSuffix = Date.now()
     await tx.user.update({
       where: { id: userId },
@@ -139,20 +157,10 @@ export async function confirmAccountDeletion(
       },
     })
 
-    // Revoke все consent'ы.
+    // Step 4: revoke consent'ы
     await tx.userConsent.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
-    })
-
-    // Удаляем OAuth-связи (Account) — иначе юзер сможет снова войти
-    // через "Войти с Google" и наткнуться на anonymized стаб.
-    await tx.account.deleteMany({ where: { userId } })
-
-    // Логируем token как used.
-    await tx.verificationCode.update({
-      where: { id: verif.id },
-      data: { used: true },
     })
   })
 
