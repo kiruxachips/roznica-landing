@@ -187,7 +187,23 @@ export function ContactStep() {
               if (errors.email) setErrors((s) => ({ ...s, email: "" }))
               if (emailTypoFix) setEmailTypoFix(null)
             }}
-            onBlur={() => setEmailTypoFix(suggestEmail(contact.email))}
+            onBlur={(e) => {
+              setEmailTypoFix(suggestEmail(contact.email))
+              // G3: track abandoned cart — как только юзер ввёл валидный email
+              // на первом шаге и корзина не пустая. fire-and-forget.
+              const value = e.target.value.trim().toLowerCase()
+              if (value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                import("@/lib/store/cart").then(({ useCartStore }) => {
+                  const items = useCartStore.getState().items
+                  if (items.length === 0) return
+                  fetch("/api/cart/track-abandoned", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email: value, items }),
+                  }).catch(() => {})
+                })
+              }
+            }}
             className={`w-full h-11 px-4 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
               errors.email ? "border-red-400" : "border-input"
             }`}

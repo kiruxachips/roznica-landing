@@ -122,6 +122,14 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
         return
       }
 
+      // G3: снимаем abandoned-tracking — заказ реально создан, не нужно
+      // слать recovery. Fire-and-forget, не блокируем redirect.
+      if (contact.email?.trim()) {
+        fetch(`/api/cart/track-abandoned?email=${encodeURIComponent(contact.email.trim().toLowerCase())}`, {
+          method: "DELETE",
+        }).catch(() => {})
+      }
+
       clearCart()
       resetDelivery()
       resetWizard()

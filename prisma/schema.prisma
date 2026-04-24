@@ -203,6 +203,39 @@ model AdminActivityLog {
   @@index([action, entityType, createdAt])
 }
 
+/// G3: Abandoned cart recovery. Snapshot корзины ЛЕВЫЙ в момент введения
+/// email на checkout step 1. Если юзер не оформил заказ в течение часа —
+/// cron отправляет письмо с персональным промо-кодом и deep-link'ом на
+/// восстановление корзины.
+///
+/// Не храним full-items в реальном User — это Zustand локальной. Только
+/// snapshot JSON для email-генерации + recoveryToken для deep-link.
+///
+/// Жизненный цикл:
+///   - tracked: snapshot создан, cron ещё не отправлял
+///   - email_sent: cron отправил; если Order создался, помечаем recovered
+///   - recovered: юзер реально оформил заказ после клика по deep-link
+///   - expired: прошло 72 часа без recovered
+model AbandonedCart {
+  id             String    @id @default(cuid())
+  email          String
+  userId         String?   // если авторизован — полезно для сегментации
+  items          Json      // snapshot [{ variantId, name, weight, price, qty, slug, image }]
+  subtotal       Int       // для template'а и promo-условий (min-threshold)
+  recoveryToken  String    @unique
+  promoCodeId    String?   // one-time промо-код для recovery (опционально)
+  status         String    @default("tracked") // tracked|email_sent|recovered|expired
+  emailSentAt    DateTime?
+  recoveredAt    DateTime?
+  recoveredOrderId String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([email, status])
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
 /// G1-2: подписчики email-рассылок. Отдельно от User — подписка по
 /// email не требует регистрации. Статусы: active (получает письма),
 /// unsubscribed (отписался), bounced (soft/hard bounce от SMTP).
