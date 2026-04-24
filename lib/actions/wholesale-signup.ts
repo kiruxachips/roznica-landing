@@ -13,12 +13,32 @@ import { findPartyByInn } from "@/lib/integrations/dadata"
 import type { Prisma } from "@prisma/client"
 
 /**
- * Самостоятельная регистрация оптовика.
- * Фаза 1: email + пароль + имя + телефон → сразу аккаунт со status="pending_info".
- *         Юзер заходит в кабинет, видит розничные цены + баннер «заполните данные компании».
- * Фаза 2 (внутри кабинета): заполняет ИНН/реквизиты → status="pending_approval",
- *         менеджер получает уведомление, принимает решение → "active".
+ * Самостоятельная регистрация оптовика — никаких заявок и согласований.
+ * После submit:
+ *   - Company создаётся с status="active", привязана к default weight-tier прайс-листу.
+ *     Tier-скидки по весу работают сразу (6кг=3%, 15кг=5%, 30кг=9%, 60кг=20%).
+ *   - paymentTerms="prepay", creditLimit=0 — стандартный режим.
+ *   - User сразу active, auto-login в RegisterForm.
+ *   - Если позже хочет отсрочку/счёт УПД — заполняет ИНН/реквизиты
+ *     на /wholesale/company/info, менеджер одобряет и выставляет лимит.
  */
+async function getDefaultPriceListId(): Promise<string | null> {
+  const defaultId = process.env.DEFAULT_WHOLESALE_PRICE_LIST_ID
+  if (defaultId) {
+    const exists = await prisma.priceList.findFirst({
+      where: { id: defaultId, isActive: true, kind: "weight_tier" },
+      select: { id: true },
+    })
+    if (exists) return exists.id
+  }
+  // Фолбэк: первый активный weight-tier прайс-лист
+  const first = await prisma.priceList.findFirst({
+    where: { isActive: true, kind: "weight_tier" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  })
+  return first?.id ?? null
+}
 
 function emailValid(e: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)
@@ -66,6 +86,7 @@ export async function signupWholesaleSelfService(input: {
     .padStart(3, "0")}`
 
   const companyName = input.companyName?.trim() || `Новый оптовый клиент (${email})`
+  const defaultPriceListId = await getDefaultPriceListId()
 
   const { company, user } = await prisma.$transaction(async (tx) => {
     const company = await tx.wholesaleCompany.create({
@@ -75,9 +96,12 @@ export async function signupWholesaleSelfService(input: {
         contactName: input.name.trim(),
         contactPhone: input.phone,
         contactEmail: email,
-        status: "pending_info", // ждём заполнения реквизитов
+        // Сразу активная компания с weight-tier прайсом — никаких согласований.
+        // Отсрочка и счёт УПД — отдельно через заполнение реквизитов + админ-апрув.
+        status: "active",
         paymentTerms: "prepay",
         creditLimit: 0,
+        priceListId: defaultPriceListId,
       },
     })
     const user = await tx.wholesaleUser.create({
@@ -95,20 +119,22 @@ export async function signupWholesaleSelfService(input: {
     return { company, user }
   })
 
-  // Нотификация менеджеру о новом самозарегистрировавшемся
+  // Нотификация менеджеру (tradeagent) о новом самозарегистрировавшемся
   for (const adminEmail of getWholesaleNotificationEmails()) {
     await dispatchEmail({
       orderId: null,
       kind: "wholesale.admin.new_request",
       recipient: adminEmail,
       render: () => ({
-        subject: `[ОПТ] Новый самозарегистрировавшийся: ${email}`,
+        subject: `[ОПТ] Новая регистрация: ${email}`,
         html: `
           <h2>Новый оптовый клиент — самостоятельная регистрация</h2>
           <p><strong>Имя:</strong> ${input.name}</p>
           <p><strong>Телефон:</strong> ${input.phone}</p>
           <p><strong>Email:</strong> ${email}</p>
-          <p>Компания пока без реквизитов (status=pending_info). Будет видна в админке после заполнения данных.</p>
+          ${input.companyName ? `<p><strong>Компания:</strong> ${input.companyName}</p>` : ""}
+          <p>Статус: <strong>active</strong>, предоплата, tier-скидки по весу работают.</p>
+          <p>Если захочет отсрочку — заполнит реквизиты в кабинете, тогда решение за вами.</p>
         `,
       }),
       send: (e) => sendRenderedEmail(e),
@@ -119,8 +145,9 @@ export async function signupWholesaleSelfService(input: {
 }
 
 /**
- * Заполнение реквизитов компании — переводит статус pending_info → pending_approval.
- * После этого менеджер получает уведомление и может одобрить.
+ * Опциональное заполнение реквизитов — для получения счёта УПД и запроса отсрочки.
+ * Компания уже active после регистрации, эта форма не блокирует её работу.
+ * После сохранения менеджер видит заявку в админке и может выдать отсрочку + лимит.
  */
 export async function submitCompanyInfo(input: {
   legalName: string
@@ -149,9 +176,11 @@ export async function submitCompanyInfo(input: {
     throw new Error("Компания с таким ИНН уже зарегистрирована. Обратитесь к менеджеру.")
   }
 
-  // DaData snapshot — для audit и auto-approval
+  // DaData snapshot — для audit
   const dadata = await findPartyByInn(inn).catch(() => null)
 
+  // Статус НЕ меняем — компания остаётся active и продолжает работать с tier-скидками.
+  // Реквизиты нужны для счёта УПД; отсрочку/лимит выдаёт менеджер отдельным действием.
   await prisma.wholesaleCompany.update({
     where: { id: ctx.companyId },
     data: {
@@ -165,7 +194,6 @@ export async function submitCompanyInfo(input: {
       bankAccount: input.bankAccount?.trim() || null,
       bankBic: input.bankBic?.trim() || null,
       corrAccount: input.corrAccount?.trim() || null,
-      status: "pending_approval",
       dadataStatus: dadata?.data.state?.status ?? null,
       dadataCheckedAt: dadata ? new Date() : null,
       dadataPayload: dadata ? (dadata as unknown as Prisma.InputJsonValue) : undefined,

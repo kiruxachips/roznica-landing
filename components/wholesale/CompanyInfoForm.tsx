@@ -96,7 +96,9 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
     }
   }
 
-  const readonly = values.status === "pending_approval" || values.status === "active"
+  // Реквизиты можно редактировать в любой момент. Менеджер видит изменения
+  // в админке и при необходимости пересогласует отсрочку/лимит.
+  const readonly = false
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-5 space-y-4">
@@ -106,13 +108,6 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
         </div>
       )}
 
-      {readonly && (
-        <div className="rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-sm px-4 py-3">
-          {values.status === "pending_approval"
-            ? "Реквизиты отправлены на проверку. Изменить их сейчас нельзя — свяжитесь с менеджером."
-            : "Компания уже активна. Для изменения реквизитов свяжитесь с менеджером."}
-        </div>
-      )}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2 relative">

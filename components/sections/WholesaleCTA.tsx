@@ -20,7 +20,7 @@ export function WholesaleCTA() {
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Для кофеен, HoReCa, ритейла и корпоративных клиентов.
-              Прямой контракт, выгодные цены от объёма, оплата по отсрочке.
+              Регистрируйтесь за минуту — и сразу закупайте с автоматической скидкой от объёма. Никаких заявок и согласований.
             </p>
           </div>
 
@@ -54,13 +54,13 @@ export function WholesaleCTA() {
               href="/wholesale/register"
               className="inline-flex items-center justify-center rounded-xl bg-primary text-primary-foreground font-medium px-6 py-3 hover:bg-primary/90 transition-colors"
             >
-              Подать заявку на опт
+              Зарегистрироваться и закупать
             </Link>
             <Link
               href="/wholesale/login"
               className="inline-flex items-center justify-center rounded-xl border border-border bg-white font-medium px-6 py-3 hover:bg-muted transition-colors"
             >
-              Уже есть доступ — войти
+              Уже есть аккаунт — войти
             </Link>
           </div>
         </div>

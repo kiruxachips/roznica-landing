@@ -32,34 +32,26 @@ export default async function WholesaleDashboardPage() {
             <p className="text-muted-foreground text-sm mt-1">{company?.legalName}</p>
           </div>
 
-          {company?.status === "pending_info" && (
+          {/* Опциональный prompt: если ИНН ещё не заполнен — предлагаем дать реквизиты
+              для счёта УПД + отсрочки. Работе каталога не мешает, компания уже active. */}
+          {(!company?.inn || company.inn.startsWith("TMP")) && (
             <Link
               href="/wholesale/company/info"
-              className="block rounded-2xl bg-amber-50 border border-amber-200 p-4 hover:bg-amber-100 transition-colors"
+              className="block rounded-2xl bg-primary/5 border border-primary/20 p-4 hover:bg-primary/10 transition-colors"
             >
               <div className="flex items-start gap-3">
-                <div className="text-xl">📝</div>
+                <div className="text-xl">📄</div>
                 <div>
-                  <div className="font-semibold text-amber-900">
-                    Заполните данные компании
+                  <div className="font-semibold">
+                    Хотите счёт УПД или оплату по отсрочке? (опционально)
                   </div>
-                  <div className="text-sm text-amber-800 mt-0.5">
-                    Укажите ИНН, реквизиты и юр.адрес — после одобрения менеджером в каталоге
-                    активируются скидки по весу (от 3% до 20%) и доступ к отсрочке оплаты.
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    Заполните ИНН и реквизиты — менеджер свяжется и выдаст лимит отсрочки.
+                    Каталог и скидки по весу работают уже сейчас, это не обязательно.
                   </div>
                 </div>
               </div>
             </Link>
-          )}
-
-          {company?.status === "pending_approval" && (
-            <div className="rounded-2xl bg-blue-50 border border-blue-200 p-4">
-              <div className="font-semibold text-blue-900">Заявка на рассмотрении</div>
-              <div className="text-sm text-blue-800 mt-0.5">
-                Мы получили ваши реквизиты и проверяем их. Обычно это занимает 1 рабочий день.
-                Вы получите уведомление на {ctx.email}.
-              </div>
-            </div>
           )}
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
