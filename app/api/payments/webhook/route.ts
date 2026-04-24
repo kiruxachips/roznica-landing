@@ -100,8 +100,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({}, { status: 200 })
   }
 
-  // Use verified status from API, not from webhook body
+  // Use verified status from API, not from webhook body.
+  // Валидация против whitelist — защита от будущих breaking changes ЮKassa
+  // API, которые могут добавить новый статус ("on_hold" и т.п.) и сломать
+  // нашу switch-логику.
+  const { isPaymentStatus } = await import("@/lib/order-status")
   const verifiedStatus = verifiedPayment.status
+  if (!isPaymentStatus(verifiedStatus)) {
+    console.error(`[webhook] unknown payment status from YooKassa: "${verifiedStatus}"`)
+    return NextResponse.json(
+      { error: "Unknown payment status" },
+      { status: 400 }
+    )
+  }
 
   if (verifiedStatus === "succeeded") {
     // Idempotency: skip if already processed
