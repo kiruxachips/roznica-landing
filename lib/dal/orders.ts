@@ -5,6 +5,11 @@ import type { OrderData } from "@/lib/types"
 import { validatePromoCode } from "@/lib/dal/promo-codes"
 import { deductBonusesInTx, reverseOrderEarnedBonuses } from "@/lib/dal/bonuses"
 import { refundGiftStock, areGiftsEnabled } from "@/lib/dal/gifts"
+import {
+  getWelcomeDiscountConfig,
+  isEligibleForWelcomeDiscount,
+  computeWelcomeDiscount,
+} from "@/lib/dal/welcome-discount"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
@@ -118,6 +123,24 @@ export async function createOrder(data: OrderData) {
     if (result.valid && result.promo && result.discount) {
       discount = result.discount
       promoCodeId = result.promo.id
+    }
+  }
+
+  // G1-1: welcome-скидка применяется ТОЛЬКО если юзер не использовал промокод
+  // (иначе стек скидок перекрывает маржу). Это осознанное решение —
+  // сфокусированная конверсия новичка, а не stacking.
+  // Для guest (userId=null) welcome-скидка тоже даётся — им повод зарегистрироваться.
+  let welcomeDiscount = 0
+  let welcomeApplied = false
+  if (!isWholesale && discount === 0) {
+    const eligible = await isEligibleForWelcomeDiscount(data.userId)
+    if (eligible) {
+      const cfg = await getWelcomeDiscountConfig()
+      welcomeDiscount = computeWelcomeDiscount(subtotal, cfg)
+      if (welcomeDiscount > 0) {
+        welcomeApplied = true
+        discount = welcomeDiscount
+      }
     }
   }
 
@@ -249,6 +272,36 @@ export async function createOrder(data: OrderData) {
       `
       if (affected === 0) {
         throw new Error("Промокод недействителен или исчерпан. Попробуйте оформить заказ без него")
+      }
+    }
+
+    // Atomic credit-limit check для B2B net-terms заказов.
+    // SELECT ... FOR UPDATE блокирует строку компании до конца транзакции,
+    // предотвращая race: два одновременных заказа от разных сотрудников не
+    // смогут вместе превысить лимит.
+    if (
+      isWholesale &&
+      data.wholesaleCompanyId &&
+      data.paymentTerms &&
+      data.paymentTerms !== "prepay"
+    ) {
+      const locked = await tx.$queryRaw<
+        { creditLimit: number; creditUsed: number }[]
+      >`
+        SELECT "creditLimit", "creditUsed"
+        FROM "WholesaleCompany"
+        WHERE id = ${data.wholesaleCompanyId}
+        FOR UPDATE
+      `
+      if (!locked.length) {
+        throw new Error("Компания не найдена")
+      }
+      const { creditLimit, creditUsed } = locked[0]
+      if (creditUsed + total > creditLimit) {
+        throw new Error(
+          `Превышен кредитный лимит. Доступно: ${(creditLimit - creditUsed).toLocaleString("ru")}₽, ` +
+            `сумма заказа: ${total.toLocaleString("ru")}₽.`
+        )
       }
     }
 
@@ -397,6 +450,18 @@ export async function createOrder(data: OrderData) {
         description: `Заказ ${created.orderNumber}: отсрочка ${data.paymentTerms}`,
         idempotencyKey: `credit:order_placed:${created.id}`,
         createdBy: data.wholesaleUserId ?? "system",
+      })
+    }
+
+    // G1-1: фиксируем firstOrderCompletedAt при оформлении (не дожидаемся
+    // фактической оплаты — welcome-скидка уже применена к этому заказу
+    // и повторный бесплатный "первый" клиент не должен получать её же
+    // при следующей попытке). Если заказ отменится — не сбрасываем
+    // (см. comment в schema.prisma: абуз-защита).
+    if (welcomeApplied && data.userId) {
+      await tx.user.update({
+        where: { id: data.userId },
+        data: { firstOrderCompletedAt: new Date() },
       })
     }
 

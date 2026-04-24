@@ -6,6 +6,8 @@ import { OrderStatusChanger } from "./OrderStatusChanger"
 import { OrderDeliverySection } from "./OrderDeliverySection"
 import { OrderNotesEditor } from "@/components/admin/OrderNotesEditor"
 import { WholesaleOrderPanel } from "@/components/admin/wholesale/WholesaleOrderPanel"
+import { InvoiceGenerator } from "@/components/admin/wholesale/InvoiceGenerator"
+import { getInvoiceByOrderId } from "@/lib/dal/wholesale-invoices"
 
 export default async function AdminOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -14,6 +16,9 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
   if (!order) notFound()
 
   const statusLogs = order.statusLogs
+
+  // Для оптового заказа подгружаем уже сгенерированный счёт (если есть)
+  const invoice = order.channel === "wholesale" ? await getInvoiceByOrderId(order.id) : null
 
   const emailDispatches = await prisma.emailDispatch.findMany({
     where: { orderId: order.id },
@@ -67,18 +72,25 @@ export default async function AdminOrderDetailPage({ params }: { params: Promise
       <div className="space-y-6">
         {/* Wholesale panel — только для B2B */}
         {order.channel === "wholesale" && (
-          <WholesaleOrderPanel
-            orderId={order.id}
-            orderNumber={order.orderNumber}
-            total={order.total}
-            approvalStatus={order.approvalStatus}
-            paymentStatus={order.paymentStatus}
-            paymentTerms={order.paymentTerms}
-            wholesaleCompanyId={order.wholesaleCompanyId}
-            b2bLegalName={order.b2bLegalName}
-            b2bInn={order.b2bInn}
-            b2bKpp={order.b2bKpp}
-          />
+          <>
+            <WholesaleOrderPanel
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              total={order.total}
+              approvalStatus={order.approvalStatus}
+              paymentStatus={order.paymentStatus}
+              paymentTerms={order.paymentTerms}
+              wholesaleCompanyId={order.wholesaleCompanyId}
+              b2bLegalName={order.b2bLegalName}
+              b2bInn={order.b2bInn}
+              b2bKpp={order.b2bKpp}
+            />
+            <InvoiceGenerator
+              orderId={order.id}
+              existingInvoiceUrl={invoice?.pdfUrl ?? null}
+              existingInvoiceNumber={invoice?.number ?? null}
+            />
+          </>
         )}
 
         {/* Status */}

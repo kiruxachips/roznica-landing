@@ -42,6 +42,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { name: "Склад", href: "/admin/warehouse", icon: Boxes, permission: "stock.view" },
   { name: "Категории", href: "/admin/categories", icon: FolderTree, permission: "categories.view" },
   { name: "Заказы", href: "/admin/orders", icon: ShoppingCart, permission: "orders.view" },
+  { name: "Клиенты", href: "/admin/customers", icon: Users, permission: "customers.view" },
   { name: "Доставка", href: "/admin/delivery", icon: Truck, permission: "delivery.settings" },
   { name: "Отзывы", href: "/admin/reviews", icon: MessageSquare, permission: "reviews.view" },
   { name: "Акции", href: "/admin/promotions", icon: Sparkles, permission: "promos.view" },

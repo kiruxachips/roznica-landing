@@ -150,13 +150,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { email },
           include: { company: { select: { id: true, status: true } } },
         })
-        if (!user || !user.passwordHash) return null
-        // Email подтверждается в момент апрува заявки — unverified не должен входить
+        if (!user) return null
+        // Защита в 3 уровня — порядок важен:
+        //   1. status === "active" (не pending/blocked) — иначе даже пароль не спасёт
+        //   2. passwordHash не null (pending-юзер без пароля)
+        //   3. emailVerified стоит (pending ещё не принял invite)
+        // Любой сбой → возвращаем null без подсказки причины (защита от enumeration).
+        if (user.status !== "active") {
+          if (user.status === "pending") {
+            throw new AuthError("Завершите активацию по ссылке из письма.")
+          }
+          throw new AuthError("Учётная запись заблокирована. Свяжитесь с менеджером.")
+        }
+        if (!user.passwordHash) return null
         if (!user.emailVerified) {
           throw new AuthError("Email не подтверждён. Проверьте почту или задайте пароль по ссылке из письма.")
-        }
-        if (user.status !== "active") {
-          throw new AuthError("Учётная запись заблокирована. Свяжитесь с менеджером.")
         }
         if (user.company.status === "rejected") {
           throw new AuthError("Компания отклонена в доступе к оптовому кабинету.")

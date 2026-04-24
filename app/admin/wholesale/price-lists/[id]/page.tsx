@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { requireAdmin } from "@/lib/admin-guard"
 import { getPriceListById, getAllActiveVariantsForPricing } from "@/lib/dal/wholesale-price-lists"
 import { PriceListEditor } from "@/components/admin/wholesale/PriceListEditor"
+import { PriceListImportExport } from "@/components/admin/wholesale/PriceListImportExport"
 
 export const dynamic = "force-dynamic"
 
@@ -34,6 +35,8 @@ export default async function AdminWholesalePriceListDetailPage({
           {priceList.isActive ? " · активен" : " · выключен"}
         </p>
       </div>
+
+      <PriceListImportExport priceListId={priceList.id} />
 
       <PriceListEditor priceList={priceList} allVariants={allVariants} />
     </div>

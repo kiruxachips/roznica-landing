@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Package, ShoppingBag, Building2, FileText, LogOut } from "lucide-react"
+import { LayoutDashboard, Package, ShoppingBag, Building2, FileText, LogOut, Users } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { cn } from "@/lib/utils"
 
@@ -11,7 +11,8 @@ const navItems = [
   { name: "Каталог", href: "/wholesale/catalog", icon: Package },
   { name: "Корзина", href: "/wholesale/cart", icon: ShoppingBag },
   { name: "Мои заказы", href: "/wholesale/orders", icon: FileText },
-  { name: "Компания", href: "/wholesale/company", icon: Building2 },
+  { name: "Компания", href: "/wholesale/company", icon: Building2, exact: true },
+  { name: "Сотрудники", href: "/wholesale/company/users", icon: Users },
 ]
 
 export function WholesaleSidebar() {

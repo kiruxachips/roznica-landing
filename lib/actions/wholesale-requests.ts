@@ -1,7 +1,6 @@
 "use server"
 
 import crypto from "crypto"
-import bcrypt from "bcryptjs"
 import { headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
@@ -10,7 +9,9 @@ import { createAccessRequest } from "@/lib/dal/wholesale-requests"
 import { dispatchEmail } from "@/lib/dal/email-dispatch"
 import { sendRenderedEmail } from "@/lib/email"
 import { enqueueOutbox } from "@/lib/dal/outbox"
-import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { findPartyByInn } from "@/lib/integrations/dadata"
+import type { Prisma } from "@prisma/client"
 
 async function getIp(): Promise<string> {
   const h = await headers()
@@ -96,18 +97,6 @@ export async function submitWholesaleAccessRequest(input: {
   return { id: req.id }
 }
 
-/**
- * Генерация криптостойкого временного пароля (12 символов, alphanum без
- * похожих символов I/l/O/0 — чтобы клиент не ошибся при перепечатке).
- */
-function generateTempPassword(): string {
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
-  const bytes = crypto.randomBytes(12)
-  return Array.from(bytes)
-    .map((b) => alphabet[b % alphabet.length])
-    .join("")
-}
-
 export async function approveWholesaleAccessRequest(
   requestId: string,
   input: {
@@ -129,14 +118,23 @@ export async function approveWholesaleAccessRequest(
   const existingUser = await prisma.wholesaleUser.findUnique({ where: { email: req.contactEmail } })
   if (existingUser) throw new Error("Пользователь с таким email уже существует в оптовом кабинете")
 
-  const tempPassword = generateTempPassword()
-  const passwordHash = await bcrypt.hash(tempPassword, 10)
+  // Генерируем invite-token для установки пароля клиентом — никакого plain-text
+  // пароля в email. Безопаснее + стандартный UX.
+  const inviteToken = crypto.randomBytes(32).toString("hex")
+  const inviteExpires = new Date(Date.now() + 14 * 86400 * 1000) // 14 дней
+
+  // Проверка в DaData — snapshot для audit. Если юрлицо не ACTIVE,
+  // админ видит предупреждение в UI, но финальное решение за человеком.
+  const dadata = await findPartyByInn(req.inn)
 
   const { company, user } = await prisma.$transaction(async (tx) => {
     const company = await tx.wholesaleCompany.create({
       data: {
         legalName: req.legalName,
         inn: req.inn,
+        kpp: dadata?.data.kpp ?? null,
+        ogrn: dadata?.data.ogrn ?? null,
+        legalAddress: dadata?.data.address?.value ?? null,
         contactName: req.contactName,
         contactPhone: req.contactPhone,
         contactEmail: req.contactEmail,
@@ -147,18 +145,31 @@ export async function approveWholesaleAccessRequest(
         managerAdminId: input.managerAdminId,
         approvedById: admin.userId,
         approvedAt: new Date(),
+        dadataStatus: dadata?.data.state?.status ?? null,
+        dadataCheckedAt: dadata ? new Date() : null,
+        dadataPayload: dadata ? (dadata as unknown as Prisma.InputJsonValue) : undefined,
       },
     })
+    // Создаём owner со статусом pending и без пароля — активируется через invite-token.
     const user = await tx.wholesaleUser.create({
       data: {
         email: req.contactEmail,
-        emailVerified: new Date(),
-        passwordHash,
+        passwordHash: null,
         name: req.contactName,
         phone: req.contactPhone,
         role: "owner",
-        status: "active",
+        status: "pending",
         companyId: company.id,
+      },
+    })
+    await tx.wholesaleInvitation.create({
+      data: {
+        companyId: company.id,
+        email: req.contactEmail,
+        role: "owner",
+        token: inviteToken,
+        invitedById: admin.userId,
+        expiresAt: inviteExpires,
       },
     })
     await tx.wholesaleAccessRequest.update({
@@ -181,7 +192,7 @@ export async function approveWholesaleAccessRequest(
     payload: { companyId: company.id, inn: company.inn, legalName: company.legalName },
   })
 
-  // Email клиенту — доступ открыт, временный пароль
+  // Email клиенту — ссылка на установку пароля, без plain-text
   const nextAuthUrl = process.env.NEXTAUTH_URL || "https://millor-coffee.ru"
   await dispatchEmail({
     orderId: null,
@@ -193,10 +204,8 @@ export async function approveWholesaleAccessRequest(
         <h2>Ваш оптовый кабинет активирован</h2>
         <p>Здравствуйте, ${user.name}!</p>
         <p>Заявка по компании <strong>${company.legalName}</strong> одобрена.</p>
-        <p><strong>Логин:</strong> ${user.email}<br/>
-           <strong>Временный пароль:</strong> <code>${tempPassword}</code></p>
-        <p><a href="${nextAuthUrl}/wholesale/login">Войти в кабинет</a></p>
-        <p>После входа рекомендуем сменить пароль в разделе профиля.</p>
+        <p><a href="${nextAuthUrl}/wholesale/invite/${inviteToken}">Установить пароль и войти</a></p>
+        <p>Ссылка действительна 14 дней.</p>
         <p>С уважением,<br/>команда Millor Coffee</p>
       `,
     }),

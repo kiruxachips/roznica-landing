@@ -1,7 +1,8 @@
 "use client"
 
 import Image from "next/image"
-import { User, Truck, MapPin, Home } from "lucide-react"
+import { useEffect, useState } from "react"
+import { User, Truck, MapPin, Home, Sparkles } from "lucide-react"
 import type { CartItem } from "@/lib/types"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
@@ -34,6 +35,32 @@ export function OrderSummary({
     completed.contact && (contact.firstName || contact.lastName || contact.phone)
   const hasDelivery = completed.delivery && selectedRate
   const isPvz = selectedRate?.deliveryType === "pvz"
+
+  // G1-1: тянем welcome-скидку с backend (зависит от userId + config в settings).
+  // Эндпоинт лёгкий (settings через cached DAL + single User-query), кэшировать
+  // через SWR/useMemo не стоит — пересчёт только при изменении subtotal.
+  const [welcomeDiscount, setWelcomeDiscount] = useState<{
+    discount: number
+    percent: number
+  } | null>(null)
+  useEffect(() => {
+    if (total <= 0) {
+      setWelcomeDiscount(null)
+      return
+    }
+    const ctrl = new AbortController()
+    fetch(`/api/cart/welcome-discount?subtotal=${total}`, { signal: ctrl.signal })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.eligible && d.discount > 0) {
+          setWelcomeDiscount({ discount: d.discount, percent: d.percent })
+        } else {
+          setWelcomeDiscount(null)
+        }
+      })
+      .catch(() => {})
+    return () => ctrl.abort()
+  }, [total])
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:sticky lg:top-24 space-y-4">
@@ -117,6 +144,15 @@ export function OrderSummary({
             <span>-{promoDiscount}₽</span>
           </div>
         )}
+        {welcomeDiscount && promoDiscount === 0 && (
+          <div className="flex justify-between text-emerald-600 items-center">
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5" />
+              Первый заказ −{welcomeDiscount.percent}%
+            </span>
+            <span>-{welcomeDiscount.discount}₽</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Доставка</span>
           <span>
@@ -125,7 +161,9 @@ export function OrderSummary({
         </div>
         <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
           <span>Итого</span>
-          <span className="text-primary">{finalTotal}₽</span>
+          <span className="text-primary">
+            {finalTotal - (welcomeDiscount && promoDiscount === 0 ? welcomeDiscount.discount : 0)}₽
+          </span>
         </div>
       </div>
     </div>

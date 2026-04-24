@@ -42,6 +42,15 @@ export interface ProductDetail {
   bitterness: number | null
   body: number | null
   brewingMethods: string[]
+  // G5: Premium attrs
+  elevationMin: number | null
+  elevationMax: number | null
+  harvestDate: Date | null
+  roastedAt: Date | null
+  batchId: string | null
+  tasterNotes: string | null
+  cupper: string | null
+  sca: number | null
   badge: string | null
   metaTitle: string | null
   metaDescription: string | null

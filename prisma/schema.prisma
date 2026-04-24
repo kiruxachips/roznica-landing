@@ -55,6 +55,18 @@ model Product {
   body             Int? // 0-100
   brewingMethods   String[] @default([])
 
+  // G5: Premium coffee attributes — ключевые для позиционирования specialty-кофе.
+  // Coffee enthusiasts платят 2-3× больше за прозрачность происхождения.
+  // Все nullable, заполняются в админке по мере наличия данных.
+  elevationMin  Int? // метры над уровнем моря (нижняя граница диапазона, если farm на холме)
+  elevationMax  Int?
+  harvestDate   DateTime? // дата урожая (обычно округляем до месяца)
+  roastedAt     DateTime? // дата обжарки — КРИТИЧНАЯ для "свежеобжаренного". Отображается как "2 дня назад".
+  batchId       String? // партия обжарки — трейсабилити ("та же кружка Peru из партии B-048")
+  tasterNotes   String? // ноты от куппера (professional), отдельно от flavorNotes для casual
+  cupper        String? // имя куппера (для доверия и PR)
+  sca           Int? // SCA score 80-100 (specialty если >= 80). null для commercial.
+
   // Pack images
   smallImage String? // 250г pack image path, e.g. /images/coffee/Small/Peru.jpg
 
@@ -191,28 +203,56 @@ model AdminActivityLog {
   @@index([action, entityType, createdAt])
 }
 
+/// G1-2: подписчики email-рассылок. Отдельно от User — подписка по
+/// email не требует регистрации. Статусы: active (получает письма),
+/// unsubscribed (отписался), bounced (soft/hard bounce от SMTP).
+/// Группы (subscriptionGroups) позволяют сегментировать рассылку:
+/// ["promotions"] — только скидки, ["new_products"] — новинки, etc.
+model NewsletterSubscriber {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  status             String    @default("active") // "active" | "unsubscribed" | "bounced"
+  // Группы подписок — array TEXT. Хэштег-стиль фильтрация в cron'е.
+  subscriptionGroups String[]  @default(["promotions"])
+  // Привязка к юзеру (если есть) — необязательно, но полезно для CRM.
+  userId             String?
+  user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  source             String?   // "footer_form" | "checkout" | "register"
+  // unsubscribeToken — одноразовый для one-click отписки из письма,
+  // без логина. Ротируется при subscribe заново.
+  unsubscribeToken   String    @unique
+  ipAddress          String?
+  userAgent          String?   @db.Text
+  createdAt          DateTime  @default(now())
+  unsubscribedAt     DateTime?
+  bouncedAt          DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
 /// Хранение согласия на обработку ПД (152-ФЗ требует письменного
 /// согласия + документирование для предъявления Роскомнадзору).
 /// Создаётся при submit checkout / регистрации с IP + User-Agent +
 /// version текста оферты на момент клика. Не удаляется — только revokedAt.
 model UserConsent {
-  id         String   @id @default(cuid())
+  id            String    @id @default(cuid())
   // userId nullable — гостевой заказ тоже даёт согласие (по email).
-  userId     String?
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId        String?
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
   // Email+name снимок — если юзер удалён, согласие остаётся anonymized.
   emailSnapshot String?
   // Тип согласия: privacy (обязательное), marketing (subscribe),
   // cookies (для будущего cookie-banner).
-  type       String   // "privacy" | "marketing" | "cookies"
-  version    Int      @default(1) // версия текста на момент согласия
-  acceptedAt DateTime @default(now())
-  revokedAt  DateTime?
-  ipAddress  String?
-  userAgent  String?  @db.Text
+  type          String // "privacy" | "marketing" | "cookies"
+  version       Int       @default(1) // версия текста на момент согласия
+  acceptedAt    DateTime  @default(now())
+  revokedAt     DateTime?
+  ipAddress     String?
+  userAgent     String?   @db.Text
   // Контекст: при каком действии было дано согласие.
-  source     String   // "checkout" | "register" | "settings" | "cookie_banner"
-  orderId    String?  // если источник — checkout
+  source        String // "checkout" | "register" | "settings" | "cookie_banner"
+  orderId       String? // если источник — checkout
 
   @@index([userId, type])
   @@index([type, acceptedAt])
@@ -246,6 +286,13 @@ model User {
   addresses         Address[]
   bonusTransactions BonusTransaction[]
   consents          UserConsent[]
+  newsletterSubscriptions NewsletterSubscriber[]
+  // Welcome-discount: время первой оплаченной покупки. Пока null — юзер
+  // имеет право на welcome-скидку (% настраивается через DeliverySetting).
+  // Проставляется в createOrder при отсутствии. Даже если заказ потом
+  // отменят — welcome не восстанавливается (иначе абуз: оформил → отменил
+  // → опять скидка). Для честности — админ может вручную сбросить через SQL.
+  firstOrderCompletedAt DateTime?
   // Soft-delete: при удалении аккаунта через /account/delete проставляем
   // deletedAt и анонимизируем email/name/phone. БД-связи (Order, BonusTransaction)
   // сохраняются для бухучёта и compliance. Физическое удаление — никогда.
@@ -716,57 +763,57 @@ model IntegrationLog {
 // ожидает завершения настройки админом; "active" — работает; "suspended" —
 // временно приостановлена (долг, нарушение); "rejected" — не активна.
 model WholesaleCompany {
-  id             String                       @id @default(cuid())
-  legalName      String // ООО "Ромашка"
-  brandName      String? // публичное название (может совпадать)
-  inn            String                       @unique // основной идентификатор
-  kpp            String?
-  ogrn           String?
-  legalAddress   String?                      @db.Text
-  postalAddress  String?                      @db.Text
+  id                 String                       @id @default(cuid())
+  legalName          String // ООО "Ромашка"
+  brandName          String? // публичное название (может совпадать)
+  inn                String                       @unique // основной идентификатор
+  kpp                String?
+  ogrn               String?
+  legalAddress       String?                      @db.Text
+  postalAddress      String?                      @db.Text
   // Банковские реквизиты (для генерации счетов, Фаза 5)
-  bankName       String?
-  bankBic        String?
-  bankAccount    String?
-  corrAccount    String?
+  bankName           String?
+  bankBic            String?
+  bankAccount        String?
+  corrAccount        String?
   // Контактные данные
-  contactName    String?
-  contactPhone   String?
-  contactEmail   String?
+  contactName        String?
+  contactPhone       String?
+  contactEmail       String?
   // Статус аккаунта
-  status         String                       @default("active") // "active" | "suspended" | "rejected"
+  status             String                       @default("active") // "active" | "suspended" | "rejected"
   // Бизнес-условия
-  paymentTerms   String                       @default("prepay") // "prepay" | "net7" | "net14" | "net30" | "net60"
-  creditLimit    Int                          @default(0) // в рублях
-  creditUsed     Int                          @default(0) // неоплаченные заказы
+  paymentTerms       String                       @default("prepay") // "prepay" | "net7" | "net14" | "net30" | "net60"
+  creditLimit        Int                          @default(0) // в рублях
+  creditUsed         Int                          @default(0) // неоплаченные заказы
   // Ценообразование
-  priceListId    String?
-  priceList      PriceList?                   @relation(fields: [priceListId], references: [id], onDelete: SetNull)
+  priceListId        String?
+  priceList          PriceList?                   @relation(fields: [priceListId], references: [id], onDelete: SetNull)
   // Кто одобрил заявку
-  approvedById   String? // AdminUser.id
-  approvedAt     DateTime?
+  approvedById       String? // AdminUser.id
+  approvedAt         DateTime?
   // Ответственный менеджер (CRM)
-  managerAdminId String? // AdminUser.id
-  notes          String?                      @db.Text // внутренние заметки
+  managerAdminId     String? // AdminUser.id
+  notes              String?                      @db.Text // внутренние заметки
   // Фаза 6: cron-алерты на превышение кредитного лимита.
   // creditAlertSentAt — последний раз, когда было уведомление;
   // cron не отправляет повторно пока creditUsed не упадёт и снова не вырастет.
-  creditAlertSentAt    DateTime?
-  creditAlertPctSent   Int? // 80 | 90 | 100 — последний порог, о котором уведомили
+  creditAlertSentAt  DateTime?
+  creditAlertPctSent Int? // 80 | 90 | 100 — последний порог, о котором уведомили
   // Фаза 8: snapshot DaData для audit-проверки юрлица.
-  dadataStatus         String? // "ACTIVE" | "LIQUIDATING" | "LIQUIDATED" | "REORGANIZING" | "BANKRUPT"
-  dadataCheckedAt      DateTime?
-  dadataPayload        Json?
+  dadataStatus       String? // "ACTIVE" | "LIQUIDATING" | "LIQUIDATED" | "REORGANIZING" | "BANKRUPT"
+  dadataCheckedAt    DateTime?
+  dadataPayload      Json?
   // Связи
-  users          WholesaleUser[]
-  invitations    WholesaleInvitation[]
-  accessRequests WholesaleAccessRequest[]
-  creditTx       WholesaleCreditTransaction[]
-  documents      WholesaleDocument[]
-  invoices       WholesaleInvoice[]
-  orders         Order[]
-  createdAt      DateTime                     @default(now())
-  updatedAt      DateTime                     @updatedAt
+  users              WholesaleUser[]
+  invitations        WholesaleInvitation[]
+  accessRequests     WholesaleAccessRequest[]
+  creditTx           WholesaleCreditTransaction[]
+  documents          WholesaleDocument[]
+  invoices           WholesaleInvoice[]
+  orders             Order[]
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
 
   @@index([status])
   @@index([managerAdminId])
@@ -777,16 +824,16 @@ model WholesaleCompany {
 // инвайт → на email приходит ссылка с одноразовым токеном → сотрудник
 // устанавливает пароль и становится WholesaleUser той же компании.
 model WholesaleInvitation {
-  id          String   @id @default(cuid())
+  id          String           @id @default(cuid())
   companyId   String
   company     WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
   email       String
-  role        String   @default("buyer") // "buyer" | "accountant"
-  token       String   @unique // одноразовый, crypto.randomBytes(32)
+  role        String           @default("buyer") // "buyer" | "accountant"
+  token       String           @unique // одноразовый, crypto.randomBytes(32)
   invitedById String? // WholesaleUser.id (owner) или AdminUser.id
   expiresAt   DateTime
   usedAt      DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime         @default(now())
 
   @@index([companyId])
   @@index([email])
@@ -797,46 +844,48 @@ model WholesaleInvitation {
 // Отделён от WholesaleDocument чтобы хранить структурированные данные
 // (для повторной генерации PDF, отчётов бухгалтерии, отправки в ЭДО).
 model WholesaleInvoice {
-  id          String   @id @default(cuid())
-  number      String   @unique // "INV-2026-0001" — сквозная годовая нумерация
-  kind        String   @default("invoice") // "invoice" | "upd" | "act"
-  orderId     String?  @unique // один счёт на заказ (для UPD/invoice)
-  companyId   String
-  company     WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  id             String           @id @default(cuid())
+  number         String           @unique // "INV-2026-0001" — сквозная годовая нумерация
+  kind           String           @default("invoice") // "invoice" | "upd" | "act"
+  orderId        String?          @unique // один счёт на заказ (для UPD/invoice)
+  companyId      String
+  company        WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Restrict)
   // Snapshot цен — чтобы при rerender PDF не зависеть от меняющегося каталога
-  subtotal    Int
-  discount    Int      @default(0)
-  total       Int
-  vatRate     Int?     // % НДС (обычно 20 или 0). null = без НДС (УСН).
-  vatAmount   Int?
+  subtotal       Int
+  discount       Int              @default(0)
+  total          Int
+  vatRate        Int? // % НДС (обычно 20 или 0). null = без НДС (УСН).
+  vatAmount      Int?
   // Snapshot реквизитов плательщика и получателя
-  buyerSnapshot  Json   // { legalName, inn, kpp, address, bankName, bankAccount, bic }
-  sellerSnapshot Json   // { legalName, inn, kpp, address, bankName, bankAccount, bic }
-  itemsSnapshot  Json   // [{ name, weight, quantity, price, total }]
+  buyerSnapshot  Json // { legalName, inn, kpp, address, bankName, bankAccount, bic }
+  sellerSnapshot Json // { legalName, inn, kpp, address, bankName, bankAccount, bic }
+  itemsSnapshot  Json // [{ name, weight, quantity, price, total }]
   // Статус жизненного цикла
-  status      String   @default("draft") // "draft" | "sent" | "paid" | "cancelled"
-  pdfUrl      String? // /uploads/wholesale/invoices/...pdf
-  generatedById String? // AdminUser.id
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  status         String           @default("draft") // "draft" | "sent" | "paid" | "cancelled"
+  pdfUrl         String? // /uploads/wholesale/invoices/...pdf
+  generatedById  String? // AdminUser.id
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([companyId, createdAt])
   @@index([status])
   @@index([kind, createdAt])
 }
 
-// Пользователь B2B-кабинета. В MVP каждый WholesaleUser принадлежит одной
-// компании; в будущем (Фаза 7) — через таблицу WholesaleMembership
-// многие-ко-многим с ролями.
+// Пользователь B2B-кабинета. С Фазы 7 — поддержка нескольких юзеров от одной
+// компании с ролями. Роли: "owner" (создал компанию, может приглашать), "buyer"
+// (оформляет заказы), "accountant" (видит счета и финансы, не оформляет заказы).
 model WholesaleUser {
   id            String           @id @default(cuid())
   email         String           @unique
   emailVerified DateTime?
-  passwordHash  String
+  // passwordHash nullable — сотрудник получил приглашение, но ещё не задал пароль.
+  // До этого момента status="pending", войти нельзя.
+  passwordHash  String?
   name          String
   phone         String?
-  role          String           @default("buyer") // "owner" | "buyer" | "accountant" — в MVP только buyer
-  status        String           @default("active") // "active" | "blocked"
+  role          String           @default("buyer") // "owner" | "buyer" | "accountant"
+  status        String           @default("active") // "pending" | "active" | "blocked"
   companyId     String
   company       WholesaleCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
   lastLoginAt   DateTime?

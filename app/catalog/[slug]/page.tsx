@@ -15,6 +15,7 @@ import { FlavorProfileBars } from "@/components/product/FlavorProfileBars"
 import { FlavorNotes } from "@/components/product/FlavorNotes"
 import { ProductClientSection } from "@/components/product/ProductClientSection"
 import { ProductTabs } from "@/components/product/ProductTabs"
+import { CoffeePassport } from "@/components/product/CoffeePassport"
 import { ProductCard } from "@/components/catalog/ProductCard"
 import { Star } from "lucide-react"
 import type { ProductType } from "@/lib/types"
@@ -242,6 +243,24 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 )}
               </div>
             </div>
+
+            {/* G5: Паспорт зерна — premium-сигнал доверия. Рендерится только
+                если заполнено хотя бы одно из полей (elevation/harvest/roast/
+                batchId/sca/cupper/tasterNotes). */}
+            {product.productType === "coffee" && (
+              <div className="mt-8">
+                <CoffeePassport
+                  elevationMin={product.elevationMin}
+                  elevationMax={product.elevationMax}
+                  harvestDate={product.harvestDate}
+                  roastedAt={product.roastedAt}
+                  batchId={product.batchId}
+                  tasterNotes={product.tasterNotes}
+                  cupper={product.cupper}
+                  sca={product.sca}
+                />
+              </div>
+            )}
 
             {/* Tabs: Description / Meta / Reviews */}
             <ProductTabs

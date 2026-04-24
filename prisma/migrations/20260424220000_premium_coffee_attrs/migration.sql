@@ -1,0 +1,9 @@
+-- G5: Premium coffee attrs для specialty-позиционирования.
+ALTER TABLE "Product" ADD COLUMN "elevationMin" INTEGER;
+ALTER TABLE "Product" ADD COLUMN "elevationMax" INTEGER;
+ALTER TABLE "Product" ADD COLUMN "harvestDate" TIMESTAMP(3);
+ALTER TABLE "Product" ADD COLUMN "roastedAt" TIMESTAMP(3);
+ALTER TABLE "Product" ADD COLUMN "batchId" TEXT;
+ALTER TABLE "Product" ADD COLUMN "tasterNotes" TEXT;
+ALTER TABLE "Product" ADD COLUMN "cupper" TEXT;
+ALTER TABLE "Product" ADD COLUMN "sca" INTEGER;

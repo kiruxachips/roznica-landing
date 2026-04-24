@@ -80,7 +80,9 @@ export default auth((req) => {
 
   // Wholesale routes
   if (pathname.startsWith("/wholesale")) {
-    const isPublic = WHOLESALE_PUBLIC_PATHS.has(pathname)
+    // /wholesale/invite/{token} — публичная страница активации приглашения
+    const isInvitePath = pathname.startsWith("/wholesale/invite/")
+    const isPublic = isInvitePath || WHOLESALE_PUBLIC_PATHS.has(pathname)
 
     // Публичные: если уже залогинен как wholesale — отправляем в кабинет
     if (isPublic) {

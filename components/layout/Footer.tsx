@@ -2,6 +2,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { Send, Phone, Mail } from "lucide-react"
 import { SHOP_URL } from "@/lib/constants"
+import { NewsletterForm } from "./NewsletterForm"
 
 const navigation = [
   { name: "Каталог", href: "/catalog" },
@@ -97,6 +98,19 @@ export function Footer() {
               <Mail className="w-3.5 h-3.5 shrink-0" />
               Import@kldrefine.com
             </a>
+          </div>
+        </div>
+
+        {/* Newsletter — публичная подписка, для гостей и зарегистрированных */}
+        <div className="border-t border-white/10 mt-5 pt-5 grid md:grid-cols-[1fr_auto] gap-3 items-center">
+          <div>
+            <p className="text-sm font-semibold">Свежие сорта раз в месяц</p>
+            <p className="text-xs text-coffee-400 mt-0.5">
+              Новинки обжарки и скидки. Без спама. Можно отписаться в один клик.
+            </p>
+          </div>
+          <div className="min-w-[280px]">
+            <NewsletterForm />
           </div>
         </div>
 

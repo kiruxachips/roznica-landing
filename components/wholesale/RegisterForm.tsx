@@ -1,13 +1,55 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { submitWholesaleAccessRequest } from "@/lib/actions/wholesale-requests"
+
+interface DadataSuggestion {
+  value: string
+  inn?: string
+  kpp?: string
+  ogrn?: string
+  address?: string
+  status?: string
+}
 
 export function WholesaleRegisterForm() {
   const router = useRouter()
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [legalName, setLegalName] = useState("")
+  const [inn, setInn] = useState("")
+  const [suggestions, setSuggestions] = useState<DadataSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const q = legalName.trim().length >= 3 ? legalName : inn.replace(/\D/g, "").length >= 5 ? inn : ""
+    if (!q) {
+      setSuggestions([])
+      return
+    }
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/wholesale/dadata?q=${encodeURIComponent(q)}`)
+        if (!res.ok) return
+        const data = (await res.json()) as { suggestions: DadataSuggestion[] }
+        setSuggestions(data.suggestions ?? [])
+      } catch {
+        // Тихо — DaData не обязательна для работы формы
+      }
+    }, 300)
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [legalName, inn])
+
+  function applySuggestion(s: DadataSuggestion) {
+    setLegalName(s.value)
+    if (s.inn) setInn(s.inn)
+    setShowSuggestions(false)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -39,14 +81,41 @@ export function WholesaleRegisterForm() {
         </div>
       )}
       <div className="grid sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
+        <div className="sm:col-span-2 relative">
           <label className="text-sm font-medium mb-1.5 block">Полное название юрлица</label>
           <input
             name="legalName"
             required
             placeholder='ООО "Ромашка"'
+            value={legalName}
+            onChange={(e) => {
+              setLegalName(e.target.value)
+              setShowSuggestions(true)
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
+          {showSuggestions && suggestions.length > 0 && (
+            <ul className="absolute z-10 left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-border max-h-64 overflow-y-auto">
+              {suggestions.map((s, i) => (
+                <li
+                  key={i}
+                  onMouseDown={() => applySuggestion(s)}
+                  className="px-4 py-2 text-sm cursor-pointer hover:bg-muted"
+                >
+                  <div className="font-medium">{s.value}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {s.inn && `ИНН ${s.inn}`}
+                    {s.address && ` · ${s.address}`}
+                    {s.status && s.status !== "ACTIVE" && (
+                      <span className="ml-1 text-red-600">({s.status})</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <div>
           <label className="text-sm font-medium mb-1.5 block">ИНН</label>
@@ -57,6 +126,11 @@ export function WholesaleRegisterForm() {
             pattern="\d{10}|\d{12}"
             title="10 или 12 цифр"
             placeholder="7701234567"
+            value={inn}
+            onChange={(e) => {
+              setInn(e.target.value)
+              setShowSuggestions(true)
+            }}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>

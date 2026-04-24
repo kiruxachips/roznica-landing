@@ -1,9 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useWholesaleCart } from "@/lib/store/wholesale-cart"
 import { submitWholesaleOrder } from "@/lib/actions/wholesale-orders"
+import { WholesaleDeliveryPicker, type DeliveryPickerValue } from "./DeliveryPicker"
+
+function parseWeightGrams(w: string): number {
+  const lower = w.toLowerCase().trim()
+  const m = lower.match(/^([\d.,]+)\s*(кг|г|kg|g)?$/)
+  if (!m) return 0
+  const n = parseFloat(m[1].replace(",", "."))
+  if (isNaN(n)) return 0
+  const unit = m[2] || "г"
+  return unit === "кг" || unit === "kg" ? Math.round(n * 1000) : Math.round(n)
+}
 
 interface Props {
   paymentTerms: string
@@ -23,14 +34,33 @@ export function WholesaleCheckout(props: Props) {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
+  const [delivery, setDelivery] = useState<DeliveryPickerValue>({
+    city: "",
+    postalCode: "",
+    selected: null,
+  })
+  const itemsForPacking = useMemo(
+    () =>
+      items
+        .map((i) => ({ weightGrams: parseWeightGrams(i.weight), quantity: i.quantity }))
+        .filter((i) => i.weightGrams > 0 && i.quantity > 0),
+    [items]
+  )
+
   const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0)
+  const deliveryPrice = delivery.selected?.priceWithMarkup ?? 0
+  const total = subtotal + deliveryPrice
   const isNetTerms = props.paymentTerms !== "prepay"
-  const exceedsCredit = isNetTerms && subtotal > props.creditAvailable
+  const exceedsCredit = isNetTerms && total > props.creditAvailable
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (items.length === 0) {
       setError("Корзина пуста")
+      return
+    }
+    if (!delivery.selected) {
+      setError("Выберите тариф доставки")
       return
     }
     if (exceedsCredit) {
@@ -54,6 +84,12 @@ export function WholesaleCheckout(props: Props) {
         contactName: String(form.get("contactName") || ""),
         contactPhone: String(form.get("contactPhone") || ""),
         notes: String(form.get("notes") || "") || undefined,
+        deliveryMethod: delivery.selected.carrier,
+        deliveryType: delivery.selected.type,
+        destinationCity: delivery.city,
+        postalCode: delivery.postalCode,
+        estimatedDelivery: delivery.selected.estimatedDays,
+        tariffCode: delivery.selected.tariffCode,
       })
 
       if (!result.success) {
@@ -133,9 +169,13 @@ export function WholesaleCheckout(props: Props) {
                 placeholder="Город, улица, здание, офис"
                 className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Транспортную компанию и тариф согласуем с менеджером отдельно.
-              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <WholesaleDeliveryPicker
+                items={itemsForPacking}
+                cartTotal={subtotal}
+                onChange={setDelivery}
+              />
             </div>
             <div className="sm:col-span-2">
               <label className="text-sm font-medium mb-1.5 block">
@@ -173,6 +213,18 @@ export function WholesaleCheckout(props: Props) {
           ))}
         </div>
         <div className="flex justify-between text-sm pt-2 border-t">
+          <span className="text-muted-foreground">Подытог</span>
+          <span>{subtotal.toLocaleString("ru")}₽</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span className="text-muted-foreground">Доставка</span>
+          <span>
+            {delivery.selected
+              ? `${deliveryPrice.toLocaleString("ru")}₽`
+              : "выберите тариф"}
+          </span>
+        </div>
+        <div className="flex justify-between text-sm">
           <span className="text-muted-foreground">Условия оплаты</span>
           <span className="font-medium">
             {props.paymentTerms === "prepay"
@@ -190,7 +242,7 @@ export function WholesaleCheckout(props: Props) {
         )}
         <div className="flex justify-between text-lg font-bold pt-2 border-t">
           <span>К оплате</span>
-          <span>{subtotal.toLocaleString("ru")}₽</span>
+          <span>{total.toLocaleString("ru")}₽</span>
         </div>
         <button
           type="submit"

@@ -3,6 +3,7 @@ import Link from "next/link"
 import { getWholesaleContext } from "@/lib/wholesale-guard"
 import { WholesaleSidebar } from "@/components/wholesale/Sidebar"
 import { getWholesaleOrderByIdForCompany } from "@/lib/dal/wholesale-orders"
+import { getInvoiceByOrderId } from "@/lib/dal/wholesale-invoices"
 
 export const dynamic = "force-dynamic"
 
@@ -17,6 +18,7 @@ export default async function WholesaleOrderDetailPage({
 
   const order = await getWholesaleOrderByIdForCompany(id, ctx.companyId)
   if (!order) notFound()
+  const invoice = await getInvoiceByOrderId(id)
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -98,6 +100,20 @@ export default async function WholesaleOrderDetailPage({
               {order.deliveryAddress || "—"}
             </p>
           </section>
+
+          {invoice?.pdfUrl && (
+            <section className="bg-white rounded-2xl shadow-sm p-5">
+              <h2 className="font-semibold mb-2">Документы</h2>
+              <a
+                href={invoice.pdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl bg-primary/10 text-primary font-medium px-4 py-2 hover:bg-primary/15"
+              >
+                📄 Счёт {invoice.number} (PDF)
+              </a>
+            </section>
+          )}
 
           {order.statusLogs.length > 0 && (
             <section className="bg-white rounded-2xl shadow-sm p-5">
