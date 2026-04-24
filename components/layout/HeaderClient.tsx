@@ -17,10 +17,10 @@ const CartDrawer = dynamic(
 )
 
 const navigation = [
-  { name: "Для юр.лиц", href: "/wholesale", highlight: true },
   { name: "Блог", href: "/blog" },
   { name: "О нас", href: "/#about" },
   { name: "Отзывы", href: "/#testimonials" },
+  { name: "Для юр.лиц", href: "/wholesale", highlight: true },
 ]
 
 interface HeaderClientProps {
@@ -75,9 +75,9 @@ export function HeaderClient({ user }: HeaderClientProps) {
               <CartButton onClick={openCart} />
               <Link
                 href="/catalog"
-                className={cn(buttonVariants({ size: "lg" }), "ml-2")}
+                className="ml-1 inline-flex items-center rounded-full bg-primary text-primary-foreground text-sm font-medium px-4 py-2 hover:bg-primary/90 transition-colors shadow-sm"
               >
-                В каталог
+                Каталог
               </Link>
             </div>
 
