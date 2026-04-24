@@ -17,7 +17,6 @@ const CartDrawer = dynamic(
 )
 
 const navigation = [
-  { name: "Каталог", href: "/catalog" },
   { name: "Для юр.лиц", href: "/wholesale", highlight: true },
   { name: "Блог", href: "/blog" },
   { name: "О нас", href: "/#about" },
@@ -74,6 +73,12 @@ export function HeaderClient({ user }: HeaderClientProps) {
             <div className="hidden md:flex md:items-center gap-1.5 lg:gap-2">
               <UserMenu user={user} />
               <CartButton onClick={openCart} />
+              <Link
+                href="/catalog"
+                className={cn(buttonVariants({ size: "lg" }), "ml-2")}
+              >
+                В каталог
+              </Link>
             </div>
 
             <div className="md:hidden flex items-center gap-1">
