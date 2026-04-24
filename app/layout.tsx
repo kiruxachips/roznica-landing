@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import { CookieBanner } from "@/components/ui/cookie-banner"
 import { Analytics } from "@/components/ui/analytics"
+import { BottomNav } from "@/components/layout/BottomNav"
 import { WebVitals } from "@/components/ui/web-vitals"
 import "./globals.css"
 
@@ -104,6 +105,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <BottomNav />
         <CookieBanner />
         <Analytics />
         <WebVitals />

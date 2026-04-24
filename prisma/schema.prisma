@@ -203,6 +203,41 @@ model AdminActivityLog {
   @@index([action, entityType, createdAt])
 }
 
+/// G2: реферальная программа. Каждый юзер получает персональный код
+/// (short human-readable, "JOHN-5K2A"). Переход по /?ref=CODE кладёт
+/// cookie `ref=CODE` на 30 дней. При первом оформлении заказа нового
+/// юзера:
+///   - Создаётся ReferralRedemption (inviter + invitee + order)
+///   - Бонусы начисляются обоим через BonusTransaction
+///   - ReferralCode.usageCount++
+model ReferralCode {
+  id                String               @id @default(cuid())
+  userId            String               @unique // один код на юзера
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  code              String               @unique
+  usageCount        Int                  @default(0)
+  totalRewardEarned Int                  @default(0) // сумма бонусов начисленных inviter'у
+  createdAt         DateTime             @default(now())
+  expiresAt         DateTime?
+  redemptions       ReferralRedemption[]
+
+  @@index([code])
+}
+
+model ReferralRedemption {
+  id             String       @id @default(cuid())
+  referralCodeId String
+  referralCode   ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
+  referredUserId String       // новый юзер
+  orderId        String       @unique // первый оплаченный заказ — trigger
+  referrerReward Int          // бонусы inviter'у (₽)
+  referredReward Int          // бонусы invitee (₽)
+  createdAt      DateTime     @default(now())
+
+  @@index([referredUserId])
+  @@index([referralCodeId, createdAt])
+}
+
 /// G3: Abandoned cart recovery. Snapshot корзины ЛЕВЫЙ в момент введения
 /// email на checkout step 1. Если юзер не оформил заказ в течение часа —
 /// cron отправляет письмо с персональным промо-кодом и deep-link'ом на
@@ -320,6 +355,7 @@ model User {
   bonusTransactions BonusTransaction[]
   consents          UserConsent[]
   newsletterSubscriptions NewsletterSubscriber[]
+  referralCode      ReferralCode?
   // Welcome-discount: время первой оплаченной покупки. Пока null — юзер
   // имеет право на welcome-скидку (% настраивается через DeliverySetting).
   // Проставляется в createOrder при отсутствии. Даже если заказ потом

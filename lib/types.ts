@@ -126,6 +126,10 @@ export interface OrderData {
   /** G5: выбранный юзером подарок (если доступен при cartTotal). Опциональный;
    *  валидация и привязка происходят на сервере в createOrder. */
   selectedGiftId?: string | null
+  /** G2: реферальный код из cookie `ref`. Заполняется в server-action createOrder
+   *  из cookies(). Если юзер pre-existing (firstOrderCompletedAt ≠ null) —
+   *  код игнорируется: reward только для первого заказа нового юзера. */
+  referralCode?: string | null
   // B2B channel (опциональное расширение). Для retail — не указывать.
   channel?: "retail" | "wholesale"
   wholesaleCompanyId?: string

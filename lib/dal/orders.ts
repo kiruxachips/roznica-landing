@@ -10,6 +10,11 @@ import {
   isEligibleForWelcomeDiscount,
   computeWelcomeDiscount,
 } from "@/lib/dal/welcome-discount"
+import {
+  getReferralConfig,
+  findActiveReferralCode,
+  applyReferralReward,
+} from "@/lib/dal/referral"
 import { calculateDeliveryRates, buildPackagePlan, type ItemToPack } from "@/lib/delivery"
 import { adjustStock, type StockAdjustResult } from "@/lib/dal/stock"
 import { notifyStockChanges } from "@/lib/integrations/stock-alerts"
@@ -463,6 +468,36 @@ export async function createOrder(data: OrderData) {
         where: { id: data.userId },
         data: { firstOrderCompletedAt: new Date() },
       })
+    }
+
+    // G2: реферальная награда. Условия:
+    //   - есть data.referralCode (из cookie `ref`)
+    //   - юзер зарегистрирован (data.userId) — без userId бонусы некуда класть
+    //   - это ПЕРВЫЙ заказ (до этой строки firstOrderCompletedAt был null,
+    //     сейчас только что поставили выше, но проверяем через isEligibleFor*)
+    //   - code существует и не expired
+    //   - inviter != invitee (сам-на-себя — абуз)
+    //   - реферальная программа включена (setting)
+    if (data.referralCode && data.userId && welcomeApplied /*proxy=первый заказ*/) {
+      try {
+        const cfg = await getReferralConfig()
+        if (cfg.enabled) {
+          const refCode = await findActiveReferralCode(data.referralCode)
+          if (refCode && refCode.userId !== data.userId) {
+            await applyReferralReward(tx, {
+              referralCodeId: refCode.id,
+              inviterUserId: refCode.userId,
+              referredUserId: data.userId,
+              orderId: created.id,
+              inviterBonus: cfg.inviterBonus,
+              inviteeBonus: cfg.inviteeBonus,
+            })
+          }
+        }
+      } catch (e) {
+        // Referral не блокирует заказ — логируем и идём дальше.
+        console.error("[createOrder] referral reward failed:", e)
+      }
     }
 
     return { created, stockResults }

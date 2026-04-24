@@ -33,6 +33,23 @@ export default auth((req) => {
   const role = user?.role as string | undefined
   const companyStatus = user?.companyStatus as string | undefined
 
+  // G2: referral-code tracking. Если в URL ?ref=CODE — кладём cookie на
+  // 30 дней и продолжаем. Cookie читается в createOrder (server-action)
+  // чтобы применить reward новому юзеру на первой покупке.
+  const refParam = req.nextUrl.searchParams.get("ref")
+  if (refParam && refParam.length > 2 && refParam.length < 30) {
+    const response = NextResponse.next()
+    response.cookies.set("ref", refParam.toUpperCase(), {
+      maxAge: 30 * 24 * 60 * 60,
+      httpOnly: false, // читается из server-actions через cookies(), httpOnly не критичен
+      sameSite: "lax",
+      path: "/",
+    })
+    // Не редиректим — пусть юзер видит нужную страницу с query-param
+    // (наложение на контент не нужно, cookie уже стоит).
+    return response
+  }
+
   // Admin routes
   if (pathname.startsWith("/admin")) {
     const isLoginPage = pathname === "/admin/login"

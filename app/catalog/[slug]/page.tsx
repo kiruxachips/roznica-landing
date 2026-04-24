@@ -5,6 +5,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { getProductBySlug, getRelatedProducts } from "@/lib/dal/products"
+import { getFrequentlyBoughtTogether } from "@/lib/dal/frequently-bought-together"
 import { isProductFavorited } from "@/lib/dal/favorites"
 import { auth } from "@/lib/auth"
 import { FavoriteButton } from "@/components/account/FavoriteButton"
@@ -56,11 +57,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const session = await auth()
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
-  const [favorited, relatedProducts] = await Promise.all([
+  const [favorited, relatedProducts, fbtProducts] = await Promise.all([
     isCustomer && session?.user?.id
       ? isProductFavorited(session.user.id, product.id)
       : Promise.resolve(false),
     getRelatedProducts(product.id, product.productType as ProductType, product.categoryId, 4),
+    getFrequentlyBoughtTogether(product.id, 4),
   ])
 
   // R3: расширенный Product schema для rich snippets Google/Yandex.
@@ -277,7 +279,27 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               reviews={product.reviews}
             />
 
-            {/* Related products */}
+            {/* G8: FBT — на основе реальной co-occurrence в заказах.
+                Показываем только если набралось минимум 2 FBT-товара
+                (иначе сигнал слишком слабый). Блок идёт ДО related,
+                т.к. FBT имеет больший conversion lift. */}
+            {fbtProducts.length >= 2 && (
+              <div className="mt-14 sm:mt-20">
+                <h2 className="font-sans text-xl sm:text-2xl font-bold mb-2">
+                  Часто покупают вместе
+                </h2>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Собрано из реальных заказов наших клиентов
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {fbtProducts.map((p) => (
+                    <ProductCard key={p.id} product={p} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Related products — fallback-рекомендация по категории/типу */}
             {relatedProducts.length > 0 && (
               <div className="mt-14 sm:mt-20">
                 <h2 className="font-sans text-xl sm:text-2xl font-bold mb-6">С этим также покупают</h2>

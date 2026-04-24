@@ -114,6 +114,21 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     data.userId = session.user.id
   }
 
+  // G2: referral-code из cookie `ref` (кладётся middleware при переходе
+  // с ?ref=CODE). Если data.referralCode уже задан вызывающим кодом —
+  // не перезаписываем; иначе читаем cookie.
+  if (!data.referralCode) {
+    try {
+      const { cookies } = await import("next/headers")
+      const store = await cookies()
+      const refCookie = store.get("ref")?.value
+      if (refCookie) data.referralCode = refCookie
+    } catch {
+      // Вне request-контекста (например, unit-test) — cookies() падает,
+      // это ОК, просто без referral.
+    }
+  }
+
   // Server-side input validation
   const phoneDigits = data.customerPhone.replace(/\D/g, "")
   if (!/^[78]\d{10}$/.test(phoneDigits)) {
