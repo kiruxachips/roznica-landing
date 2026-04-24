@@ -84,6 +84,24 @@ export async function GET(request: Request) {
         continue
       }
 
+      // Crash-safety: сдвигаем nextDeliveryDate РАНЬШЕ send через conditional
+      // update. Если два крона запустились параллельно или retry случился
+      // между send и старым update, только один поток пройдёт OCC-проверку
+      // (WHERE nextDeliveryDate=prev).
+      const claimed = await prisma.subscription.updateMany({
+        where: {
+          id: sub.id,
+          nextDeliveryDate: sub.nextDeliveryDate,
+        },
+        data: {
+          nextDeliveryDate: new Date(now.getTime() + sub.intervalDays * 86_400_000),
+        },
+      })
+      if (claimed.count === 0) {
+        // Параллельный процесс уже сдвинул дату — пропускаем.
+        continue
+      }
+
       const checkoutUrl = `${siteUrl}/catalog/${sub.variant.product.slug}?subscribe=${sub.id}`
 
       await sendRenderedEmail({
@@ -106,14 +124,6 @@ export async function GET(request: Request) {
         `,
       })
 
-      // Сдвигаем nextDeliveryDate на intervalDays вперёд. Если юзер
-      // не кликнет — следующее уведомление придёт через N дней.
-      await prisma.subscription.update({
-        where: { id: sub.id },
-        data: {
-          nextDeliveryDate: new Date(now.getTime() + sub.intervalDays * 86_400_000),
-        },
-      })
       notified++
     } catch (e) {
       errors.push(`${sub.id}: ${e instanceof Error ? e.message : "unknown"}`)

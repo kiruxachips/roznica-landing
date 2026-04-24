@@ -458,27 +458,36 @@ export async function createOrder(data: OrderData) {
       })
     }
 
-    // G1-1: фиксируем firstOrderCompletedAt при оформлении (не дожидаемся
-    // фактической оплаты — welcome-скидка уже применена к этому заказу
-    // и повторный бесплатный "первый" клиент не должен получать её же
-    // при следующей попытке). Если заказ отменится — не сбрасываем
-    // (см. comment в schema.prisma: абуз-защита).
-    if (welcomeApplied && data.userId) {
-      await tx.user.update({
+    // G1-1: firstOrderCompletedAt — ставим при ЛЮБОМ первом заказе (не только
+    // когда welcome applied). Это корректный маркер «был ли вообще first order»,
+    // нужный и для welcome-exhaustion, и для referral-check ниже.
+    // Определяем "первый" через data.userId + свежее чтение User (в рамках
+    // той же транзакции — мы ещё не обновили).
+    let isFirstOrder = false
+    if (data.userId) {
+      const u = await tx.user.findUnique({
         where: { id: data.userId },
-        data: { firstOrderCompletedAt: new Date() },
+        select: { firstOrderCompletedAt: true },
       })
+      if (u && u.firstOrderCompletedAt === null) {
+        isFirstOrder = true
+        await tx.user.update({
+          where: { id: data.userId },
+          data: { firstOrderCompletedAt: new Date() },
+        })
+      }
     }
 
     // G2: реферальная награда. Условия:
     //   - есть data.referralCode (из cookie `ref`)
     //   - юзер зарегистрирован (data.userId) — без userId бонусы некуда класть
-    //   - это ПЕРВЫЙ заказ (до этой строки firstOrderCompletedAt был null,
-    //     сейчас только что поставили выше, но проверяем через isEligibleFor*)
+    //   - это ПЕРВЫЙ заказ (isFirstOrder, определён выше НЕЗАВИСИМО от welcome-
+    //     стекования: юзер может использовать promo-код и всё равно получить
+    //     reward для inviter'а — это по факту первая покупка в системе).
     //   - code существует и не expired
     //   - inviter != invitee (сам-на-себя — абуз)
     //   - реферальная программа включена (setting)
-    if (data.referralCode && data.userId && welcomeApplied /*proxy=первый заказ*/) {
+    if (data.referralCode && data.userId && isFirstOrder) {
       try {
         const cfg = await getReferralConfig()
         if (cfg.enabled) {

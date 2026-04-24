@@ -80,12 +80,17 @@ export async function subscribeToNewsletter(
   }
 
   // 152-ФЗ: подписка на маркетинг-рассылку — отдельное явное согласие.
+  // Map source → ConsentSource enum (footer_form не в enum, маппим в settings).
   try {
+    const consentSource: "checkout" | "register" | "settings" | "cookie_banner" =
+      source === "checkout" || source === "register" || source === "cookie_banner"
+        ? source
+        : "settings"
     await recordConsent({
       userId,
       emailSnapshot: email,
       type: "marketing",
-      source: (source as "checkout" | "register" | "settings" | "cookie_banner") ?? "settings",
+      source: consentSource,
     })
   } catch (e) {
     console.error("[newsletter] failed to record marketing consent:", e)

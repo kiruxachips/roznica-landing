@@ -33,20 +33,23 @@ export default auth((req) => {
   const role = user?.role as string | undefined
   const companyStatus = user?.companyStatus as string | undefined
 
-  // G2: referral-code tracking. Если в URL ?ref=CODE — кладём cookie на
-  // 30 дней и продолжаем. Cookie читается в createOrder (server-action)
-  // чтобы применить reward новому юзеру на первой покупке.
+  // G2: referral-code tracking. Валидируем формат по whitelist regex
+  // (PREFIX-SUFFIX из букв/цифр/дефиса) чтобы не класть мусор/XSS в cookie.
+  // Skip для admin/wholesale — там referrals не нужны, cookie был бы dead weight.
   const refParam = req.nextUrl.searchParams.get("ref")
-  if (refParam && refParam.length > 2 && refParam.length < 30) {
+  const skipRefPaths = pathname.startsWith("/admin") || pathname.startsWith("/wholesale")
+  if (
+    refParam &&
+    !skipRefPaths &&
+    /^[A-Za-z0-9][A-Za-z0-9-]{2,28}[A-Za-z0-9]$/.test(refParam)
+  ) {
     const response = NextResponse.next()
     response.cookies.set("ref", refParam.toUpperCase(), {
       maxAge: 30 * 24 * 60 * 60,
-      httpOnly: false, // читается из server-actions через cookies(), httpOnly не критичен
+      httpOnly: true, // server-actions читают через cookies() — httpOnly ок
       sameSite: "lax",
       path: "/",
     })
-    // Не редиректим — пусть юзер видит нужную страницу с query-param
-    // (наложение на контент не нужно, cookie уже стоит).
     return response
   }
 

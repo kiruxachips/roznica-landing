@@ -46,11 +46,13 @@ export function BottomNav() {
     s.items.reduce((sum, i) => sum + i.quantity, 0)
   )
 
-  // На checkout и admin — прячем.
+  // На checkout/admin/wholesale/auth — прячем (чтобы юзер случайно не
+  // потерял введённые данные при регистрации/логине).
   const hide =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/checkout") ||
-    pathname.startsWith("/wholesale")
+    pathname.startsWith("/wholesale") ||
+    pathname.startsWith("/auth")
   if (hide) return null
 
   return (

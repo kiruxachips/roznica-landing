@@ -58,16 +58,37 @@ export async function GET(request: Request) {
   for (const order of candidates) {
     if (!order.customerEmail) continue
 
-    // Idempotency-check через EmailDispatch: не шлём повторно.
+    // Idempotency-check + claim через EmailDispatch: создаём запись в
+    // status=pending РАНЬШЕ send. Если две параллельные cron'ы запустятся,
+    // вторая увидит pending/sent и пропустит. Crash во время send оставит
+    // запись в pending → retry-воркер подхватит по снапшоту.
     const existing = await prisma.emailDispatch.findFirst({
       where: {
         orderId: order.id,
         kind: "review.request",
         recipient: order.customerEmail,
-        status: "sent",
+        status: { in: ["sent", "pending", "failed", "dead"] },
       },
     })
     if (existing) continue
+
+    let dispatch
+    try {
+      dispatch = await prisma.emailDispatch.create({
+        data: {
+          orderId: order.id,
+          kind: "review.request",
+          recipient: order.customerEmail,
+          status: "pending",
+          attempts: 0,
+          subject: `Отзыв о заказе ${order.orderNumber}`,
+        },
+      })
+    } catch {
+      // P2002 на unique (orderId, kind, recipient, status="sent") —
+      // параллельный процесс уже шлёт. Пропускаем.
+      continue
+    }
 
     try {
       // Берём первый товар заказа для персонализации ссылки.
@@ -109,29 +130,24 @@ export async function GET(request: Request) {
         `,
       })
 
-      await prisma.emailDispatch.create({
+      await prisma.emailDispatch.update({
+        where: { id: dispatch.id },
         data: {
-          orderId: order.id,
-          kind: "review.request",
-          recipient: order.customerEmail,
           status: "sent",
           attempts: 1,
-          subject: `Отзыв о заказе ${order.orderNumber}`,
           sentAt: new Date(),
         },
       })
       sent++
     } catch (e) {
       errors.push(`${order.orderNumber}: ${e instanceof Error ? e.message : "unknown"}`)
-      // Записываем как failed — ретраер подхватит позже.
-      await prisma.emailDispatch.create({
+      // Помечаем как failed — retry-воркер из EmailDispatch поднимет по
+      // nextAttemptAt через стандартный flow.
+      await prisma.emailDispatch.update({
+        where: { id: dispatch.id },
         data: {
-          orderId: order.id,
-          kind: "review.request",
-          recipient: order.customerEmail,
           status: "failed",
           attempts: 1,
-          subject: `Отзыв о заказе ${order.orderNumber}`,
           error: e instanceof Error ? e.message.slice(0, 500) : "unknown",
         },
       })

@@ -55,6 +55,18 @@ export async function GET(request: Request) {
   const errors: string[] = []
 
   for (const cart of candidates) {
+    // Optimistic-lock: пытаемся перевести cart tracked→email_sent РАНЬШЕ
+    // чем sendEmail. Если crash после этой строки, retry cron уже не
+    // найдёт tracked по этому id → не будет дубликата.
+    const claimed = await prisma.abandonedCart.updateMany({
+      where: { id: cart.id, status: "tracked" },
+      data: { status: "email_sent", emailSentAt: new Date() },
+    })
+    if (claimed.count === 0) {
+      // Другой worker/запуск уже подхватил этот cart.
+      continue
+    }
+
     try {
       // Создаём одноразовый промо-код для этой корзины.
       // Не стэкается с welcome-discount (в createOrder promoCode приоритетнее).
@@ -115,19 +127,22 @@ export async function GET(request: Request) {
         `,
       })
 
-      await prisma.abandonedCart.update({
-        where: { id: cart.id },
-        data: {
-          status: "email_sent",
-          emailSentAt: new Date(),
-          promoCodeId: null, // храним code в promo-системе; ссылку на id не держим
-        },
-      })
       sent++
     } catch (e) {
       errors.push(
         `${cart.id}: ${e instanceof Error ? e.message : "unknown"}`
       )
+      // Rollback claim: email не отправлен. Возвращаем cart в tracked
+      // чтобы следующий cron попробовал снова (но через 72ч станет expired).
+      try {
+        await prisma.abandonedCart.update({
+          where: { id: cart.id },
+          data: { status: "tracked", emailSentAt: null },
+        })
+      } catch {
+        // ignore — если retry падает, cart в email_sent и просто не получит
+        // повторного email'а. Для юзера не страшнее чем просто не получить.
+      }
     }
   }
 

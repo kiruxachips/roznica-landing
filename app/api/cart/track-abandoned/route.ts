@@ -61,14 +61,26 @@ export async function POST(request: Request) {
   })
 
   if (existing) {
+    // Если предыдущий snapshot заметно отличается от нового (по составу
+    // товаров или сумме >20%) и с момента последнего email прошло >6 часов,
+    // сбрасываем в tracked — юзер вернулся с новыми намерениями, cron
+    // пришлёт новый recovery-email. Это редкий кейс, но важный для conversion.
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000)
+    const significantChange =
+      existing.status === "email_sent" &&
+      existing.emailSentAt &&
+      existing.emailSentAt < sixHoursAgo &&
+      Math.abs(existing.subtotal - subtotal) > existing.subtotal * 0.2
+
     await prisma.abandonedCart.update({
       where: { id: existing.id },
       data: {
         items: body.items,
         subtotal,
         userId,
-        // Не сбрасываем status=email_sent обратно в tracked — иначе cron
-        // снова пришлёт (и это будет spam). Cron сам игнорирует уже sent.
+        ...(significantChange
+          ? { status: "tracked", emailSentAt: null }
+          : {}),
       },
     })
     return NextResponse.json({ ok: true, id: existing.id })
