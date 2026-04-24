@@ -50,6 +50,20 @@ services:
       - MILLORBOT_SHARED_SECRET=${MILLORBOT_SHARED_SECRET:-}
       - ADMIN_NOTIFICATION_EMAILS=${ADMIN_NOTIFICATION_EMAILS:-newrefining@yandex.ru}
       - CRON_SECRET=${CRON_SECRET:-}
+      # Wholesale Phase 5: реквизиты продавца для PDF-счетов
+      - SELLER_LEGAL_NAME=${SELLER_LEGAL_NAME:-}
+      - SELLER_INN=${SELLER_INN:-}
+      - SELLER_KPP=${SELLER_KPP:-}
+      - SELLER_ADDRESS=${SELLER_ADDRESS:-}
+      - SELLER_BANK_NAME=${SELLER_BANK_NAME:-}
+      - SELLER_BANK_ACCOUNT=${SELLER_BANK_ACCOUNT:-}
+      - SELLER_BANK_BIC=${SELLER_BANK_BIC:-}
+      - SELLER_CORR_ACCOUNT=${SELLER_CORR_ACCOUNT:-}
+      # Wholesale Phase 8: DaData автозаполнение (без ключа — ручной ввод)
+      - DADATA_API_KEY=${DADATA_API_KEY:-}
+      # PDF шрифт override (опционально, по умолчанию тянется с jsdelivr)
+      - PDF_FONT_URL_REGULAR=${PDF_FONT_URL_REGULAR:-}
+      - PDF_FONT_URL_BOLD=${PDF_FONT_URL_BOLD:-}
     depends_on:
       - db
     volumes:
