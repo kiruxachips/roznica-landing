@@ -3,11 +3,13 @@
 import Link from "next/link"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, Lock } from "lucide-react"
+import { useSession } from "next-auth/react"
+import { ArrowLeft, Eye, EyeOff, Lock, UserPlus } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { createOrder } from "@/lib/actions/orders"
+import { registerUser } from "@/lib/actions/auth"
 import { GiftPicker } from "../GiftPicker"
 
 interface UnavailableItem {
@@ -21,6 +23,11 @@ interface UnavailableItem {
 
 export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const router = useRouter()
+  const { data: session } = useSession()
+  // Скрываем блок «создать аккаунт» только для уже авторизованных покупателей.
+  // Для админа, гостя без сессии и неавторизованных — показываем.
+  const isCustomer = (session?.user as Record<string, unknown> | undefined)?.userType === "customer"
+
   const items = useCartStore((s) => s.items)
   const totalPrice = useCartStore((s) => s.totalPrice)
   const promoCode = useCartStore((s) => s.promoCode)
@@ -42,6 +49,10 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const setNotes = useCheckoutWizard((s) => s.setNotes)
   const agreed = useCheckoutWizard((s) => s.agreed)
   const setAgreed = useCheckoutWizard((s) => s.setAgreed)
+  const createAccount = useCheckoutWizard((s) => s.createAccount)
+  const setCreateAccount = useCheckoutWizard((s) => s.setCreateAccount)
+  const accountPassword = useCheckoutWizard((s) => s.accountPassword)
+  const setAccountPassword = useCheckoutWizard((s) => s.setAccountPassword)
   const setStep = useCheckoutWizard((s) => s.setStep)
   const resetWizard = useCheckoutWizard((s) => s.reset)
 
@@ -49,9 +60,23 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const [error, setError] = useState("")
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
   const [unavailableItems, setUnavailableItems] = useState<UnavailableItem[]>([])
+  const [passwordVisible, setPasswordVisible] = useState(false)
+  const [accountError, setAccountError] = useState("")
+  const showRegistrationPrompt = !isCustomer
 
   const afterDiscount = totalPrice() - promoDiscount
   const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
+
+  function validateAccountPassword(value: string): string {
+    // Зеркалирует серверные правила из registerUser (lib/actions/auth.ts):
+    // ≥8 символов, хотя бы одна буква (RU/EN) и одна цифра. Без спецсимволов,
+    // чтобы не путать менеджеры паролей.
+    if (value.length < 8) return "Пароль должен быть не менее 8 символов"
+    if (!/[a-zA-Zа-яА-ЯёЁ]/.test(value) || !/\d/.test(value)) {
+      return "Пароль должен содержать хотя бы одну букву и одну цифру"
+    }
+    return ""
+  }
 
   async function handleSubmit() {
     // Защита на случай программного dispatchEvent из sticky bar или от
@@ -65,10 +90,25 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
       setError("Выберите способ доставки на предыдущем шаге")
       return
     }
+    // Если юзер хочет создать аккаунт — нужны email + валидный пароль.
+    // Email вводится на шаге Контакты, поэтому при отсутствии возвращаем туда.
+    if (showRegistrationPrompt && createAccount) {
+      if (!contact.email.trim()) {
+        setAccountError("Чтобы создать аккаунт, укажите email на шаге «Контакты»")
+        setStep("contact")
+        return
+      }
+      const passwordError = validateAccountPassword(accountPassword)
+      if (passwordError) {
+        setAccountError(passwordError)
+        return
+      }
+    }
     if (loading) return
 
     setLoading(true)
     setError("")
+    setAccountError("")
     try {
       const rawAddress = doorAddress || ""
       const fullDoorAddress =
@@ -130,9 +170,50 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
         }).catch(() => {})
       }
 
+      // Регистрируем покупателя, если попросил «сохранить данные».
+      // Гонимся за тем, чтобы request долетел до сервера до редиректа на YooKassa,
+      // но не блокируем дольше 2.5с — серверный action всё равно дозавершит работу
+      // и пришлёт письмо. Ошибки (например, email уже подтверждён) не мешают
+      // оформлению заказа: linkGuestOrders подцепит этот заказ, когда юзер
+      // подтвердит email через /auth/verify.
+      let pendingVerificationEmail: string | null = null
+      if (
+        showRegistrationPrompt &&
+        createAccount &&
+        contact.email.trim() &&
+        accountPassword
+      ) {
+        const email = contact.email.trim()
+        const fullName = `${contact.lastName.trim()} ${contact.firstName.trim()}`.trim()
+        const regPromise = registerUser({
+          email,
+          password: accountPassword,
+          name: fullName,
+        }).catch((err) => {
+          console.error("Account registration after order failed:", err)
+          return null
+        })
+        await Promise.race([
+          regPromise,
+          new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+        ])
+        pendingVerificationEmail = email
+      }
+
       clearCart()
       resetDelivery()
       resetWizard()
+
+      // Сохраняем email для thank-you, чтобы показать банер «подтвердите email».
+      // Sessionstorage переживает редирект на YooKassa и обратно (тот же таб + тот
+      // же origin при возврате).
+      if (pendingVerificationEmail && typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem("checkoutPendingVerification", pendingVerificationEmail)
+        } catch {
+          // Privacy mode / quota — банер просто не покажется, не критично.
+        }
+      }
 
       if (result.paymentUrl) {
         window.location.href = result.paymentUrl
@@ -193,6 +274,97 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
         value={selectedGiftId}
         onChange={setSelectedGiftId}
       />
+
+      {showRegistrationPrompt && (
+        <div className="rounded-xl border border-border bg-secondary/30 p-4">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={createAccount}
+              onChange={(e) => {
+                setCreateAccount(e.target.checked)
+                if (!e.target.checked) {
+                  setAccountPassword("")
+                  setAccountError("")
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-input accent-primary"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <UserPlus className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">
+                  Сохранить данные для следующих заказов
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {contact.email.trim() ? (
+                  <>
+                    Создадим личный кабинет на{" "}
+                    <span className="font-medium text-foreground">
+                      {contact.email.trim()}
+                    </span>{" "}
+                    — в следующий раз не нужно будет заполнять адрес и контакты заново.
+                  </>
+                ) : (
+                  <>
+                    Укажите email на шаге{" "}
+                    <button
+                      type="button"
+                      onClick={() => setStep("contact")}
+                      className="text-primary hover:underline"
+                    >
+                      «Контакты»
+                    </button>
+                    , чтобы создать личный кабинет и не вводить адрес повторно.
+                  </>
+                )}
+              </p>
+            </div>
+          </label>
+
+          {createAccount && (
+            <div className="mt-3 pl-7">
+              <label className="block text-xs font-medium mb-1">Пароль для входа</label>
+              <div className="relative">
+                <input
+                  type={passwordVisible ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={accountPassword}
+                  onChange={(e) => {
+                    setAccountPassword(e.target.value)
+                    if (accountError) setAccountError("")
+                  }}
+                  className={`w-full h-11 px-4 pr-10 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary ${
+                    accountError ? "border-red-400" : "border-input"
+                  }`}
+                  placeholder="Минимум 8 символов, буква и цифра"
+                />
+                <button
+                  type="button"
+                  onClick={() => setPasswordVisible((v) => !v)}
+                  tabIndex={-1}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={passwordVisible ? "Скрыть пароль" : "Показать пароль"}
+                >
+                  {passwordVisible ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {accountError && (
+                <p className="text-xs text-red-600 mt-1">{accountError}</p>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                После оплаты пришлём письмо для подтверждения email — переходить
+                сразу не обязательно.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <label className="flex items-start gap-2 cursor-pointer">
         <input

@@ -18,6 +18,8 @@ interface CheckoutWizardState {
   contact: ContactData
   notes: string
   agreed: boolean
+  createAccount: boolean
+  accountPassword: string
 
   setStep: (step: CheckoutStep) => void
   markCompleted: (step: CheckoutStep) => void
@@ -25,6 +27,8 @@ interface CheckoutWizardState {
   setContact: (data: Partial<ContactData>) => void
   setNotes: (notes: string) => void
   setAgreed: (agreed: boolean) => void
+  setCreateAccount: (value: boolean) => void
+  setAccountPassword: (value: string) => void
   reset: () => void
 }
 
@@ -34,6 +38,8 @@ const initial = {
   contact: { firstName: "", lastName: "", phone: "", email: "" },
   notes: "",
   agreed: false,
+  createAccount: false,
+  accountPassword: "",
 }
 
 export const useCheckoutWizard = create<CheckoutWizardState>()(
@@ -57,6 +63,8 @@ export const useCheckoutWizard = create<CheckoutWizardState>()(
       setContact: (data) => set((s) => ({ contact: { ...s.contact, ...data } })),
       setNotes: (notes) => set({ notes }),
       setAgreed: (agreed) => set({ agreed }),
+      setCreateAccount: (createAccount) => set({ createAccount }),
+      setAccountPassword: (accountPassword) => set({ accountPassword }),
       reset: () => set(initial),
     }),
     {
@@ -66,11 +74,14 @@ export const useCheckoutWizard = create<CheckoutWizardState>()(
       // wizard'у), чтобы F5 на шаге payment вернул юзера туда же, где он был,
       // а не откидывал на первый шаг. agreed — не персистим (требование
       // оферты: юзер должен свежо ставить галочку перед оплатой).
+      // accountPassword — не персистим (плейнтекст-пароль не должен жить
+      // в sessionStorage дольше, чем нужно).
       partialize: (s) => ({
         contact: s.contact,
         notes: s.notes,
         step: s.step,
         completed: s.completed,
+        createAccount: s.createAccount,
       }),
     }
   )

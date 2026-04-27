@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
-import { CheckCircle, Clock, Package, XCircle } from "lucide-react"
+import { CheckCircle, Clock, MailCheck, Package, XCircle } from "lucide-react"
 
 interface OrderSummary {
   orderNumber: string
@@ -25,6 +25,7 @@ interface OrderSummary {
 
 export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: OrderSummary; shouldTrack: boolean; paymentStatus?: string | null }) {
   const goalSent = useRef(false)
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState<string | null>(null)
 
   useEffect(() => {
     if (!shouldTrack || goalSent.current) return
@@ -37,6 +38,23 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
       })
     }
   }, [shouldTrack, order.total])
+
+  // Если на чекауте юзер выбрал «создать аккаунт», PaymentStep кладёт email
+  // в sessionStorage перед редиректом на оплату. Показываем напоминание о
+  // подтверждении email и сразу удаляем флаг, чтобы при перезагрузке страницы
+  // банер не висел повторно.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const email = sessionStorage.getItem("checkoutPendingVerification")
+      if (email) {
+        setPendingVerificationEmail(email)
+        sessionStorage.removeItem("checkoutPendingVerification")
+      }
+    } catch {
+      // sessionStorage недоступен (privacy mode) — банер просто не покажется.
+    }
+  }, [])
 
   if (paymentStatus === "pending") {
     return (
@@ -124,6 +142,34 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           Заказ <span className="font-semibold text-foreground">{order.orderNumber}</span> успешно оформлен
         </p>
       </div>
+
+      {/* Account verification banner — показываем, если на checkout-е юзер
+          попросил создать аккаунт. После подтверждения email заказ
+          автоматически привяжется к личному кабинету (linkGuestOrders). */}
+      {pendingVerificationEmail && (
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 sm:p-5 mb-5 sm:mb-6 flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <MailCheck className="w-5 h-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm mb-1">Подтвердите email — и личный кабинет ваш</p>
+            <p className="text-xs sm:text-sm text-muted-foreground mb-3">
+              Мы отправили код подтверждения на{" "}
+              <span className="font-medium text-foreground break-all">
+                {pendingVerificationEmail}
+              </span>
+              . После подтверждения этот заказ появится в личном кабинете, а на
+              следующий заказ контакты и адрес заполнятся автоматически.
+            </p>
+            <Link
+              href={`/auth/verify?email=${encodeURIComponent(pendingVerificationEmail)}`}
+              className="inline-flex items-center justify-center h-9 px-4 bg-primary text-primary-foreground rounded-xl text-xs sm:text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              Подтвердить email
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Order details */}
       <div className="bg-white rounded-2xl p-4 sm:p-8 shadow-sm mb-5 sm:mb-6">
