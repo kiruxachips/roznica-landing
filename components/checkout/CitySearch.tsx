@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useDeliveryStore } from "@/lib/store/delivery"
-import { useCartStore } from "@/lib/store/cart"
 
 interface CityResult {
   code: string
@@ -21,81 +20,13 @@ export function CitySearch() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const city = useDeliveryStore((s) => s.city)
-  const cityCode = useDeliveryStore((s) => s.cityCode)
-  const region = useDeliveryStore((s) => s.region)
-  const postalCode = useDeliveryStore((s) => s.postalCode)
   const setCity = useDeliveryStore((s) => s.setCity)
   const setPostalCode = useDeliveryStore((s) => s.setPostalCode)
-  const setRates = useDeliveryStore((s) => s.setRates)
-  const setRatesLoading = useDeliveryStore((s) => s.setRatesLoading)
-  const setRatesError = useDeliveryStore((s) => s.setRatesError)
-  const selectRate = useDeliveryStore((s) => s.selectRate)
-  const selectedRate = useDeliveryStore((s) => s.selectedRate)
 
-  const cartTotal = useCartStore((s) => s.totalPrice)()
-  const cartItems = useCartStore((s) => s.items)
-  const itemsForPacking = useCartStore((s) => s.itemsForPacking)()
-  // Стабильная строка для зависимости useEffect — массив каждый рендер новый,
-  // поэтому хэшируем содержимое (вес + количество), чтобы избежать лишних пересчётов.
-  const itemsKey = cartItems
-    .map((i) => `${i.variantId}:${i.quantity}:${i.weight}`)
-    .join("|")
-
-  // Fetch rates when city or cart changes. Debounce 500ms, чтобы быстрые
-  // +/- по количеству в корзине не спамили backend — пересчёт произойдёт
-  // после того как юзер перестанет кликать.
-  useEffect(() => {
-    if (!cityCode && !postalCode) return
-
-    setRatesLoading(true)
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      fetch("/api/delivery/rates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cityCode: cityCode || undefined,
-          postalCode: postalCode || undefined,
-          city: city || undefined,
-          region: region || undefined,
-          cartTotal,
-          items: itemsForPacking,
-        }),
-        signal: controller.signal,
-      })
-        .then((r) => (r.ok ? r.json() : Promise.reject()))
-        .then((rates) => {
-          setRates(rates)
-          setRatesLoading(false)
-          if (rates.length === 0) return
-          // Preserve current selection if same carrier+tariff is still offered,
-          // otherwise auto-select the cheapest option. Если вес вырос и тариф
-          // выпал — селектор сбросится, юзер увидит обновлённую цену.
-          const current = selectedRate
-          const match =
-            current &&
-            rates.find(
-              (r: { carrier: string; tariffCode: number }) =>
-                r.carrier === current.carrier && r.tariffCode === current.tariffCode
-            )
-          selectRate(match || rates[0])
-        })
-        .catch((e) => {
-          if (e?.name === "AbortError") return
-          setRatesError("Не удалось рассчитать стоимость доставки")
-          setRatesLoading(false)
-        })
-    }, 500)
-
-    return () => {
-      clearTimeout(timer)
-      controller.abort()
-    }
-    // city is intentionally excluded — cityCode is the unique identifier;
-    // city name is sent in the body but shouldn't trigger re-fetch.
-    // itemsForPacking опущен — используем itemsKey как стабильный маркер содержимого корзины.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityCode, postalCode, cartTotal, itemsKey])
+  // Пересчёт тарифов вынесен в useDeliveryRates() и подключён в CheckoutForm —
+  // он работает на любом шаге, в т.ч. когда CitySearch уже размонтирован
+  // (например, корзина мутирует на шаге «Оплата» через модалку
+  // unavailableItems).
 
   // Debounced city search
   useEffect(() => {

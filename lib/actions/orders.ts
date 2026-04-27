@@ -1,6 +1,6 @@
 "use server"
 
-import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, type UnavailableItemDetail } from "@/lib/dal/orders"
+import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, DeliveryPriceMismatchError, type UnavailableItemDetail } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 import { refundGiftStock } from "@/lib/dal/gifts"
 import { updateTasteProfile } from "@/lib/dal/taste-profile"
@@ -77,7 +77,12 @@ async function rollbackOrder(
 
 export type CreateOrderResult =
   | { success: true; orderNumber: string; id: string; thankYouToken: string | null; paymentUrl: string | null }
-  | { success: false; error: string; unavailableItems?: UnavailableItemDetail[] }
+  | {
+      success: false
+      error: string
+      unavailableItems?: UnavailableItemDetail[]
+      deliveryPriceMismatch?: { clientPrice: number; serverPrice: number }
+    }
 
 export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
   try {
@@ -91,6 +96,19 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
         success: false,
         error: "Некоторые товары больше недоступны",
         unavailableItems: e.items,
+      }
+    }
+    // Сервер пересчитал доставку и она оказалась дороже, чем клиент видел в UI.
+    // Никогда не списываем больше отображённой суммы — клиент покажет модалку
+    // «цена доставки изменилась», обновит сводку и попросит подтвердить ещё раз.
+    if (e instanceof DeliveryPriceMismatchError) {
+      return {
+        success: false,
+        error: e.message,
+        deliveryPriceMismatch: {
+          clientPrice: e.clientPrice,
+          serverPrice: e.serverPrice,
+        },
       }
     }
     const msg = e instanceof Error ? e.message : "Неизвестная ошибка при создании заказа"

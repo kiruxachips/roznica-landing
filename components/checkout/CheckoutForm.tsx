@@ -6,6 +6,7 @@ import { Pencil } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
+import { useDeliveryRates } from "@/lib/hooks/use-delivery-rates"
 import { StepIndicator } from "./StepIndicator"
 import { OrderSummary } from "./OrderSummary"
 import { ContactStep } from "./steps/ContactStep"
@@ -31,6 +32,11 @@ export function CheckoutForm() {
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
+
+  // Пересчёт тарифов на любом шаге — состав корзины может измениться
+  // и на шаге «Оплата» (модалка unavailableItems удаляет товар, и без
+  // пересчёта priceWithMarkup застревает на прежнем значении).
+  useDeliveryRates()
 
   // Если юзер вернулся на /checkout с пустой корзиной — сбрасываем wizard,
   // чтобы не «подвешивать» заполненные шаги поверх несуществующего заказа.

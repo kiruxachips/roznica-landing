@@ -21,6 +21,11 @@ interface UnavailableItem {
   currentPrice?: number
 }
 
+interface DeliveryPriceMismatch {
+  clientPrice: number
+  serverPrice: number
+}
+
 export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const router = useRouter()
   const { data: session } = useSession()
@@ -37,6 +42,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const updatePrice = useCartStore((s) => s.updatePrice)
 
   const selectedRate = useDeliveryStore((s) => s.selectedRate)
+  const selectRate = useDeliveryStore((s) => s.selectRate)
   const selectedPickupPoint = useDeliveryStore((s) => s.selectedPickupPoint)
   const doorAddress = useDeliveryStore((s) => s.doorAddress)
   const deliveryCity = useDeliveryStore((s) => s.city)
@@ -60,6 +66,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const [error, setError] = useState("")
   const [selectedGiftId, setSelectedGiftId] = useState<string | null>(null)
   const [unavailableItems, setUnavailableItems] = useState<UnavailableItem[]>([])
+  const [priceMismatch, setPriceMismatch] = useState<DeliveryPriceMismatch | null>(null)
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [accountError, setAccountError] = useState("")
   const showRegistrationPrompt = !isCustomer
@@ -154,6 +161,19 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
       if (!result.success) {
         if (result.unavailableItems && result.unavailableItems.length > 0) {
           setUnavailableItems(result.unavailableItems)
+          setLoading(false)
+          return
+        }
+        if (result.deliveryPriceMismatch && selectedRate) {
+          // Сервер вернул реальную цену доставки — обновляем выбранный
+          // тариф локально, чтобы OrderSummary и кнопка «Оплатить» сразу
+          // показали итог = серверный итог. Юзер увидит модалку и
+          // подтвердит ещё раз; следующий submit пройдёт без рассинхрона.
+          selectRate({
+            ...selectedRate,
+            priceWithMarkup: result.deliveryPriceMismatch.serverPrice,
+          })
+          setPriceMismatch(result.deliveryPriceMismatch)
           setLoading(false)
           return
         }
@@ -479,6 +499,37 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
                 className="h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
               >
                 Отменить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {priceMismatch && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold mb-2">Доставка пересчитана</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Сумма заказа изменилась — после удаления товара из корзины она
+              стала ниже порога бесплатной доставки. Стоимость доставки сейчас{" "}
+              <span className="font-medium text-foreground">
+                {priceMismatch.serverPrice}₽
+              </span>{" "}
+              вместо{" "}
+              <span className="line-through">{priceMismatch.clientPrice}₽</span>.
+              Подтвердите оплату на новой сумме.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setPriceMismatch(null)}
+                className="h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Понятно, посмотреть итог
               </button>
             </div>
           </div>

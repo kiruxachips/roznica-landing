@@ -1,0 +1,102 @@
+"use client"
+
+import { useEffect } from "react"
+import { useDeliveryStore } from "@/lib/store/delivery"
+import { useCartStore } from "@/lib/store/cart"
+import { useWelcomeDiscount } from "@/lib/hooks/use-welcome-discount"
+
+/**
+ * Пересчитывает тарифы доставки при изменении города или состава корзины.
+ * Раньше жил внутри CitySearch, но тот компонент монтируется только на
+ * шаге «Доставка». Если корзина мутирует на шаге «Оплата» (модалка
+ * unavailableItems → удаление товара / правка цены), пересчёта не было —
+ * selectedRate.priceWithMarkup застывал от прежнего состава, и мог
+ * показывать «бесплатно» при сумме ниже порога.
+ *
+ * Хук монтируется в CheckoutForm (root), реагирует на cityCode/postalCode/
+ * cartTotal/itemsKey независимо от текущего шага мастера.
+ */
+export function useDeliveryRates() {
+  const cityCode = useDeliveryStore((s) => s.cityCode)
+  const postalCode = useDeliveryStore((s) => s.postalCode)
+  const city = useDeliveryStore((s) => s.city)
+  const region = useDeliveryStore((s) => s.region)
+  const setRates = useDeliveryStore((s) => s.setRates)
+  const setRatesLoading = useDeliveryStore((s) => s.setRatesLoading)
+  const setRatesError = useDeliveryStore((s) => s.setRatesError)
+  const selectRate = useDeliveryStore((s) => s.selectRate)
+  const selectedRate = useDeliveryStore((s) => s.selectedRate)
+
+  const subtotal = useCartStore((s) => s.totalPrice)()
+  const promoDiscount = useCartStore((s) => s.promoDiscount)
+  const cartItems = useCartStore((s) => s.items)
+  const itemsForPacking = useCartStore((s) => s.itemsForPacking)()
+
+  // Сервер в createOrder передаёт в calculateDeliveryRates `cartTotal =
+  // afterDiscount - bonusUsed`. Welcome-скидка применяется только если
+  // нет промокода (так в DAL). Воспроизводим ту же формулу, иначе правило
+  // «бесплатно от X₽» сработает на клиенте, но не на сервере → списание
+  // больше суммы, которую видел пользователь.
+  const welcome = useWelcomeDiscount(subtotal)
+  const effectiveDiscount =
+    promoDiscount > 0 ? promoDiscount : welcome?.discount ?? 0
+  const cartTotal = Math.max(0, subtotal - effectiveDiscount)
+  // Стабильная строка-ключ — массив каждый рендер новый, без хэша
+  // useEffect зацикливался бы.
+  const itemsKey = cartItems
+    .map((i) => `${i.variantId}:${i.quantity}:${i.weight}`)
+    .join("|")
+
+  useEffect(() => {
+    if (!cityCode && !postalCode) return
+
+    setRatesLoading(true)
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      fetch("/api/delivery/rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cityCode: cityCode || undefined,
+          postalCode: postalCode || undefined,
+          city: city || undefined,
+          region: region || undefined,
+          cartTotal,
+          items: itemsForPacking,
+        }),
+        signal: controller.signal,
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((rates) => {
+          setRates(rates)
+          setRatesLoading(false)
+          if (rates.length === 0) return
+          // Если выбранный ранее тариф (carrier+tariffCode) ещё в выдаче —
+          // сохраняем выбор, но обновляем priceWithMarkup. Иначе — авто
+          // на самый дешёвый.
+          const current = selectedRate
+          const match =
+            current &&
+            rates.find(
+              (r: { carrier: string; tariffCode: number }) =>
+                r.carrier === current.carrier && r.tariffCode === current.tariffCode
+            )
+          selectRate(match || rates[0])
+        })
+        .catch((e) => {
+          if (e?.name === "AbortError") return
+          setRatesError("Не удалось рассчитать стоимость доставки")
+          setRatesLoading(false)
+        })
+    }, 500)
+
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+    // city/region/itemsForPacking опущены: cityCode — уникальный идентификатор,
+    // itemsKey — стабильный хэш состава. selectedRate в deps вызвал бы
+    // бесконечный рефетч (хук сам же его обновляет через selectRate).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityCode, postalCode, cartTotal, itemsKey])
+}

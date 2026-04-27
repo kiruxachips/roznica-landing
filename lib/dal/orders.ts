@@ -64,6 +64,27 @@ export class UnavailableItemsError extends Error {
   }
 }
 
+/**
+ * Выбрасывается, если клиент видел цену доставки X, а серверный пересчёт
+ * вернул Y > X. Списать с пользователя сумму больше отображённой нельзя
+ * никогда (юридически и репутационно), поэтому останавливаем оформление
+ * и просим обновить страницу — фронт перерисует с актуальной ценой.
+ *
+ * Обратный случай (сервер посчитал ДЕШЕВЛЕ) не ошибка — принимаем
+ * серверную цену молча, клиенту в плюс.
+ */
+export class DeliveryPriceMismatchError extends Error {
+  constructor(
+    public clientPrice: number,
+    public serverPrice: number
+  ) {
+    super(
+      `Цена доставки изменилась: было ${clientPrice}₽, стало ${serverPrice}₽. Обновите страницу`
+    )
+    this.name = "DeliveryPriceMismatchError"
+  }
+}
+
 export async function createOrder(data: OrderData) {
   const channel: "retail" | "wholesale" = data.channel === "wholesale" ? "wholesale" : "retail"
   const isWholesale = channel === "wholesale"
@@ -195,6 +216,18 @@ export async function createOrder(data: OrderData) {
       )
     }
     deliveryPrice = matchingRate.priceWithMarkup
+
+    // Trust-guard: клиент видел в UI цену data.deliveryPrice. Если сервер
+    // насчитал БОЛЬШЕ — никогда молча не списываем разницу (и не вешаем
+    // её в email/в платёж YooKassa). Останавливаем оформление, фронт
+    // покажет понятное сообщение и обновит сводку. Тонкий допуск 1₽ —
+    // на разные направления округлений между провайдерами.
+    if (
+      typeof data.deliveryPrice === "number" &&
+      deliveryPrice > data.deliveryPrice + 1
+    ) {
+      throw new DeliveryPriceMismatchError(data.deliveryPrice, deliveryPrice)
+    }
   }
   const total = afterDiscount - bonusUsed + deliveryPrice
 
