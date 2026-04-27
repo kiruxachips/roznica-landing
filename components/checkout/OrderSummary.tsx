@@ -140,9 +140,7 @@ export function OrderSummary({
         </div>
         <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">
           <span>Итого</span>
-          <span className="text-primary">
-            {finalTotal - (welcomeDiscount && promoDiscount === 0 ? welcomeDiscount.discount : 0)}₽
-          </span>
+          <span className="text-primary">{finalTotal}₽</span>
         </div>
       </div>
     </div>

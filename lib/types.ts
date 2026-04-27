@@ -124,6 +124,13 @@ export interface OrderData {
    * админскими создателями заказов и B2B-flow.
    */
   clientRequestId?: string
+  /**
+   * Pass-2-B: финальная сумма, которую клиент показал пользователю в UI
+   * на кнопке «Оплатить». Сервер пересчитает свою сумму и сравнит — если
+   * списать пришлось бы больше, выбросим ошибку (зеркало деливери-guard'а).
+   * Для wholesale guard выключен — там pricing считается по прайс-листам.
+   */
+  expectedFinalTotal?: number
   // Delivery module fields
   deliveryType?: "door" | "pvz"
   deliveryPrice?: number

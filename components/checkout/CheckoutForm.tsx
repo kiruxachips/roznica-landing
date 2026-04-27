@@ -7,6 +7,7 @@ import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { useDeliveryRates } from "@/lib/hooks/use-delivery-rates"
+import { useWelcomeDiscount } from "@/lib/hooks/use-welcome-discount"
 import { StepIndicator } from "./StepIndicator"
 import { OrderSummary } from "./OrderSummary"
 import { ContactStep } from "./steps/ContactStep"
@@ -73,7 +74,15 @@ export function CheckoutForm() {
   }
 
   const total = totalPrice()
-  const afterDiscount = total - promoDiscount
+  // Pass-2-A: единый источник истины для скидки. Раньше CheckoutForm считал
+  // finalTotal только с promo, а OrderSummary при рендере ещё раз вычитал
+  // welcome — кнопка «Оплатить — N₽» и строка «Итого N₽» расходились.
+  // Серверная DAL-логика: discount = promo XOR welcome, не оба одновременно
+  // (orders.ts:139-149). Зеркалируем здесь.
+  const welcome = useWelcomeDiscount(total).value
+  const effectiveDiscount =
+    promoDiscount > 0 ? promoDiscount : welcome?.discount ?? 0
+  const afterDiscount = total - effectiveDiscount
   const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
   const finalTotal = afterDiscount + deliveryPrice
 

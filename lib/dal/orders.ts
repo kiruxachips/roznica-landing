@@ -85,6 +85,23 @@ export class DeliveryPriceMismatchError extends Error {
   }
 }
 
+/**
+ * Pass-2-B: широкий total-guard. Ловит любой источник рассинхрона
+ * (не только delivery): welcome, promo, gift-stock, bonus в будущем.
+ * Зеркало DeliveryPriceMismatchError для полной суммы.
+ */
+export class TotalMismatchError extends Error {
+  constructor(
+    public clientTotal: number,
+    public serverTotal: number
+  ) {
+    super(
+      `Сумма заказа изменилась: было ${clientTotal}₽, стало ${serverTotal}₽. Обновите страницу`
+    )
+    this.name = "TotalMismatchError"
+  }
+}
+
 export async function createOrder(data: OrderData) {
   const channel: "retail" | "wholesale" = data.channel === "wholesale" ? "wholesale" : "retail"
   const isWholesale = channel === "wholesale"
@@ -240,6 +257,17 @@ export async function createOrder(data: OrderData) {
     }
   }
   const total = afterDiscount - bonusUsed + deliveryPrice
+
+  // Pass-2-B: total-guard. Поверх delivery-guard'а проверяем итоговую сумму —
+  // ловит любой mismatch (welcome, promo, gift availability changing
+  // discount slot, future bonus). Допуск 2₽ — суммируется округление по
+  // двум статьям (discount + delivery). Для wholesale выключен.
+  if (!isWholesale && Number.isFinite(data.expectedFinalTotal)) {
+    const expected = data.expectedFinalTotal as number
+    if (total > expected + 2) {
+      throw new TotalMismatchError(expected, total)
+    }
+  }
 
   // G5: валидация выбранного подарка. cartTotal для проверки доступности =
   // afterDiscount (после скидки) — это согласовано с фронтом и с DAL

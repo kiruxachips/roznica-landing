@@ -212,6 +212,16 @@ M1 → M3 → M4 → M5 → M7 → M8 (M2 уже в C9; M6 — отдельно)
 ### Проход 6 — Final Cross-Audit
 Запустить новую серию из 5 параллельных аудитов по тому же скопу + проверка, что ни один из закрытых пунктов не «всплыл» в новой регрессии.
 
+### Проход 2 (post-audit) — найденные кросс-аудитом критические дыры
+Аудит обнаружил пункты, которых не было в первоначальном плане. Закрыто:
+
+- **Pass-2-A** (CRITICAL): кнопка «Оплатить» показывала `finalTotal` БЕЗ welcome, OrderSummary вычитала welcome второй раз → расхождение 10% при first order. Welcome теперь учтён в `CheckoutForm.afterDiscount` (единый источник истины), оба места рендерятся согласованно. Соответствует серверной формуле `discount = promo XOR welcome`.
+- **Pass-2-B** (CRITICAL): server-side `TotalMismatchError` поверх `DeliveryPriceMismatchError`. Клиент шлёт `expectedFinalTotal`, сервер сравнивает фактический `total` и блокирует оформление если списать пришлось бы больше. Допуск 2₽.
+- **Pass-2-C** (HIGH): `P2002` catch теперь проверяет `meta.target` — раньше слепо ловил любой unique-violation и возвращал заказ по `clientRequestId`, хотя падение могло быть на другом поле (теоретическая коллизия `orderNumber`).
+- **Pass-2-D** (MEDIUM): `stockSnapshot` для replacement-товара = реальный `stock` варианта (правильно). `realQty` идёт в `quantity`, snapshot — в snapshot.
+- **Pass-2-E** (HIGH): `callbackUrl` в LoginForm проверяется на `startsWith('/') && !startsWith('//')` — open-redirect на внешний домен закрыт.
+- **Pass-2-F** (MEDIUM): PII (имя, телефон) маскируется в `console.error("[createOrder] failed")` — `***1234`, `K***`. Отладочная польза сохранена, утечка в облачные логи минимизирована.
+
 ---
 
 ## Definition of Done
@@ -266,3 +276,9 @@ M1 → M3 → M4 → M5 → M7 → M8 (M2 уже в C9; M6 — отдельно)
 | M6 | dev-only encryption key fallback | `[x]` | pass-5 |
 | M7 | Sticky bar hidden on OOS | `[x]` | pass-5 |
 | M8 | CartUpsell error logging | `[x]` | pass-5 |
+| Pass-2-A | Welcome в едином finalTotal | `[x]` | pass-2 (post-audit) |
+| Pass-2-B | TotalMismatchError server-guard | `[x]` | pass-2 (post-audit) |
+| Pass-2-C | P2002 target check | `[x]` | pass-2 (post-audit) |
+| Pass-2-D | realQty/stockSnapshot fix | `[x]` | pass-2 (post-audit) |
+| Pass-2-E | callbackUrl open-redirect | `[x]` | pass-2 (post-audit) |
+| Pass-2-F | PII в logs masked | `[x]` | pass-2 (post-audit) |

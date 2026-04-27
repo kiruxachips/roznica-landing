@@ -1,6 +1,6 @@
 "use server"
 
-import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, DeliveryPriceMismatchError, type UnavailableItemDetail } from "@/lib/dal/orders"
+import { createOrder as createOrderDAL, updateOrderStatus as updateOrderStatusDAL, getOrderById, ALLOWED_TRANSITIONS, UnavailableItemsError, DeliveryPriceMismatchError, TotalMismatchError, type UnavailableItemDetail } from "@/lib/dal/orders"
 import { creditBonusesForOrder } from "@/lib/dal/bonuses"
 import { refundGiftStock } from "@/lib/dal/gifts"
 import { updateTasteProfile } from "@/lib/dal/taste-profile"
@@ -82,6 +82,7 @@ export type CreateOrderResult =
       error: string
       unavailableItems?: UnavailableItemDetail[]
       deliveryPriceMismatch?: { clientPrice: number; serverPrice: number }
+      totalMismatch?: { clientTotal: number; serverTotal: number }
     }
 
 export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
@@ -123,13 +124,20 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
     return await createOrderImpl(data)
   } catch (e) {
     // C1: race победил — конкурент успел создать заказ с тем же clientRequestId.
-    // Перечитываем и возвращаем как success.
-    const isUniqueViolation =
-      typeof e === "object" &&
-      e !== null &&
-      "code" in e &&
-      (e as { code: string }).code === "P2002"
-    if (isUniqueViolation && data.clientRequestId) {
+    // Pass-2-C: проверяем что unique-violation именно по clientRequestId,
+    // а не по другому полю (например orderNumber-collision). Иначе мы могли
+    // вернуть success с неправильным id для совершенно другого incident'а.
+    const prismaErr =
+      typeof e === "object" && e !== null && "code" in e
+        ? (e as { code?: string; meta?: { target?: string[] | string } })
+        : null
+    const isClientRequestIdViolation =
+      prismaErr?.code === "P2002" &&
+      (Array.isArray(prismaErr.meta?.target)
+        ? prismaErr.meta?.target.includes("clientRequestId")
+        : prismaErr.meta?.target === "clientRequestId" ||
+          prismaErr.meta?.target?.includes?.("clientRequestId"))
+    if (isClientRequestIdViolation && data.clientRequestId) {
       const existing = await prisma.order.findUnique({
         where: { clientRequestId: data.clientRequestId },
         select: {
@@ -171,10 +179,31 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
         },
       }
     }
+    // Pass-2-B: широкий total-guard. Ловит любой источник несовпадения
+    // финальной суммы (welcome/promo/gift availability), не только delivery.
+    if (e instanceof TotalMismatchError) {
+      return {
+        success: false,
+        error: e.message,
+        totalMismatch: {
+          clientTotal: e.clientTotal,
+          serverTotal: e.serverTotal,
+        },
+      }
+    }
     const msg = e instanceof Error ? e.message : "Неизвестная ошибка при создании заказа"
+    // Pass-2-F: маскируем PII в логах (152-ФЗ + GDPR-style гигиена). Имя
+    // и телефон не попадают целиком в Sentry/cloud-logs — оставляем хвост
+    // для дебага orphan-заказа в БД, но без полной идентификации.
+    const phoneMasked = data.customerPhone
+      ? `***${data.customerPhone.slice(-4)}`
+      : "—"
+    const customerMasked = data.customerName
+      ? `${data.customerName.slice(0, 1)}***`
+      : "—"
     console.error("[createOrder] failed:", {
-      customer: data.customerName,
-      phone: data.customerPhone,
+      customer: customerMasked,
+      phone: phoneMasked,
       method: data.deliveryMethod,
       tariff: data.tariffCode,
       items: data.items.length,

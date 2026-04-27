@@ -12,6 +12,7 @@ import { createOrder } from "@/lib/actions/orders"
 import { registerUser } from "@/lib/actions/auth"
 import { GiftPicker } from "../GiftPicker"
 import { ReplacementPicker } from "../ReplacementPicker"
+import { useWelcomeDiscount } from "@/lib/hooks/use-welcome-discount"
 import type { RecommendedProduct } from "@/lib/types"
 
 interface UnavailableItem {
@@ -96,7 +97,13 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   }, [])
   const showRegistrationPrompt = !isCustomer
 
-  const afterDiscount = totalPrice() - promoDiscount
+  // Pass-2-A: совпадает с CheckoutForm + сервером (promo XOR welcome).
+  // Используется для giftThreshold-проверки и cartTotal в GiftPicker.
+  const subtotalForDiscount = totalPrice()
+  const welcomeForCart = useWelcomeDiscount(subtotalForDiscount).value
+  const effectiveDiscountForCart =
+    promoDiscount > 0 ? promoDiscount : welcomeForCart?.discount ?? 0
+  const afterDiscount = subtotalForDiscount - effectiveDiscountForCart
   const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
 
   function validateAccountPassword(value: string): string {
@@ -181,6 +188,9 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
 
       const result = await createOrder({
         clientRequestId: clientRequestIdRef.current,
+        // Pass-2-B: финал, который видит юзер на кнопке. Сервер сравнит,
+        // не списать ли больше — если да, остановит и попросит refresh.
+        expectedFinalTotal: finalTotal,
         customerName: `${contact.lastName.trim()} ${contact.firstName.trim()}`.trim(),
         customerEmail: contact.email.trim() || undefined,
         customerPhone: contact.phone,
@@ -216,6 +226,16 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
       if (!result.success) {
         if (result.unavailableItems && result.unavailableItems.length > 0) {
           setUnavailableItems(result.unavailableItems)
+          setLoading(false)
+          return
+        }
+        if (result.totalMismatch) {
+          // Pass-2-B: серверный пересчёт дал большую сумму — кнопка
+          // показывала меньшую. Просим пользователя обновить страницу,
+          // чтобы он увидел корректный итог перед оплатой.
+          setError(
+            `Сумма заказа изменилась: было ${result.totalMismatch.clientTotal}₽, стало ${result.totalMismatch.serverTotal}₽. Обновите страницу.`
+          )
           setLoading(false)
           return
         }
@@ -541,6 +561,9 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
               image: replacement.primaryImage,
               quantity: realQty,
               slug: replacement.slug,
+              // Pass-2-D: используем realQty не как stockSnapshot — последний
+              // должен быть РЕАЛЬНЫМ stock, чтобы CartDrawer корректно
+              // дизейблил «+». Берём оригинал.
               stockSnapshot: replacement.recommendedVariant.stock,
             })
             setUnavailableItems((prev) =>

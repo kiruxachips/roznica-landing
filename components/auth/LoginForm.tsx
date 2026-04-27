@@ -29,7 +29,16 @@ const OAUTH_ERRORS: Record<string, string> = {
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/account"
+  // Pass-2-E: open-redirect защита. Принимаем только относительные пути,
+  // начинающиеся с одного `/`. Двойной слэш `//evil.com` или абсолютный
+  // `https://evil.com` отвергаем — иначе атакующий мог бы прислать ссылку
+  // /auth/login?callbackUrl=https://phish.example и угнать сессию после
+  // успешного логина.
+  const rawCallback = searchParams.get("callbackUrl") || "/account"
+  const callbackUrl =
+    rawCallback.startsWith("/") && !rawCallback.startsWith("//")
+      ? rawCallback
+      : "/account"
   const verified = searchParams.get("verified")
   const oauthError = searchParams.get("error")
   const oauthErrorMessage = oauthError
