@@ -76,7 +76,18 @@ async function rollbackOrder(
 }
 
 export type CreateOrderResult =
-  | { success: true; orderNumber: string; id: string; thankYouToken: string | null; paymentUrl: string | null }
+  | {
+      success: true
+      orderNumber: string
+      id: string
+      thankYouToken: string | null
+      paymentUrl: string | null
+      /** I5 (B-1): proof of ownership для PendingPaymentBanner +
+       *  /api/orders/check-pending. Совпадает с Order.trackingToken. */
+      trackingToken: string | null
+      /** Сумма заказа — для отображения в banner'е. */
+      total: number
+    }
   | {
       success: false
       error: string
@@ -103,6 +114,8 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
           orderNumber: true,
           id: true,
           thankYouToken: true,
+          trackingToken: true,
+          total: true,
           paymentId: true,
         },
       })
@@ -112,6 +125,8 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
           orderNumber: existing.orderNumber,
           id: existing.id,
           thankYouToken: existing.thankYouToken,
+          trackingToken: existing.trackingToken,
+          total: existing.total,
           // paymentUrl восстановить из YooKassa дорого — клиент уже либо
           // на /thank-you, либо на платёжке. Возвращаем null: PaymentStep
           // увидит "success без paymentUrl" → редиректит на thank-you,
@@ -144,6 +159,8 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
           orderNumber: true,
           id: true,
           thankYouToken: true,
+          trackingToken: true,
+          total: true,
         },
       })
       if (existing) {
@@ -152,6 +169,8 @@ export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
           orderNumber: existing.orderNumber,
           id: existing.id,
           thankYouToken: existing.thankYouToken,
+          trackingToken: existing.trackingToken,
+          total: existing.total,
           paymentUrl: null,
         }
       }
@@ -409,6 +428,8 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
       id: order.id,
       thankYouToken: order.thankYouToken,
       paymentUrl,
+      trackingToken: order.trackingToken,
+      total: order.total,
     }
   }
 
@@ -418,6 +439,8 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     id: order.id,
     thankYouToken: order.thankYouToken,
     paymentUrl: null,
+    trackingToken: order.trackingToken,
+    total: order.total,
   }
 }
 

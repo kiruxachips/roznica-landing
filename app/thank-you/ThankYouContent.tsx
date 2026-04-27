@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { CheckCircle, Clock, MailCheck, Package, XCircle } from "lucide-react"
+import { usePendingPaymentStore } from "@/lib/store/pending-payment"
+import { PendingPaymentBanner } from "@/components/cart/PendingPaymentBanner"
 
 interface OrderSummary {
   orderNumber: string
@@ -39,6 +41,20 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
     }
   }, [shouldTrack, order.total])
 
+  // I5 (B-1): если юзер дошёл до thank-you с подтверждённым/отменённым
+  // статусом — снимаем pending-payment банер. Cross-tab broadcast внутри
+  // clear() уведомит остальные открытые вкладки (например, /cart на
+  // соседнем устройстве).
+  const clearPending = usePendingPaymentStore((s) => s.clear)
+  const pending = usePendingPaymentStore((s) => s.current)
+  useEffect(() => {
+    if (paymentStatus === "succeeded" || paymentStatus === "canceled") {
+      if (pending && pending.orderNumber === order.orderNumber) {
+        clearPending()
+      }
+    }
+  }, [paymentStatus, pending, order.orderNumber, clearPending])
+
   // Если на чекауте юзер выбрал «создать аккаунт», PaymentStep кладёт email
   // в sessionStorage перед редиректом на оплату. Показываем напоминание о
   // подтверждении email и сразу удаляем флаг, чтобы при перезагрузке страницы
@@ -69,9 +85,16 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           </p>
         </div>
 
+        {/* I5 (B-1): даём кнопку «Доплатить» прямо на thank-you. Банер
+            ищет свой заказ в pending-payment store — если юзер вернулся
+            на эту страницу из YooKassa, snapshot всё ещё там; он
+            достанет свежий paymentUrl через /api/orders/check-pending. */}
+        <PendingPaymentBanner />
+
         <div className="bg-amber-50 rounded-2xl p-6 sm:p-8 mb-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Вы вернулись без завершения оплаты. Заказ сохранён — свяжитесь с нами, если хотите оплатить позже.
+            Если кнопка «Доплатить» выше не работает, свяжитесь с нами —
+            пришлём новую ссылку для оплаты.
           </p>
         </div>
 

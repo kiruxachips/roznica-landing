@@ -8,6 +8,7 @@ import { ArrowLeft, Eye, EyeOff, Lock, UserPlus } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
+import { usePendingPaymentStore } from "@/lib/store/pending-payment"
 import { createOrder } from "@/lib/actions/orders"
 import { registerUser } from "@/lib/actions/auth"
 import { GiftPicker } from "../GiftPicker"
@@ -305,6 +306,23 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           pendingVerificationEmail = email
         }
         // Если regResult.error — banner НЕ ставим.
+      }
+
+      // I5 (B-1): сохраняем snapshot ДО очистки клиентского состояния.
+      // Если юзер закроет вкладку на платёжке или нажмёт «Назад» —
+      // PendingPaymentBanner на /cart покажет «Завершите оплату».
+      // 10 минут — стандартный TTL confirmation_url у YooKassa; после
+      // — endpoint /repay перевыпустит платёж для того же заказа.
+      if (result.paymentUrl && result.trackingToken) {
+        usePendingPaymentStore.getState().setPending({
+          orderId: result.id,
+          orderNumber: result.orderNumber,
+          amount: result.total,
+          paymentUrl: result.paymentUrl,
+          trackingToken: result.trackingToken,
+          createdAt: Date.now(),
+          expiresAt: Date.now() + 10 * 60 * 1000,
+        })
       }
 
       clearCart()

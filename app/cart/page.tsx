@@ -2,6 +2,7 @@ import { Metadata } from "next"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { CartPage } from "@/components/cart/CartPage"
+import { PendingPaymentBanner } from "@/components/cart/PendingPaymentBanner"
 
 export const metadata: Metadata = {
   title: "Корзина | Millor Coffee",
@@ -15,6 +16,10 @@ export default function CartRoute() {
       <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 bg-secondary/20 min-h-screen">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <h1 className="font-sans text-2xl sm:text-3xl font-bold mb-5 sm:mb-8">Корзина</h1>
+          {/* I5 (B-1): «Завершите оплату» — банер виден если у юзера есть
+              незавершённый pending-заказ в localStorage. Скрывается сам,
+              если webhook подтвердил оплату на другой вкладке. */}
+          <PendingPaymentBanner />
           <CartPage />
         </div>
       </main>
