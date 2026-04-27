@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Payment verification failed" }, { status: 500 })
   }
 
-  const order = await prisma.order.findFirst({
+  let order = await prisma.order.findFirst({
     where: { paymentId },
     include: {
       user: { select: { email: true, name: true, notifyOrderStatus: true } },
@@ -94,6 +94,31 @@ export async function POST(request: NextRequest) {
       promoCode: { select: { code: true } },
     },
   })
+
+  // Pass-2-H (post-B-audit): fallback по metadata.orderId. Если юзер
+  // прошёл repay-flow, на Order сохранён НОВЫЙ paymentId. Старый Payment
+  // остаётся валидным в YooKassa ~10 минут — если юзер успел оплатить
+  // СТАРУЮ ссылку из второй вкладки, webhook придёт с paymentId, которого
+  // в БД уже нет. Без fallback — потерянный платёж. С fallback — находим
+  // заказ по metadata.orderId и обрабатываем как обычный succeed/cancel.
+  if (!order) {
+    const fallbackOrderId = verifiedPayment.metadata?.orderId
+    if (fallbackOrderId) {
+      order = await prisma.order.findUnique({
+        where: { id: fallbackOrderId },
+        include: {
+          user: { select: { email: true, name: true, notifyOrderStatus: true } },
+          items: { select: { variantId: true, quantity: true, name: true, weight: true, price: true } },
+          promoCode: { select: { code: true } },
+        },
+      })
+      if (order) {
+        console.warn(
+          `[webhook] order ${order.orderNumber}: paymentId mismatch (got ${paymentId}, current ${order.paymentId}) — using metadata.orderId fallback`
+        )
+      }
+    }
+  }
 
   if (!order) {
     console.warn(`Webhook: order not found for paymentId ${paymentId}`)

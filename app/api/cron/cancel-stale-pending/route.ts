@@ -56,7 +56,11 @@ export async function GET(request: Request) {
       selectedGiftId: true,
       items: { select: { variantId: true, quantity: true } },
     },
-    take: 100, // батчим, чтобы один прогон не висел вечно при бэклоге
+    // Батч 500: при средней транзакции ~50ms прогон укладывается в ~25 сек,
+    // что меньше тайм-аута cron-curl (90s). Подняли с 100, чтобы дренаж
+    // backlog'a (например, после простоя cron'а) не растягивался на часы —
+    // меньше окно race с repay-flow.
+    take: 500,
   })
 
   if (stale.length === 0) {

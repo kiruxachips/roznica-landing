@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
 import { headers } from "next/headers"
+import { timingSafeEqual } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { createPayment } from "@/lib/yookassa"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -43,6 +45,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid request" }, { status: 400 })
   }
 
+  // Pass-2-G (post-B-audit CRITICAL): rate-limit. Без него атакующий с
+  // украденным trackingToken мог бы за минуту создать сотни платежей в
+  // YooKassa (DoS на квоту + orphan-Payment'ы). Двухуровневый ключ:
+  //  - per-orderId: 1 repay в 30 сек (нормальный кейс — 1 кнопка раз в час).
+  //  - per-IP: 10 repay в 5 минут (защита от перебора по разным orderId).
+  const ipHeader = (await headers()).get("x-forwarded-for") || ""
+  const ip = ipHeader.split(",")[0]?.trim() || "unknown"
+  const orderLimit = checkRateLimit(`repay:order:${parsed.orderId}`, {
+    max: 1,
+    windowMs: 30_000,
+    blockMs: 30_000,
+  })
+  if (!orderLimit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited", message: "Слишком частые запросы — подождите 30 секунд" },
+      { status: 429, headers: { "Retry-After": String(orderLimit.retryAfter ?? 30) } }
+    )
+  }
+  const ipLimit = checkRateLimit(`repay:ip:${ip}`, {
+    max: 10,
+    windowMs: 5 * 60_000,
+    blockMs: 5 * 60_000,
+  })
+  if (!ipLimit.allowed) {
+    return NextResponse.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(ipLimit.retryAfter ?? 300) } }
+    )
+  }
+
   const order = await prisma.order.findUnique({
     where: { id: parsed.orderId },
     select: {
@@ -56,7 +88,17 @@ export async function POST(request: Request) {
     },
   })
 
-  if (!order || order.trackingToken !== parsed.trackingToken) {
+  // Pass-2-G: constant-time compare для trackingToken — закрывает
+  // теоретическую timing-атаку. Также отвергаем не-совпавшие длины,
+  // потому что timingSafeEqual выбросит на разных размерах.
+  const tokenOk =
+    !!order?.trackingToken &&
+    order.trackingToken.length === parsed.trackingToken.length &&
+    timingSafeEqual(
+      Buffer.from(order.trackingToken),
+      Buffer.from(parsed.trackingToken)
+    )
+  if (!order || !tokenOk) {
     return NextResponse.json({ error: "not_found" }, { status: 404 })
   }
 

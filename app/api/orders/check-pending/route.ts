@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { z } from "zod"
+import { timingSafeEqual } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { getPayment } from "@/lib/yookassa"
 
@@ -57,8 +58,17 @@ export async function GET(request: Request) {
     },
   })
 
-  // Не палим существование заказа при невалидном token — отвечаем "not-found".
-  if (!order || order.trackingToken !== parsed.trackingToken) {
+  // Pass-2-G: constant-time compare. Не палим существование заказа при
+  // невалидном token — отвечаем "not-found". timingSafeEqual требует
+  // одинаковой длины, поэтому len-check сначала.
+  const tokenOk =
+    !!order?.trackingToken &&
+    order.trackingToken.length === parsed.trackingToken.length &&
+    timingSafeEqual(
+      Buffer.from(order.trackingToken),
+      Buffer.from(parsed.trackingToken)
+    )
+  if (!order || !tokenOk) {
     return NextResponse.json({ status: "not-found" }, { status: 200 })
   }
 
