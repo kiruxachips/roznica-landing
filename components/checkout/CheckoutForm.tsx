@@ -46,6 +46,21 @@ export function CheckoutForm() {
     if (mounted && items.length === 0) resetWizard()
   }, [mounted, items.length, resetWizard])
 
+  // Хуки ВСЕГДА вызываются до early-return: rules-of-hooks. Если корзина
+  // пуста, total=0 и хук просто вернёт {loading:false, value:null}.
+  const total = totalPrice()
+  // Pass-2-A: единый источник истины для скидки. Раньше CheckoutForm считал
+  // finalTotal только с promo, а OrderSummary при рендере ещё раз вычитал
+  // welcome — кнопка «Оплатить — N₽» и строка «Итого N₽» расходились.
+  // Серверная DAL-логика: discount = promo XOR welcome, не оба одновременно
+  // (orders.ts:139-149). Зеркалируем здесь.
+  const welcome = useWelcomeDiscount(total).value
+  const effectiveDiscount =
+    promoDiscount > 0 ? promoDiscount : welcome?.discount ?? 0
+  const afterDiscount = total - effectiveDiscount
+  const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
+  const finalTotal = afterDiscount + deliveryPrice
+
   if (!mounted) return null
 
   if (items.length === 0) {
@@ -72,19 +87,6 @@ export function CheckoutForm() {
       </div>
     )
   }
-
-  const total = totalPrice()
-  // Pass-2-A: единый источник истины для скидки. Раньше CheckoutForm считал
-  // finalTotal только с promo, а OrderSummary при рендере ещё раз вычитал
-  // welcome — кнопка «Оплатить — N₽» и строка «Итого N₽» расходились.
-  // Серверная DAL-логика: discount = promo XOR welcome, не оба одновременно
-  // (orders.ts:139-149). Зеркалируем здесь.
-  const welcome = useWelcomeDiscount(total).value
-  const effectiveDiscount =
-    promoDiscount > 0 ? promoDiscount : welcome?.discount ?? 0
-  const afterDiscount = total - effectiveDiscount
-  const deliveryPrice = selectedRate ? selectedRate.priceWithMarkup : 0
-  const finalTotal = afterDiscount + deliveryPrice
 
   const contactSummary =
     completed.contact &&
