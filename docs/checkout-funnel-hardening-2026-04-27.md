@@ -265,7 +265,8 @@ M1 → M3 → M4 → M5 → M7 → M8 (M2 уже в C9; M6 — отдельно)
 | I2 | reset wizard clears persist | `[x]` | 9e46a2f |
 | I3 | PVZ modal timeout | `[x]` | 9e46a2f |
 | I4 | Replacement quantity vs stock | `[x]` | 9e46a2f |
-| I5 | pendingPayment flow | `[ ]` | отдельный PR — переделка clearCart |
+| I5 | pendingPayment flow | `[x]` | B-1: 6bf8d5e, B-2/B-3: dfcde45, B-4: pending |
+| I5-B5 | Email recovery «завершите оплату» | `[ ]` | backlog — улучшение UX, не критично |
 | I6 | GiftPicker pre-submit recheck | `[x]` | 9e46a2f |
 | I7 | WeightSelector + Sticky shared state | `[x]` | 9e46a2f |
 | I8 | Email-suggest AbortController | `[x]` | 9e46a2f |

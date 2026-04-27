@@ -546,12 +546,15 @@ export async function createOrder(data: OrderData) {
   return order.created
 }
 
-export async function getOrders(filters: { status?: string; search?: string; channel?: string; page?: number; limit?: number } = {}) {
-  const { status, search, channel, page = 1, limit = 20 } = filters
+export async function getOrders(filters: { status?: string; search?: string; channel?: string; paymentStatus?: string; page?: number; limit?: number } = {}) {
+  const { status, search, channel, paymentStatus, page = 1, limit = 20 } = filters
 
   const conditions: Record<string, unknown>[] = []
   if (status) conditions.push({ status })
   if (channel && channel !== "all") conditions.push({ channel })
+  // I5 (B-4): отдельный фильтр по платёжному статусу. Полезно админу
+  // чтобы быстро найти заказы, ждущие оплаты, и переотправить ссылку.
+  if (paymentStatus) conditions.push({ paymentStatus })
   if (search) {
     conditions.push({
       OR: [

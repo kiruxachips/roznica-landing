@@ -23,16 +23,17 @@ const statusStyles: Record<string, string> = {
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; page?: string; search?: string; channel?: string }>
+  searchParams: Promise<{ status?: string; page?: string; search?: string; channel?: string; paymentStatus?: string }>
 }) {
   await requireAdmin("orders.view")
   const params = await searchParams
   const status = params.status
   const search = params.search
   const channel = params.channel
+  const paymentStatus = params.paymentStatus
   const page = Number(params.page) || 1
 
-  const { orders, total } = await getOrders({ status, search, channel, page })
+  const { orders, total } = await getOrders({ status, search, channel, paymentStatus, page })
   const totalPages = Math.ceil(total / 20)
 
   const buildHref = (overrides: Record<string, string | undefined>) => {
@@ -40,6 +41,10 @@ export default async function AdminOrdersPage({
     if (overrides.status ?? status) q.set("status", overrides.status ?? status!)
     if (overrides.search ?? search) q.set("search", overrides.search ?? search!)
     if (overrides.channel ?? channel) q.set("channel", overrides.channel ?? channel!)
+    if ("paymentStatus" in overrides ? overrides.paymentStatus : paymentStatus) {
+      const v = "paymentStatus" in overrides ? overrides.paymentStatus : paymentStatus
+      if (v) q.set("paymentStatus", v)
+    }
     const qs = q.toString()
     return `/admin/orders${qs ? `?${qs}` : ""}`
   }
@@ -93,6 +98,26 @@ export default async function AdminOrdersPage({
         ))}
       </div>
 
+      {/* I5 (B-4): фильтр по платёжному статусу — отдельная ось от order.status. */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <span className="text-xs text-muted-foreground self-center">Оплата:</span>
+        <Link href={buildHref({ paymentStatus: undefined })} className={`px-3 py-1.5 rounded-lg text-xs ${!paymentStatus ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          Все
+        </Link>
+        <Link href={buildHref({ paymentStatus: "pending" })} className={`px-3 py-1.5 rounded-lg text-xs ${paymentStatus === "pending" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          Ждёт оплаты
+        </Link>
+        <Link href={buildHref({ paymentStatus: "succeeded" })} className={`px-3 py-1.5 rounded-lg text-xs ${paymentStatus === "succeeded" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          Оплачен
+        </Link>
+        <Link href={buildHref({ paymentStatus: "canceled" })} className={`px-3 py-1.5 rounded-lg text-xs ${paymentStatus === "canceled" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          Платёж отменён
+        </Link>
+        <Link href={buildHref({ paymentStatus: "refunded" })} className={`px-3 py-1.5 rounded-lg text-xs ${paymentStatus === "refunded" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}>
+          Возврат
+        </Link>
+      </div>
+
       <div className="bg-white rounded-xl shadow-sm border border-border overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
@@ -102,6 +127,7 @@ export default async function AdminOrdersPage({
               <th className="text-left px-4 py-3 font-medium">Клиент</th>
               <th className="text-left px-4 py-3 font-medium">Сумма</th>
               <th className="text-left px-4 py-3 font-medium">Статус</th>
+              <th className="text-left px-4 py-3 font-medium">Оплата</th>
               <th className="text-left px-4 py-3 font-medium">Дата</th>
             </tr>
           </thead>
@@ -143,6 +169,26 @@ export default async function AdminOrdersPage({
                     <span className="ml-1 px-2 py-0.5 rounded-md text-xs bg-amber-50 text-amber-700 border border-amber-200">
                       ждёт одобрения
                     </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {order.paymentStatus ? (
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                      order.paymentStatus === "succeeded"
+                        ? "bg-green-50 text-green-700"
+                        : order.paymentStatus === "pending"
+                          ? "bg-amber-50 text-amber-700"
+                          : order.paymentStatus === "canceled"
+                            ? "bg-red-50 text-red-700"
+                            : "bg-gray-50 text-gray-600"
+                    }`}>
+                      {order.paymentStatus === "succeeded" && "Оплачен"}
+                      {order.paymentStatus === "pending" && "Ждёт"}
+                      {order.paymentStatus === "canceled" && "Отменён"}
+                      {order.paymentStatus === "refunded" && "Возврат"}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">
