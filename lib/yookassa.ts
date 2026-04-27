@@ -17,6 +17,11 @@ interface CreatePaymentParams {
   amount: number // in rubles
   returnUrl: string
   description: string
+  /** I5 (B-2): override Idempotence-Key. По умолчанию = orderId, что
+   *  идемпотентно для первичного платежа. Для repay-flow передаётся
+   *  свежий ключ типа `repay-${orderId}-${ts}`, иначе YooKassa вернёт
+   *  кэшированный платёж со старым (протухшим) confirmation_url. */
+  idempotenceKey?: string
 }
 
 interface YookassaPayment {
@@ -34,13 +39,14 @@ export async function createPayment({
   amount,
   returnUrl,
   description,
+  idempotenceKey,
 }: CreatePaymentParams): Promise<YookassaPayment> {
   const res = await fetchWithTimeout(`${YOOKASSA_API}/payments`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Basic ${getAuth()}`,
-      "Idempotence-Key": orderId,
+      "Idempotence-Key": idempotenceKey ?? orderId,
     },
     body: JSON.stringify({
       amount: {

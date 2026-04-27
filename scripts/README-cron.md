@@ -15,6 +15,11 @@
 # Abandoned cart recovery — каждые 15 минут
 */15 * * * * user curl -s -H "Authorization: Bearer ${CRON_SECRET}" https://millor-coffee.ru/api/cron/abandoned-cart-recovery > /dev/null
 
+# I5 (B-3): отмена «застрявших» pending-заказов старше 48 часов —
+# каждые 30 минут. Без этого stock декрементируется навсегда у любого
+# заказа, который пользователь начал, но не оплатил.
+*/30 * * * * user curl -s -H "Authorization: Bearer ${CRON_SECRET}" https://millor-coffee.ru/api/cron/cancel-stale-pending > /dev/null
+
 # Review prompts — раз в день в 10:00 UTC (13:00 MSK — адекватное время для email)
 0 10 * * * user curl -s -H "Authorization: Bearer ${CRON_SECRET}" https://millor-coffee.ru/api/cron/review-prompts > /dev/null
 

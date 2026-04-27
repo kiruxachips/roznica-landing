@@ -24,10 +24,13 @@ import {
  */
 export function PendingPaymentBanner() {
   const current = usePendingPaymentStore((s) => s.current)
+  const setPending = usePendingPaymentStore((s) => s.setPending)
   const clear = usePendingPaymentStore((s) => s.clear)
   const [freshUrl, setFreshUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expired, setExpired] = useState(false)
+  const [repaying, setRepaying] = useState(false)
+  const [repayError, setRepayError] = useState<string | null>(null)
 
   // Cross-tab: если оплатили на другой вкладке, тут банер исчезает.
   useEffect(() => {
@@ -123,12 +126,50 @@ export function PendingPaymentBanner() {
         {expired ? (
           <button
             type="button"
-            disabled
-            className="flex-1 h-10 bg-amber-200 text-amber-700 rounded-xl text-sm font-medium flex items-center justify-center gap-2 cursor-not-allowed"
-            title="Создание новой ссылки оплаты появится в ближайшем апдейте"
+            disabled={repaying}
+            onClick={async () => {
+              if (!current) return
+              setRepaying(true)
+              setRepayError(null)
+              try {
+                const r = await fetch("/api/orders/repay", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    orderId: current.orderId,
+                    trackingToken: current.trackingToken,
+                  }),
+                })
+                if (!r.ok) {
+                  const data = await r.json().catch(() => ({}))
+                  if (data?.error === "cancelled" || data?.error === "already_paid") {
+                    // Серверный статус говорит, что банер больше не нужен.
+                    clear()
+                    return
+                  }
+                  throw new Error(data?.error || "Не удалось создать ссылку")
+                }
+                const data: { paymentUrl: string; expiresAt: number } =
+                  await r.json()
+                // Обновляем store: новый URL + новое expiresAt — и сразу
+                // редирект пользователя на платёж.
+                setPending({
+                  ...current,
+                  paymentUrl: data.paymentUrl,
+                  expiresAt: data.expiresAt,
+                })
+                window.location.href = data.paymentUrl
+              } catch (e) {
+                setRepayError(
+                  e instanceof Error ? e.message : "Попробуйте ещё раз"
+                )
+                setRepaying(false)
+              }
+            }}
+            className="flex-1 h-10 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <Clock className="w-4 h-4" />
-            Создать новую ссылку (скоро)
+            {repaying ? "Создаём ссылку…" : "Создать новую ссылку оплаты"}
           </button>
         ) : freshUrl ? (
           <a
@@ -140,6 +181,10 @@ export function PendingPaymentBanner() {
           </a>
         ) : null}
       </div>
+
+      {repayError && (
+        <p className="mt-2 text-xs text-red-700">{repayError}</p>
+      )}
     </div>
   )
 }
