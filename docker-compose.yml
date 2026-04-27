@@ -27,6 +27,12 @@ services:
       - DATABASE_URL=postgresql://roznica:${DB_PASSWORD:?required}@db:5432/roznica
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?required}
       - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3004}
+      # Стабильный ключ шифрования Server Actions. Без него Next.js
+      # генерирует новый ключ на каждой сборке → action-id из старых
+      # вкладок пользователей перестают резолвиться на свежем деплое
+      # ("Server Action X was not found on the server"). Один раз
+      # сгенерировать `openssl rand -base64 32` и больше НЕ менять.
+      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?required}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID:-}

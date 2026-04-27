@@ -231,6 +231,15 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
     } catch (e) {
       console.error("Checkout submit failed:", e)
       const msg = e instanceof Error ? e.message : "Попробуйте ещё раз"
+      // Если бандл устарел после деплоя, action-id из открытой вкладки
+      // не резолвится на новом сервере. Перезагружаем страницу, чтобы
+      // покупатель получил свежий бандл — корзина в localStorage,
+      // данные шага в Zustand persist, ничего не теряется.
+      if (/Server Action.*was not found/i.test(msg)) {
+        setError("Обновляем форму — секунду…")
+        window.location.reload()
+        return
+      }
       setError(`Ошибка при оформлении заказа: ${msg}`)
       setLoading(false)
     }
