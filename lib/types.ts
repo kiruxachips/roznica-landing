@@ -242,5 +242,8 @@ export interface RecommendedProduct {
     stock: number
   }
   score: number
-  reason: "milestone_free_delivery" | "milestone_gift" | "affinity" | "popular" | "cross-sell"
+  reason: "milestone_free_delivery" | "milestone_gift" | "affinity" | "popular" | "cross-sell" | "replacement"
+  /** Только для reason="replacement": разница в цене относительно
+   *  заменяемого варианта. Положительная — дороже, отрицательная — дешевле. */
+  priceDelta?: number
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { ArrowLeft, Eye, EyeOff, Lock, UserPlus } from "lucide-react"
@@ -11,6 +11,8 @@ import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { createOrder } from "@/lib/actions/orders"
 import { registerUser } from "@/lib/actions/auth"
 import { GiftPicker } from "../GiftPicker"
+import { ReplacementPicker } from "../ReplacementPicker"
+import type { RecommendedProduct } from "@/lib/types"
 
 interface UnavailableItem {
   variantId: string
@@ -40,6 +42,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const clearCart = useCartStore((s) => s.clearCart)
   const removeItem = useCartStore((s) => s.removeItem)
   const updatePrice = useCartStore((s) => s.updatePrice)
+  const addItem = useCartStore((s) => s.addItem)
 
   const selectedRate = useDeliveryStore((s) => s.selectedRate)
   const selectRate = useDeliveryStore((s) => s.selectRate)
@@ -69,6 +72,17 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const [priceMismatch, setPriceMismatch] = useState<DeliveryPriceMismatch | null>(null)
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [accountError, setAccountError] = useState("")
+  // Порог бесплатной доставки тянем для подсветки в ReplacementPicker
+  // («+ откроется бесплатная доставка»). Один лёгкий fetch на маунт.
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(0)
+  useEffect(() => {
+    fetch("/api/delivery/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.freeDeliveryThreshold) setFreeDeliveryThreshold(d.freeDeliveryThreshold)
+      })
+      .catch(() => {})
+  }, [])
   const showRegistrationPrompt = !isCustomer
 
   const afterDiscount = totalPrice() - promoDiscount
@@ -439,70 +453,45 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
       </div>
 
       {unavailableItems.length > 0 && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="bg-white rounded-2xl shadow-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-2">Товары изменили статус</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Пока вы оформляли заказ, эти товары стали недоступны или изменились в цене.
-              Мы не можем оформить заказ, пока они в корзине.
-            </p>
-            <ul className="space-y-2 mb-5 max-h-48 overflow-y-auto">
-              {unavailableItems.map((u) => (
-                <li key={u.variantId} className="text-sm bg-amber-50 rounded-xl px-3 py-2">
-                  <p className="font-medium">{u.name}</p>
-                  <p className="text-xs text-amber-700">
-                    {u.reason === "out_of_stock" && "Нет в наличии"}
-                    {u.reason === "insufficient_stock" &&
-                      `Доступно только ${u.available} из запрошенных ${u.requested}`}
-                    {u.reason === "inactive" && "Товар снят с продажи"}
-                    {u.reason === "price_changed" && u.currentPrice !== undefined
-                      ? `Цена изменилась, актуальная — ${u.currentPrice}₽`
-                      : u.reason === "price_changed" && "Цена изменилась"}
-                  </p>
-                </li>
-              ))}
-            </ul>
-            <div className="flex flex-col gap-2">
-              {unavailableItems.every(
-                (u) => u.reason === "price_changed" && u.currentPrice !== undefined
-              ) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    for (const u of unavailableItems) {
-                      if (u.currentPrice !== undefined) updatePrice(u.variantId, u.currentPrice)
-                    }
-                    setUnavailableItems([])
-                  }}
-                  className="h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
-                >
-                  Обновить цены и продолжить
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  for (const u of unavailableItems) removeItem(u.variantId)
-                  setUnavailableItems([])
-                }}
-                className="h-11 border border-primary text-primary rounded-xl text-sm font-medium hover:bg-primary/5 transition-colors"
-              >
-                Убрать из корзины и продолжить
-              </button>
-              <button
-                type="button"
-                onClick={() => setUnavailableItems([])}
-                className="h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
-              >
-                Отменить
-              </button>
-            </div>
-          </div>
-        </div>
+        <UnavailableItemsModal
+          items={unavailableItems}
+          freeDeliveryThreshold={freeDeliveryThreshold}
+          onReplace={(oldItem, replacement) => {
+            // Атомарно: убираем старую позицию и кладём новую с тем же
+            // количеством. Цены в локальном кэше — снимок на момент
+            // выбора замены; серверный re-validate в createOrder поймает,
+            // если за эти секунды что-то снова изменится.
+            const cartItem = items.find((i) => i.variantId === oldItem.variantId)
+            const quantity = cartItem?.quantity ?? oldItem.requested
+            removeItem(oldItem.variantId)
+            addItem({
+              productId: replacement.id,
+              variantId: replacement.recommendedVariant.id,
+              name: replacement.name,
+              weight: replacement.recommendedVariant.weight,
+              price: replacement.recommendedVariant.price,
+              image: replacement.primaryImage,
+              quantity,
+              slug: replacement.slug,
+            })
+            setUnavailableItems((prev) =>
+              prev.filter((u) => u.variantId !== oldItem.variantId)
+            )
+          }}
+          onSkip={(oldItem) => {
+            removeItem(oldItem.variantId)
+            setUnavailableItems((prev) =>
+              prev.filter((u) => u.variantId !== oldItem.variantId)
+            )
+          }}
+          onUpdatePrices={() => {
+            for (const u of unavailableItems) {
+              if (u.currentPrice !== undefined) updatePrice(u.variantId, u.currentPrice)
+            }
+            setUnavailableItems([])
+          }}
+          onClose={() => setUnavailableItems([])}
+        />
       )}
 
       {priceMismatch && (
@@ -535,6 +524,136 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface UnavailableItemsModalProps {
+  items: UnavailableItem[]
+  freeDeliveryThreshold: number
+  onReplace: (oldItem: UnavailableItem, replacement: RecommendedProduct) => void
+  onSkip: (oldItem: UnavailableItem) => void
+  onUpdatePrices: () => void
+  onClose: () => void
+}
+
+function UnavailableItemsModal({
+  items,
+  freeDeliveryThreshold,
+  onReplace,
+  onSkip,
+  onUpdatePrices,
+  onClose,
+}: UnavailableItemsModalProps) {
+  const cartItems = useCartStore((s) => s.items)
+  const totalPrice = useCartStore((s) => s.totalPrice)()
+
+  // Все товары — это просто "цена изменилась"? Тогда показываем компактную
+  // модалку как раньше: одна кнопка "обновить цены и продолжить", без
+  // подбора замен (товар-то в наличии, юзер просто увидел свежий ценник).
+  const allPriceChanged = items.every(
+    (u) => u.reason === "price_changed" && u.currentPrice !== undefined
+  )
+
+  // Out-of-stock / inactive / insufficient_stock — кандидаты на замену.
+  const replaceable = items.filter(
+    (u) =>
+      u.reason === "out_of_stock" ||
+      u.reason === "inactive" ||
+      u.reason === "insufficient_stock"
+  )
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="bg-white rounded-2xl shadow-lg p-6 max-w-lg w-full my-8 max-h-[90vh] overflow-y-auto">
+        <h3 className="text-lg font-semibold mb-2">Корзина изменилась</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          Пока вы оформляли заказ, что-то изменилось у пары позиций. Решим за
+          несколько секунд.
+        </p>
+
+        {allPriceChanged ? (
+          <>
+            <ul className="space-y-2 mb-5 max-h-48 overflow-y-auto">
+              {items.map((u) => (
+                <li key={u.variantId} className="text-sm bg-amber-50 rounded-xl px-3 py-2">
+                  <p className="font-medium">{u.name}</p>
+                  <p className="text-xs text-amber-700">
+                    {u.currentPrice !== undefined
+                      ? `Цена изменилась, актуальная — ${u.currentPrice}₽`
+                      : "Цена изменилась"}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={onUpdatePrices}
+                className="h-11 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+              >
+                Обновить цены и продолжить
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
+              >
+                Отменить
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-3 mb-5">
+              {replaceable.map((u) => {
+                const cartItem = cartItems.find((i) => i.variantId === u.variantId)
+                const lineTotal = cartItem ? cartItem.price * cartItem.quantity : 0
+                const cartTotalWithoutItem = Math.max(0, totalPrice - lineTotal)
+                return (
+                  <ReplacementPicker
+                    key={u.variantId}
+                    variantId={u.variantId}
+                    productName={u.name}
+                    quantity={cartItem?.quantity ?? u.requested ?? 1}
+                    cartTotalWithoutItem={cartTotalWithoutItem}
+                    freeDeliveryThreshold={freeDeliveryThreshold}
+                    onReplace={(rec) => onReplace(u, rec)}
+                    onSkip={() => onSkip(u)}
+                  />
+                )
+              })}
+              {/* Просто-уведомления о price_changed (если есть вместе с OOS) */}
+              {items
+                .filter((u) => !replaceable.includes(u))
+                .map((u) => (
+                  <div
+                    key={u.variantId}
+                    className="text-sm bg-amber-50 rounded-xl px-3 py-2"
+                  >
+                    <p className="font-medium">{u.name}</p>
+                    <p className="text-xs text-amber-700">
+                      {u.reason === "price_changed" && u.currentPrice !== undefined
+                        ? `Цена изменилась, актуальная — ${u.currentPrice}₽`
+                        : "Изменилось"}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full h-11 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors"
+            >
+              Закрыть
+            </button>
+          </>
+        )}
+      </div>
     </div>
   )
 }

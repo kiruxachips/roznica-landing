@@ -25,6 +25,10 @@ const REASON_LABEL: Record<RecommendedProduct["reason"], string> = {
   affinity: "Часто берут вместе",
   popular: "Добавить к заказу",
   "cross-sell": "Попробуйте также",
+  // CartUpsell вызывает /api/cart/recommendations и никогда не получает
+  // reason="replacement" (тот возвращается только из /api/cart/replacements).
+  // Лейбл здесь чисто для exhaustive-Record — fallback на нейтральный.
+  replacement: "Похожие товары",
 }
 
 export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: CartUpsellProps) {
