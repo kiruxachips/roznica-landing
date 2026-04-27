@@ -37,9 +37,15 @@ export function useDeliveryRates() {
   // нет промокода (так в DAL). Воспроизводим ту же формулу, иначе правило
   // «бесплатно от X₽» сработает на клиенте, но не на сервере → списание
   // больше суммы, которую видел пользователь.
+  //
+  // C7: ждём loading=false из useWelcomeDiscount. Без этого первый fetch
+  // тарифов уходил с cartTotal = subtotal (без скидки) → сервер мог
+  // вернуть «бесплатно», потом welcome загружался, refetch возвращал
+  // платную доставку — visible jitter и переплата у пользователей с
+  // быстрой сетью.
   const welcome = useWelcomeDiscount(subtotal)
   const effectiveDiscount =
-    promoDiscount > 0 ? promoDiscount : welcome?.discount ?? 0
+    promoDiscount > 0 ? promoDiscount : welcome.value?.discount ?? 0
   const cartTotal = Math.max(0, subtotal - effectiveDiscount)
   // Стабильная строка-ключ — массив каждый рендер новый, без хэша
   // useEffect зацикливался бы.
@@ -49,6 +55,10 @@ export function useDeliveryRates() {
 
   useEffect(() => {
     if (!cityCode && !postalCode) return
+    // C7: не запускаем fetch пока welcome ещё в процессе загрузки —
+    // иначе cartTotal будет = subtotal без скидки, а после загрузки
+    // получится refetch с другим cartTotal и потенциально другой ценой.
+    if (welcome.loading) return
 
     setRatesLoading(true)
     const controller = new AbortController()
@@ -97,6 +107,7 @@ export function useDeliveryRates() {
     // city/region/itemsForPacking опущены: cityCode — уникальный идентификатор,
     // itemsKey — стабильный хэш состава. selectedRate в deps вызвал бы
     // бесконечный рефетч (хук сам же его обновляет через selectRate).
+    // welcome.loading — нужен, чтобы дёрнуть refetch после первой загрузки скидки.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cityCode, postalCode, cartTotal, itemsKey])
+  }, [cityCode, postalCode, cartTotal, itemsKey, welcome.loading])
 }

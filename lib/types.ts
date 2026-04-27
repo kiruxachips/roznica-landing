@@ -113,6 +113,13 @@ export interface OrderData {
   userId?: string
   promoCode?: string
   bonusAmount?: number
+  /**
+   * C1: идемпотентность. Клиент генерит UUID при mount /checkout и передаёт
+   * с каждым createOrder. Повторный submit того же id вернёт уже созданный
+   * заказ (не дубль). Опционально для совместимости со старыми клиентами,
+   * админскими создателями заказов и B2B-flow.
+   */
+  clientRequestId?: string
   // Delivery module fields
   deliveryType?: "door" | "pvz"
   deliveryPrice?: number

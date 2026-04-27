@@ -86,8 +86,68 @@ export type CreateOrderResult =
 
 export async function createOrder(data: OrderData): Promise<CreateOrderResult> {
   try {
+    // C1: idempotency. Если клиент шлёт clientRequestId и заказ с таким id уже
+    // существует — возвращаем кеш вместо повторного createOrderImpl, иначе
+    // повторился бы createPayment в YooKassa (новый paymentId), отправились
+    // бы дубли email-ов и т.д. dispatchEmail сам идемпотентен по kind+orderId,
+    // но createPayment — нет, и стэкать платежи нельзя.
+    //
+    // Race-window между этим findUnique и финальным create в transaction
+    // покрывается UNIQUE constraint на clientRequestId — конкурент упадёт
+    // с P2002, ловим ниже.
+    if (data.clientRequestId) {
+      const existing = await prisma.order.findUnique({
+        where: { clientRequestId: data.clientRequestId },
+        select: {
+          orderNumber: true,
+          id: true,
+          thankYouToken: true,
+          paymentId: true,
+        },
+      })
+      if (existing) {
+        return {
+          success: true,
+          orderNumber: existing.orderNumber,
+          id: existing.id,
+          thankYouToken: existing.thankYouToken,
+          // paymentUrl восстановить из YooKassa дорого — клиент уже либо
+          // на /thank-you, либо на платёжке. Возвращаем null: PaymentStep
+          // увидит "success без paymentUrl" → редиректит на thank-you,
+          // где есть кнопка «оплатить» если заказ ещё pending.
+          paymentUrl: null,
+        }
+      }
+    }
+
     return await createOrderImpl(data)
   } catch (e) {
+    // C1: race победил — конкурент успел создать заказ с тем же clientRequestId.
+    // Перечитываем и возвращаем как success.
+    const isUniqueViolation =
+      typeof e === "object" &&
+      e !== null &&
+      "code" in e &&
+      (e as { code: string }).code === "P2002"
+    if (isUniqueViolation && data.clientRequestId) {
+      const existing = await prisma.order.findUnique({
+        where: { clientRequestId: data.clientRequestId },
+        select: {
+          orderNumber: true,
+          id: true,
+          thankYouToken: true,
+        },
+      })
+      if (existing) {
+        return {
+          success: true,
+          orderNumber: existing.orderNumber,
+          id: existing.id,
+          thankYouToken: existing.thankYouToken,
+          paymentUrl: null,
+        }
+      }
+    }
     // Специальная ветка: stock/цена поменялись между add-to-cart и оформлением.
     // Клиент получает список проблемных товаров и показывает модалку
     // с кнопкой "Убрать из корзины и продолжить" — лучше UX чем generic error.

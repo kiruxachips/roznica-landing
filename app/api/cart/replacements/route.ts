@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { z } from "zod"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { scoreReplacements } from "@/lib/recommendations"
@@ -8,6 +9,19 @@ import type { TasteProfile, ProductType } from "@/lib/types"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+
+// C6: zod-валидация. Раньше любая строка проходила как variantId — это
+// открывало кэш-флуд (GET /api/cart/replacements?variantId=<рандомное>
+// заполнял query-кэш мусором) и облегчало scrape ассортимента. cuid()
+// у Prisma — стандарт, длина 25, [a-z0-9]. Длина limit — 1..6.
+const BodySchema = z.object({
+  variantId: z
+    .string()
+    .min(20)
+    .max(40)
+    .regex(/^[a-z0-9]+$/, "invalid id"),
+  limit: z.number().int().min(1).max(6).optional(),
+})
 
 // Тот же запрос как в /api/cart/recommendations — переиспользуем кэш-ключ.
 // Ленивая выборка active-товаров с вариантами и счётом отзывов.
@@ -36,16 +50,18 @@ const getAllProductsForRecommendations = unstable_cache(
 )
 
 export async function POST(request: Request) {
-  let body: { variantId?: string; limit?: number }
+  let parsed: z.infer<typeof BodySchema>
   try {
-    body = await request.json()
+    parsed = BodySchema.parse(await request.json())
   } catch {
-    return NextResponse.json({ replacements: [] })
+    // Не leak'аем структуру схемы — просто 400.
+    return NextResponse.json(
+      { error: "invalid request" },
+      { status: 400 }
+    )
   }
-
-  const variantId = typeof body.variantId === "string" ? body.variantId : null
-  const limit = Math.min(Math.max(body.limit ?? 3, 1), 6)
-  if (!variantId) return NextResponse.json({ replacements: [] })
+  const variantId = parsed.variantId
+  const limit = parsed.limit ?? 3
 
   // Тянем target и список всех кандидатов параллельно, чтобы не ждать
   // лишний RTT — оба запроса нужны в любом случае.

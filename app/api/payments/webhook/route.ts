@@ -132,15 +132,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Amount mismatch" }, { status: 400 })
     }
 
-    await prisma.$transaction([
-      prisma.order.update({
-        where: { id: order.id },
+    // C5: compare-and-swap. Между findFirst и transaction конкурент мог
+    // уже пометить заказ как paid (повторный webhook от YooKassa retry).
+    // updateMany с WHERE paymentStatus != 'succeeded' гарантирует, что
+    // OrderStatusLog не дублируется и email-after() не отправляется
+    // повторно (тут идемпотентность Email-Dispatch тоже спасает, но
+    // явный guard дешевле и проще читать).
+    const result = await prisma.$transaction(async (tx) => {
+      const updated = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          paymentStatus: { not: "succeeded" },
+        },
         data: { status: "paid", paymentStatus: "succeeded" },
-      }),
-      prisma.orderStatusLog.create({
+      })
+      if (updated.count === 0) return { wasProcessed: true }
+      await tx.orderStatusLog.create({
         data: { orderId: order.id, fromStatus: order.status, toStatus: "paid", changedBy: "system" },
-      }),
-    ])
+      })
+      return { wasProcessed: false }
+    })
+    if (result.wasProcessed) {
+      // Конкурент опередил — отвечаем 200, ничего не дублируем.
+      return NextResponse.json({}, { status: 200 })
+    }
 
     // Build email data for detailed payment notifications
     const emailData: OrderEmailData = {
@@ -229,47 +244,70 @@ export async function POST(request: NextRequest) {
       console.error("Failed to prepare order.paid event:", e)
     }
   } else if (verifiedStatus === "canceled") {
-    // Idempotency: skip if already cancelled
+    // Idempotency: skip if already cancelled (быстрый путь по только что
+    // прочитанному order — освобождает соединение к БД до transaction).
     if (order.paymentStatus === "canceled" || order.status === "cancelled") {
       return NextResponse.json({}, { status: 200 })
     }
 
     // Stock restoration is in the same transaction as status update — atomic.
-    // If any step fails the whole transaction rolls back and nothing is lost.
+    // C5: усиление против race-условия. Между findFirst (line ~89) и началом
+    // transaction другой webhook (или admin-cancel из админки) мог уже
+    // отменить заказ. UPDATE-with-WHERE ниже обеспечивает compare-and-swap:
+    // если status уже cancelled, updateMany вернёт count=0 и transaction
+    // откатится — stock не вернётся повторно (overcount защита).
     const stockResults: StockAdjustResult[] = []
-    await prisma.$transaction(async (tx) => {
-      await tx.order.update({
-        where: { id: order.id },
-        data: {
-          status: "cancelled",
-          paymentStatus: "canceled",
-          // GF1: освобождаем подарок при отмене платежа — иначе gift.stock
-          // медленно «съедается» незавершёнными заказами.
-          selectedGiftId: null,
-        },
-      })
-      await tx.orderStatusLog.create({
-        data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
-      })
-      for (const item of order.items) {
-        if (!item.variantId) continue
-        const res = await adjustStock(
-          {
-            variantId: item.variantId,
-            delta: +item.quantity,
-            reason: "order_cancelled",
-            orderId: order.id,
-            notes: "Платёж отменён YooKassa",
-            changedBy: "system",
+    try {
+      await prisma.$transaction(async (tx) => {
+        const updated = await tx.order.updateMany({
+          where: {
+            id: order.id,
+            // accept только если не отменён — иначе кто-то уже сделал refund
+            status: { not: "cancelled" },
+            paymentStatus: { not: "canceled" },
           },
-          tx
-        )
-        stockResults.push(res)
+          data: {
+            status: "cancelled",
+            paymentStatus: "canceled",
+            // GF1: освобождаем подарок при отмене платежа — иначе gift.stock
+            // медленно «съедается» незавершёнными заказами.
+            selectedGiftId: null,
+          },
+        })
+        if (updated.count === 0) {
+          // Конкурент опередил — не возвращаем stock второй раз.
+          throw new Error("ALREADY_CANCELLED_RACE")
+        }
+        await tx.orderStatusLog.create({
+          data: { orderId: order.id, fromStatus: order.status, toStatus: "cancelled", changedBy: "system" },
+        })
+        for (const item of order.items) {
+          if (!item.variantId) continue
+          const res = await adjustStock(
+            {
+              variantId: item.variantId,
+              delta: +item.quantity,
+              reason: "order_cancelled",
+              orderId: order.id,
+              notes: "Платёж отменён YooKassa",
+              changedBy: "system",
+            },
+            tx
+          )
+          stockResults.push(res)
+        }
+        if (order.selectedGiftId) {
+          await refundGiftStock(order.selectedGiftId, tx)
+        }
+      })
+    } catch (e) {
+      if (e instanceof Error && e.message === "ALREADY_CANCELLED_RACE") {
+        // Конкурент уже обработал отмену — это нормальный idempotent-путь,
+        // отвечаем YooKassa 200.
+        return NextResponse.json({}, { status: 200 })
       }
-      if (order.selectedGiftId) {
-        await refundGiftStock(order.selectedGiftId, tx)
-      }
-    })
+      throw e
+    }
     if (stockResults.length > 0) {
       void notifyStockChanges(stockResults)
     }

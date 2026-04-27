@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { ArrowLeft, Eye, EyeOff, Lock, UserPlus } from "lucide-react"
@@ -72,6 +72,17 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
   const [priceMismatch, setPriceMismatch] = useState<DeliveryPriceMismatch | null>(null)
   const [passwordVisible, setPasswordVisible] = useState(false)
   const [accountError, setAccountError] = useState("")
+  // C1: idempotency key. Генерится один раз при монтировании PaymentStep
+  // и переживает все ре-рендеры. При двойном submit сервер вернёт уже
+  // созданный заказ вместо дубля. На каждое новое посещение checkout —
+  // новый id (компонент перемонтируется через CheckoutForm).
+  const clientRequestIdRef = useRef<string>("")
+  if (!clientRequestIdRef.current) {
+    clientRequestIdRef.current =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `crid-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  }
   // Порог бесплатной доставки тянем для подсветки в ReplacementPicker
   // («+ откроется бесплатная доставка»). Один лёгкий fetch на маунт.
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(0)
@@ -140,6 +151,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           : fullDoorAddress
 
       const result = await createOrder({
+        clientRequestId: clientRequestIdRef.current,
         customerName: `${contact.lastName.trim()} ${contact.firstName.trim()}`.trim(),
         customerEmail: contact.email.trim() || undefined,
         customerPhone: contact.phone,

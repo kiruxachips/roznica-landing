@@ -492,6 +492,11 @@ model Order {
   notes           String?     @db.Text
   thankYouToken   String?     @unique
   trackingToken   String?     @unique
+  // Идемпотентность: клиент при mount checkout генерит UUID и шлёт в createOrder.
+  // Повторный submit (двойной клик, dispatchEvent в обход disabled) вернёт тот же
+  // заказ вместо создания дубля. nullable для исторических записей и для каналов,
+  // где idempotency не нужна (например, админский createOrder из админки).
+  clientRequestId String?     @unique
   userId          String?
   user            User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   promoCodeId     String?

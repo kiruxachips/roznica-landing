@@ -1,11 +1,11 @@
 "use client"
 
 import Image from "next/image"
-import { useEffect, useState } from "react"
 import { User, Truck, MapPin, Home, Sparkles } from "lucide-react"
 import type { CartItem } from "@/lib/types"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
+import { useWelcomeDiscount } from "@/lib/hooks/use-welcome-discount"
 
 interface Props {
   items: CartItem[]
@@ -36,31 +36,10 @@ export function OrderSummary({
   const hasDelivery = completed.delivery && selectedRate
   const isPvz = selectedRate?.deliveryType === "pvz"
 
-  // G1-1: тянем welcome-скидку с backend (зависит от userId + config в settings).
-  // Эндпоинт лёгкий (settings через cached DAL + single User-query), кэшировать
-  // через SWR/useMemo не стоит — пересчёт только при изменении subtotal.
-  const [welcomeDiscount, setWelcomeDiscount] = useState<{
-    discount: number
-    percent: number
-  } | null>(null)
-  useEffect(() => {
-    if (total <= 0) {
-      setWelcomeDiscount(null)
-      return
-    }
-    const ctrl = new AbortController()
-    fetch(`/api/cart/welcome-discount?subtotal=${total}`, { signal: ctrl.signal })
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => {
-        if (d?.eligible && d.discount > 0) {
-          setWelcomeDiscount({ discount: d.discount, percent: d.percent })
-        } else {
-          setWelcomeDiscount(null)
-        }
-      })
-      .catch(() => {})
-    return () => ctrl.abort()
-  }, [total])
+  // G1-1: welcome-скидка — единая точка истины через useWelcomeDiscount.
+  // Тот же хук использует useDeliveryRates: один fetch, никакого
+  // рассинхрона между OrderSummary и серверным расчётом доставки.
+  const welcomeDiscount = useWelcomeDiscount(total).value
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:sticky lg:top-24 space-y-4">

@@ -217,16 +217,26 @@ export async function createOrder(data: OrderData) {
     }
     deliveryPrice = matchingRate.priceWithMarkup
 
-    // Trust-guard: клиент видел в UI цену data.deliveryPrice. Если сервер
-    // насчитал БОЛЬШЕ — никогда молча не списываем разницу (и не вешаем
-    // её в email/в платёж YooKassa). Останавливаем оформление, фронт
-    // покажет понятное сообщение и обновит сводку. Тонкий допуск 1₽ —
-    // на разные направления округлений между провайдерами.
-    if (
-      typeof data.deliveryPrice === "number" &&
-      deliveryPrice > data.deliveryPrice + 1
-    ) {
-      throw new DeliveryPriceMismatchError(data.deliveryPrice, deliveryPrice)
+    // Trust-guard. Клиент видел в UI цену data.deliveryPrice. Если сервер
+    // насчитал БОЛЬШЕ — никогда молча не списываем разницу (и не пишем
+    // в email/в платёж YooKassa). Допуск 1₽ — на разные направления
+    // округлений между провайдерами.
+    //
+    // Если deliveryPrice не пришёл вообще (старый клиент / B2B-flow без
+    // тарифа выбора / неправильный body) — для retail тоже падаем: не
+    // должно быть пути «выбрана доставка, но клиент не знает её цену».
+    // Для wholesale guard выключаем — там цена доставки часто = 0 или
+    // считается отдельно через прайс-листы.
+    if (!isWholesale) {
+      if (!Number.isFinite(data.deliveryPrice)) {
+        throw new DeliveryPriceMismatchError(0, deliveryPrice)
+      }
+      if (deliveryPrice > (data.deliveryPrice as number) + 1) {
+        throw new DeliveryPriceMismatchError(
+          data.deliveryPrice as number,
+          deliveryPrice
+        )
+      }
     }
   }
   const total = afterDiscount - bonusUsed + deliveryPrice
@@ -320,6 +330,7 @@ export async function createOrder(data: OrderData) {
         orderNumber: generateOrderNumber(),
         thankYouToken: generateToken(),
         trackingToken: generateToken(),
+        clientRequestId: data.clientRequestId ?? null,
         customerName: data.customerName,
         customerEmail: data.customerEmail,
         customerPhone: data.customerPhone,
