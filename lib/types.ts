@@ -100,6 +100,10 @@ export interface CartItem {
   image: string | null
   quantity: number
   slug: string
+  /** C10: snapshot склада на момент add-to-cart. Используется в CartDrawer
+   *  для дизейбла «+» при достижении остатка и показа подсказки «всего N
+   *  в наличии». Может быть null для исторических записей в localStorage. */
+  stockSnapshot?: number | null
 }
 
 export interface OrderData {

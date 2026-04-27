@@ -21,10 +21,16 @@ interface WeightSelectorProps {
   productSlug: string
   productImage: string | null
   onVariantChange?: (variant: Variant) => void
+  /** I7: контролируемый index. Если передан — компонент управляется сверху
+   *  и синхронизирован со StickyAddToCart. Иначе fallback на собственный state. */
+  selectedIndex?: number
+  onSelectIndex?: (idx: number) => void
 }
 
-export function WeightSelector({ variants, productId, productName, productSlug, productImage, onVariantChange }: WeightSelectorProps) {
-  const [selectedIndex, setSelectedIndex] = useState(variants.length - 1)
+export function WeightSelector({ variants, productId, productName, productSlug, productImage, onVariantChange, selectedIndex: controlledIndex, onSelectIndex }: WeightSelectorProps) {
+  const [uncontrolledIndex, setUncontrolledIndex] = useState(variants.length - 1)
+  const selectedIndex = controlledIndex ?? uncontrolledIndex
+  const setSelectedIndex = onSelectIndex ?? setUncontrolledIndex
   const selected = variants[selectedIndex]
   const addItem = useCartStore((s) => s.addItem)
   const openDrawer = useCartUIStore((s) => s.openDrawer)
@@ -45,6 +51,7 @@ export function WeightSelector({ variants, productId, productName, productSlug, 
       image: productImage,
       quantity: 1,
       slug: productSlug,
+      stockSnapshot: selected.stock,
     })
     openDrawer()
     setAdded(true)

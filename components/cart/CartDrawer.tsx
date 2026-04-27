@@ -127,14 +127,28 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                       <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                    <button
-                      onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
-                      disabled={item.quantity >= 99}
-                      aria-label="Увеличить количество"
-                      className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </button>
+                    {(() => {
+                      // C10: уважаем stock-snapshot. Если хранится null — fallback
+                      // на жёсткий cap 99 (старые элементы в localStorage без поля).
+                      // Серверная re-validate в createOrder всё равно поймает race,
+                      // но дизейбл здесь убирает лишний цикл «добавил 50 → OOS».
+                      const cap =
+                        typeof item.stockSnapshot === "number" && item.stockSnapshot > 0
+                          ? Math.min(item.stockSnapshot, 99)
+                          : 99
+                      const atCap = item.quantity >= cap
+                      return (
+                        <button
+                          onClick={() => !atCap && updateQuantity(item.variantId, item.quantity + 1)}
+                          disabled={atCap}
+                          aria-label="Увеличить количество"
+                          title={atCap && cap < 99 ? `Всего ${cap} в наличии` : undefined}
+                          className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>

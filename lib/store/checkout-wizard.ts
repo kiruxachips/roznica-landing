@@ -51,21 +51,47 @@ export const useCheckoutWizard = create<CheckoutWizardState>()(
         // Нельзя прыгнуть вперёд, пока предыдущий шаг не завершён.
         if (step === "delivery" && !completed.contact) return
         if (step === "payment" && (!completed.contact || !completed.delivery)) return
-        set({ step })
+        // I1: возврат назад инвалидирует всё последующее. Иначе юзер видит
+        // «Доставка ✓» с устаревшей суммой / адресом, и может попасть в
+        // mismatch на оплате (особенно после смены контактного телефона
+        // или пересчёта тарифа из-за изменения корзины).
+        let nextCompleted = completed
+        if (step === "contact") {
+          nextCompleted = { ...completed, delivery: false, payment: false }
+        } else if (step === "delivery") {
+          nextCompleted = { ...completed, payment: false }
+        }
+        set({ step, completed: nextCompleted })
       },
       markCompleted: (step) =>
         set((s) => ({ completed: { ...s.completed, [step]: true } })),
       goBack: () => {
-        const { step } = get()
-        if (step === "payment") set({ step: "delivery" })
-        else if (step === "delivery") set({ step: "contact" })
+        const { step, completed } = get()
+        if (step === "payment") {
+          set({ step: "delivery", completed: { ...completed, payment: false } })
+        } else if (step === "delivery") {
+          set({
+            step: "contact",
+            completed: { ...completed, delivery: false, payment: false },
+          })
+        }
       },
       setContact: (data) => set((s) => ({ contact: { ...s.contact, ...data } })),
       setNotes: (notes) => set({ notes }),
       setAgreed: (agreed) => set({ agreed }),
       setCreateAccount: (createAccount) => set({ createAccount }),
       setAccountPassword: (accountPassword) => set({ accountPassword }),
-      reset: () => set(initial),
+      // I2: явно стираем persist-snapshot. Без этого после reset() при
+      // следующем визите wizard восстановится со старыми completed/step из
+      // sessionStorage — и пустит юзера сразу на «Оплату» с пустыми данными.
+      reset: () => {
+        set(initial)
+        try {
+          useCheckoutWizard.persist.clearStorage()
+        } catch {
+          // Доступа к storage нет (SSR / privacy mode) — non-blocking.
+        }
+      },
     }),
     {
       name: "checkout-wizard",

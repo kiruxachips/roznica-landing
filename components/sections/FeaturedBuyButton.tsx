@@ -26,7 +26,7 @@ export function FeaturedBuyButton({ productId, variantId, name, weight, price, i
     e.stopPropagation()
     if (stock <= 0) return
 
-    addItem({ productId, variantId, name, weight, price, image, quantity: 1, slug })
+    addItem({ productId, variantId, name, weight, price, image, quantity: 1, slug, stockSnapshot: stock })
     openDrawer()
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)

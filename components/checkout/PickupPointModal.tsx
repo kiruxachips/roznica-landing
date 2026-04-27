@@ -171,13 +171,24 @@ export function PickupPointModal({ open, onClose }: Props) {
     if (city) params.set("city", city)
     if (region) params.set("region", region)
     if (postalCode) params.set("postal_code", postalCode)
-    fetch(`/api/delivery/pickup-points?${params}`)
+    // I3: 15-секундный timeout. Раньше при зависшем CDEK/Почта-апи модалка
+    // оставалась в loading навсегда, юзер в тупике. AbortController
+    // прерывает соединение, fetch падает в catch — переходим в state
+    // «попробуйте обновить».
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 15000)
+    fetch(`/api/delivery/pickup-points?${params}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((points) => {
         setPickupPoints(points)
         setPickupPointsLoading(false)
       })
       .catch(() => setPickupPointsLoading(false))
+      .finally(() => clearTimeout(timer))
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, cityCode, selectedRate?.carrier, selectedRate?.deliveryType, region, postalCode])
 

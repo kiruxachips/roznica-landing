@@ -22,6 +22,10 @@ interface StickyAddToCartProps {
   variants: Variant[]
   /** Ref to the main WeightSelector cart button — bar appears when it scrolls out of view */
   triggerRef: React.RefObject<HTMLElement | null>
+  /** I7: контролируемый index (общий с WeightSelector). Если undefined —
+   *  fallback на собственный state (для случаев standalone-использования). */
+  selectedIndex?: number
+  onSelectIndex?: (idx: number) => void
 }
 
 export function StickyAddToCart({
@@ -31,9 +35,13 @@ export function StickyAddToCart({
   productImage,
   variants,
   triggerRef,
+  selectedIndex: controlledIndex,
+  onSelectIndex,
 }: StickyAddToCartProps) {
   const [visible, setVisible] = useState(false)
-  const [selectedIndex, setSelectedIndex] = useState(variants.length - 1)
+  const [uncontrolledIndex, setUncontrolledIndex] = useState(variants.length - 1)
+  const selectedIndex = controlledIndex ?? uncontrolledIndex
+  const setSelectedIndex = onSelectIndex ?? setUncontrolledIndex
   const [added, setAdded] = useState(false)
   const addItem = useCartStore((s) => s.addItem)
   const openDrawer = useCartUIStore((s) => s.openDrawer)
@@ -61,6 +69,7 @@ export function StickyAddToCart({
       image: productImage,
       quantity: 1,
       slug: productSlug,
+      stockSnapshot: selected.stock,
     })
     openDrawer()
     setAdded(true)

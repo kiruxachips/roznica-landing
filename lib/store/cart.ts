@@ -70,7 +70,18 @@ export const useCartStore = create<CartState>()(
           const existing = state.items.find((i) => i.variantId === item.variantId)
           const newItems = existing
             ? state.items.map((i) =>
-                i.variantId === item.variantId ? { ...i, quantity: i.quantity + item.quantity } : i
+                i.variantId === item.variantId
+                  ? {
+                      ...i,
+                      quantity: i.quantity + item.quantity,
+                      // C10: обновляем snapshot если новый item принёс свежий
+                      // stockSnapshot — в момент add user видел свежее число.
+                      stockSnapshot:
+                        item.stockSnapshot !== undefined && item.stockSnapshot !== null
+                          ? item.stockSnapshot
+                          : i.stockSnapshot,
+                    }
+                  : i
               )
             : [...state.items, item]
           return {

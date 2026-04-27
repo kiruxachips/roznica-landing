@@ -80,6 +80,7 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
       image: rec.primaryImage,
       quantity: 1,
       slug: rec.slug,
+      stockSnapshot: v.stock,
     })
     setAddedId(v.id)
     if (variant === "drawer") openDrawer()

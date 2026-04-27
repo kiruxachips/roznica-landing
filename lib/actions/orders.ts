@@ -207,13 +207,22 @@ async function createOrderImpl(data: OrderData): Promise<CreateOrderResult> {
     }
   }
 
-  // Server-side input validation
+  // C9: server-side input validation. Зеркало клиентских правил, плюс
+  // нормализация телефона к каноническому +7XXXXXXXXXX — чтобы в БД не
+  // лежали вперемешку 8XXX и +7XXX (ломает поиск по customerPhone).
   const phoneDigits = data.customerPhone.replace(/\D/g, "")
   if (!/^[78]\d{10}$/.test(phoneDigits)) {
     throw new Error("Некорректный номер телефона")
   }
-  if (data.customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(data.customerEmail)) {
+  data.customerPhone = `+7${phoneDigits.slice(1)}`
+  if (
+    data.customerEmail &&
+    !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-zA-Z]{2,}$/.test(data.customerEmail)
+  ) {
     throw new Error("Некорректный email")
+  }
+  if (data.customerEmail) {
+    data.customerEmail = data.customerEmail.toLowerCase().trim()
   }
 
   const order = await createOrderDAL(data)

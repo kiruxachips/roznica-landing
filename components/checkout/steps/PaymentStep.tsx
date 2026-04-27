@@ -142,6 +142,35 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
     setError("")
     setAccountError("")
     try {
+      // I6: pre-submit recheck подарка. Между моментом загрузки списка
+      // в GiftPicker и submit'ом мог пройти час — gift могли разобрать.
+      // Сервер всё равно поймает, но кинет ошибку и пошлёт юзера на
+      // refresh; здесь же мы тихо снимаем выбор и продолжаем.
+      let giftIdForOrder = selectedGiftId
+      if (selectedGiftId) {
+        try {
+          const r = await fetch(
+            `/api/gifts/available?cartTotal=${encodeURIComponent(afterDiscount)}`
+          )
+          if (r.ok) {
+            const data = await r.json()
+            const stillAvailable = (data?.gifts ?? []).some(
+              (g: { id: string }) => g.id === selectedGiftId
+            )
+            if (!stillAvailable) {
+              giftIdForOrder = null
+              setSelectedGiftId(null)
+              setError(
+                "Выбранный подарок только что разобрали — оформляем заказ без него"
+              )
+            }
+          }
+        } catch {
+          // Network ошибка — не блокируем оформление, серверная валидация
+          // в любом случае поймает.
+        }
+      }
+
       const rawAddress = doorAddress || ""
       const fullDoorAddress =
         deliveryCity && rawAddress ? `${deliveryCity}, ${rawAddress}` : rawAddress || undefined
@@ -173,7 +202,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           : undefined,
         tariffCode: selectedRate?.tariffCode,
         postalCode: deliveryPostalCode || undefined,
-        selectedGiftId,
+        selectedGiftId: giftIdForOrder,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId,
@@ -476,6 +505,21 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
             const cartItem = items.find((i) => i.variantId === oldItem.variantId)
             const quantity = cartItem?.quantity ?? oldItem.requested
             removeItem(oldItem.variantId)
+            // I4: уважаем stock замены — если меньше, чем было в корзине,
+            // ставим максимум доступного, чтобы не словить OOS снова на
+            // следующем submit. Информируем пользователя через toast-ish error.
+            const realQty = Math.min(quantity, replacement.recommendedVariant.stock)
+            if (realQty <= 0) {
+              setError(
+                `«${replacement.name}» только что разобрали. Выберите другую замену`
+              )
+              return
+            }
+            if (realQty < quantity) {
+              setError(
+                `Доступно только ${realQty} шт. «${replacement.name}» — добавили это количество`
+              )
+            }
             addItem({
               productId: replacement.id,
               variantId: replacement.recommendedVariant.id,
@@ -483,8 +527,9 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
               weight: replacement.recommendedVariant.weight,
               price: replacement.recommendedVariant.price,
               image: replacement.primaryImage,
-              quantity,
+              quantity: realQty,
               slug: replacement.slug,
+              stockSnapshot: replacement.recommendedVariant.stock,
             })
             setUnavailableItems((prev) =>
               prev.filter((u) => u.variantId !== oldItem.variantId)

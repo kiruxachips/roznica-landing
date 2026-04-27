@@ -45,6 +45,7 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
       image: product.primaryImage,
       quantity: 1,
       slug: product.slug,
+      stockSnapshot: selected.stock,
     })
     openDrawer()
   }

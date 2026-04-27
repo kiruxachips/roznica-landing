@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import { WeightSelector } from "@/components/product/WeightSelector"
 import { StickyAddToCart } from "@/components/product/StickyAddToCart"
 import { Leaf, Zap, Truck } from "lucide-react"
@@ -29,6 +29,12 @@ export function ProductClientSection({
   productImage,
 }: ProductClientSectionProps) {
   const cartButtonRef = useRef<HTMLElement | null>(null)
+  // I7: shared selectedIndex для WeightSelector + StickyAddToCart. Раньше
+  // оба компонента держали свой useState — выбираешь 1кг наверху, sticky-bar
+  // внизу остаётся на 250г, цены/quantum расходятся. Состояние одно — оба
+  // view синхронны.
+  const defaultIdx = Math.max(0, variants.length - 1)
+  const [selectedIndex, setSelectedIndex] = useState(defaultIdx)
 
   return (
     <>
@@ -39,6 +45,8 @@ export function ProductClientSection({
           productName={productName}
           productSlug={productSlug}
           productImage={productImage}
+          selectedIndex={selectedIndex}
+          onSelectIndex={setSelectedIndex}
         />
       </div>
 
@@ -65,6 +73,8 @@ export function ProductClientSection({
         productImage={productImage}
         variants={variants}
         triggerRef={cartButtonRef}
+        selectedIndex={selectedIndex}
+        onSelectIndex={setSelectedIndex}
       />
     </>
   )

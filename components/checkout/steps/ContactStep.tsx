@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSession } from "next-auth/react"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
@@ -55,6 +55,8 @@ export function ContactStep() {
   // Подсказка-опечатка вычисляется на onBlur, а не при каждом нажатии —
   // иначе во время ввода "test@gmi" подсказка мерцала бы вкл/выкл.
   const [emailTypoFix, setEmailTypoFix] = useState<string | null>(null)
+  // I8: ref для AbortController track-abandoned запроса.
+  const trackAbortRef = useRef<AbortController | null>(null)
   const isCustomer = (session?.user as Record<string, unknown>)?.userType === "customer"
 
   useEffect(() => {
@@ -95,7 +97,14 @@ export function ContactStep() {
         e.phone = "Введите корректный номер, например +7 (999) 123-45-67"
       }
     }
-    if (contact.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim())) {
+    // C9: убираем дыры старого regex (`t@.com`, `t@gmail.c` проходили).
+    // Требуем доменную часть ≥2 символов до точки и TLD ≥2 латинских букв.
+    // Не пытаемся быть RFC-полными — это покрывает 99% реальных багов
+    // ввода, не отрезая валидные адреса.
+    if (
+      contact.email.trim() &&
+      !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-zA-Z]{2,}$/.test(contact.email.trim())
+    ) {
       e.email = "Проверьте email"
     }
     setErrors(e)
@@ -190,9 +199,18 @@ export function ContactStep() {
             onBlur={(e) => {
               setEmailTypoFix(suggestEmail(contact.email))
               // G3: track abandoned cart — как только юзер ввёл валидный email
-              // на первом шаге и корзина не пустая. fire-and-forget.
+              // на первом шаге и корзина не пустая.
+              // I8: AbortController прерывает старый запрос если юзер быстро
+              // меняет email и blur срабатывает повторно. Иначе бэкенд
+              // получает дубли и может race'ить запись abandoned-cart.
               const value = e.target.value.trim().toLowerCase()
-              if (value && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+              if (
+                value &&
+                /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)*\.[a-zA-Z]{2,}$/.test(value)
+              ) {
+                trackAbortRef.current?.abort()
+                const ctrl = new AbortController()
+                trackAbortRef.current = ctrl
                 import("@/lib/store/cart").then(({ useCartStore }) => {
                   const items = useCartStore.getState().items
                   if (items.length === 0) return
@@ -200,6 +218,7 @@ export function ContactStep() {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ email: value, items }),
+                    signal: ctrl.signal,
                   }).catch(() => {})
                 })
               }
