@@ -268,11 +268,23 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           console.error("Account registration after order failed:", err)
           return null
         })
-        await Promise.race([
+        const regResult = await Promise.race([
           regPromise,
-          new Promise<void>((resolve) => setTimeout(resolve, 2500)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
         ])
-        pendingVerificationEmail = email
+        // M1: показываем banner «подтвердите email» только если регистрация
+        // успешно стартовала (новый или unverified user). Если email уже был
+        // верифицирован, registerUser вернёт {error: "уже зарегистрирован"} —
+        // тогда banner будет вводить в заблуждение.
+        if (regResult && "success" in regResult && regResult.success) {
+          pendingVerificationEmail = email
+        } else if (regResult === null) {
+          // Race lost — серверный action всё ещё работает в background. Не
+          // знаем результат, но безопаснее показать banner: если eventually
+          // верификация не нужна, юзер просто проигнорирует.
+          pendingVerificationEmail = email
+        }
+        // Если regResult.error — banner НЕ ставим.
       }
 
       clearCart()

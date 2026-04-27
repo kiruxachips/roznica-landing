@@ -57,7 +57,14 @@ export function CartUpsell({ cartProductIds, onClose, variant = "drawer" }: Cart
       })
         .then((r) => r.json())
         .then((data) => setProducts(data.recommendations ?? []))
-        .catch(() => {})
+        .catch((e) => {
+          // M8: логируем (Sentry подцепит автоматически), секция не
+          // рендерится — корректный fallback. Раньше ошибки сети
+          // полностью скрывались, и алёрты на CDN-инцидент не приходили.
+          if (e?.name !== "AbortError") {
+            console.error("[CartUpsell] recommendations fetch failed:", e)
+          }
+        })
     }, 300)
 
     return () => {

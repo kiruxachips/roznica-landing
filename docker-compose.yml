@@ -32,7 +32,12 @@ services:
       # вкладок пользователей перестают резолвиться на свежем деплое
       # ("Server Action X was not found on the server"). Один раз
       # сгенерировать `openssl rand -base64 32` и больше НЕ менять.
-      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:?required}
+      # M6: dev-fallback — если на dev-машине нет ключа, используем
+      # фиксированный заведомо слабый ("dev-key-NOT-FOR-PRODUCTION...").
+      # Контейнер не падает на старте, но при попытке использовать на
+      # реальном домене это будет очевидно. На beget/проде .env строго
+      # содержит сильный ключ.
+      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-dev-key-NOT-FOR-PRODUCTION-replace-me-now}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - YANDEX_CLIENT_ID=${YANDEX_CLIENT_ID:-}

@@ -165,10 +165,10 @@ export function scoreReplacements(
     maxReviews: target.maxReviews,
   }
 
-  return candidates
+  const scored = candidates
     .filter((p) => p.id !== target.productId)
     .filter((p) => p.productType === target.productType)
-    .map((p): RecommendedProduct | null => {
+    .map((p): (RecommendedProduct & { _pxScore: number }) | null => {
       const variant = pickClosestPriceVariant(p.variants, target.price)
       if (!variant) return null
 
@@ -195,11 +195,18 @@ export function scoreReplacements(
         score: total,
         reason: "replacement",
         priceDelta: variant.price - target.price,
+        _pxScore: pxScore,
       }
     })
-    .filter((x): x is RecommendedProduct => x !== null)
+    .filter((x): x is RecommendedProduct & { _pxScore: number } => x !== null)
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
+
+  // M5: предпочитаем замены в той же ценовой нише (pxScore > 0.2 ≈ ±80% цены).
+  // Если после фильтра пусто — показываем без фильтра, чтобы не вернуть
+  // пустой ответ при магазине с разлётом цен.
+  const closeInPrice = scored.filter((x) => x._pxScore > 0.2)
+  const list = closeInPrice.length > 0 ? closeInPrice : scored
+  return list.slice(0, limit).map(({ _pxScore: _, ...rest }) => rest)
 }
 
 export function scoreProducts(

@@ -76,12 +76,18 @@ export function StickyAddToCart({
     setTimeout(() => setAdded(false), 2000)
   }
 
+  // M7: если выбранный вариант OOS — скрываем sticky bar полностью.
+  // Кнопка «Нет в наличии» в основной WeightSelector уже сообщает юзеру,
+  // sticky-bar дублирует визуальный шум.
+  const allOos = variants.every((v) => v.stock === 0)
+
   return (
     <div
       className={cn(
         "fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.08)] transition-transform duration-300",
-        visible ? "translate-y-0" : "translate-y-full"
+        visible && !allOos ? "translate-y-0" : "translate-y-full"
       )}
+      aria-hidden={allOos || !visible}
     >
       <div className="container mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3">

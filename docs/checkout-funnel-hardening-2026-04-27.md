@@ -241,28 +241,28 @@ M1 → M3 → M4 → M5 → M7 → M8 (M2 уже в C9; M6 — отдельно)
 
 | ID | Title | Status | Commit |
 |----|-------|--------|--------|
-| C1 | Idempotency createOrder | `[ ]` | — |
-| C2 | thank-you token-validation | `[ ]` | — |
-| C3 | deliveryPrice required + guard | `[ ]` | — |
-| C4 | rollbackOrder transaction | `[ ]` | — |
-| C5 | Webhook stock idempotency | `[ ]` | — |
-| C6 | Zod на /api/cart/replacements | `[ ]` | — |
-| C7 | Welcome-discount race | `[ ]` | — |
-| C8 | Bonuses dead code decision | `[ ]` | — |
-| C9 | Email/phone validation | `[ ]` | — |
-| C10 | Cart stock snapshot | `[ ]` | — |
-| I1 | completed flags reset on setStep | `[ ]` | — |
-| I2 | reset wizard clears persist | `[ ]` | — |
-| I3 | PVZ modal timeout | `[ ]` | — |
-| I4 | Replacement quantity vs stock | `[ ]` | — |
-| I5 | pendingPayment flow | `[ ]` | — |
-| I6 | GiftPicker pre-submit recheck | `[ ]` | — |
-| I7 | WeightSelector + Sticky shared state | `[ ]` | — |
-| I8 | Email-suggest AbortController | `[ ]` | — |
-| M1 | registerUser already-verified case | `[ ]` | — |
-| M3 | door↔pvz state cleanup | `[ ]` | — |
-| M4 | referralCode persist | `[ ]` | — |
-| M5 | scoreReplacements price filter | `[ ]` | — |
-| M6 | dev-only encryption key fallback | `[ ]` | — |
-| M7 | Sticky bar hidden on OOS | `[ ]` | — |
-| M8 | CartUpsell error logging | `[ ]` | — |
+| C1 | Idempotency createOrder | `[x]` | 1102ce9 |
+| C2 | thank-you token-validation | `[x]` | 1102ce9 |
+| C3 | deliveryPrice required + guard | `[x]` | 1102ce9 |
+| C4 | rollbackOrder transaction | `[x]` | уже было (lib/actions/orders.ts:36) |
+| C5 | Webhook stock idempotency | `[x]` | 1102ce9 (compare-and-swap) |
+| C6 | Zod на /api/cart/replacements | `[x]` | 1102ce9 |
+| C7 | Welcome-discount race | `[x]` | 1102ce9 |
+| C8 | Bonuses dead code decision | `[ ]` | parking-lot — нужно решение владельца |
+| C9 | Email/phone validation | `[x]` | 9e46a2f |
+| C10 | Cart stock snapshot | `[x]` | 9e46a2f |
+| I1 | completed flags reset on setStep | `[x]` | 9e46a2f |
+| I2 | reset wizard clears persist | `[x]` | 9e46a2f |
+| I3 | PVZ modal timeout | `[x]` | 9e46a2f |
+| I4 | Replacement quantity vs stock | `[x]` | 9e46a2f |
+| I5 | pendingPayment flow | `[ ]` | отдельный PR — переделка clearCart |
+| I6 | GiftPicker pre-submit recheck | `[x]` | 9e46a2f |
+| I7 | WeightSelector + Sticky shared state | `[x]` | 9e46a2f |
+| I8 | Email-suggest AbortController | `[x]` | 9e46a2f |
+| M1 | registerUser already-verified case | `[x]` | pass-5 |
+| M3 | door↔pvz state cleanup | `[x]` | pass-5 |
+| M4 | referralCode persist | `[ ]` | low-priority backlog |
+| M5 | scoreReplacements price filter | `[x]` | pass-5 |
+| M6 | dev-only encryption key fallback | `[x]` | pass-5 |
+| M7 | Sticky bar hidden on OOS | `[x]` | pass-5 |
+| M8 | CartUpsell error logging | `[x]` | pass-5 |

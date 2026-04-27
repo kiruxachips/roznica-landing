@@ -55,7 +55,21 @@ export const useDeliveryStore = create<DeliveryState>()(persist((set) => ({
   setRatesError: (ratesError) => set({ ratesError, rates: [] }),
 
   selectedRate: null,
-  selectRate: (selectedRate) => set({ selectedRate, selectedPickupPoint: null }),
+  selectRate: (selectedRate) =>
+    // M3: при смене типа доставки чистим оба поля. door↔pvz toggle раньше
+    // оставлял "хвосты": doorAddress висел после переключения на ПВЗ,
+    // selectedPickupPoint оставался null (ОК) но ниже по дереву компоненты
+    // могли подцепить устаревший адрес. Цена доставки уже корректно
+    // обновляется через useDeliveryRates.
+    set((state) => ({
+      selectedRate,
+      selectedPickupPoint:
+        state.selectedRate?.deliveryType !== selectedRate.deliveryType
+          ? null
+          : state.selectedPickupPoint,
+      doorAddress:
+        selectedRate.deliveryType === "pvz" ? "" : state.doorAddress,
+    })),
 
   pickupPoints: [],
   pickupPointsLoading: false,
