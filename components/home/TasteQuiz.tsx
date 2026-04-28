@@ -206,14 +206,19 @@ export function TasteQuiz() {
 
       {/* Result modal overlay */}
       {phase === "result" && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 backdrop-blur-sm"
+          onClick={(e) => { if (e.target === e.currentTarget) handleRestart() }}
+          role="dialog"
+          aria-modal="true"
+        >
           <div
             className="relative w-full max-w-5xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl m-4 sm:m-6 lg:my-10 p-5 sm:p-8 lg:p-10"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={handleRestart}
-              className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-secondary/80 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+              className="absolute top-4 right-4 z-10 h-11 w-11 rounded-full bg-secondary/80 hover:bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Закрыть"
             >
               <X className="w-4 h-4" />

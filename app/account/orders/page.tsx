@@ -5,6 +5,7 @@ import { ShoppingBag } from "lucide-react"
 import { auth } from "@/lib/auth"
 import { getOrdersByUserId } from "@/lib/dal/orders"
 import { OrderCard } from "@/components/account/OrderCard"
+import { paginateRange } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -66,21 +67,31 @@ export default async function OrdersPage({
 
       {totalPages > 1 && (
         <nav aria-label="Пагинация заказов" className="flex flex-wrap justify-center gap-2 mt-8">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-            <Link
-              key={p}
-              href={`/account/orders?page=${p}`}
-              aria-label={`Страница ${p}`}
-              aria-current={p === page ? "page" : undefined}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                p === page
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-white text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              {p}
-            </Link>
-          ))}
+          {paginateRange(page, totalPages).map((p, i) =>
+            p === "..." ? (
+              <span
+                key={`ellipsis-${i}`}
+                aria-hidden="true"
+                className="w-10 h-10 flex items-center justify-center text-sm text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <Link
+                key={p}
+                href={`/account/orders?page=${p}`}
+                aria-label={`Страница ${p}`}
+                aria-current={p === page ? "page" : undefined}
+                className={`w-10 h-10 flex items-center justify-center rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
+                  p === page
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-white text-muted-foreground hover:bg-muted"
+                }`}
+              >
+                {p}
+              </Link>
+            )
+          )}
         </nav>
       )}
     </div>

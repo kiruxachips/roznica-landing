@@ -24,11 +24,16 @@ export function StickyMobileCTA() {
 
     const hero = document.querySelector("section[data-home-hero]")
     const contact = document.getElementById("contact")
+    const footer = document.querySelector("footer")
 
     let heroVisible = hero ? isElementInViewport(hero) : false
     let contactVisible = contact ? isElementInViewport(contact) : false
+    let footerVisible = footer ? isElementInViewport(footer) : false
 
-    const evaluate = () => setVisible(!heroVisible && !contactVisible)
+    // Если виден футер — sticky CTA должна спрятаться, иначе она накладывается
+    // на «© Millor Coffee» и иконки соцсетей в самом низу страницы.
+    const evaluate = () =>
+      setVisible(!heroVisible && !contactVisible && !footerVisible)
     evaluate()
 
     const heroObs = new IntersectionObserver(
@@ -45,13 +50,22 @@ export function StickyMobileCTA() {
       },
       { threshold: 0.3 }
     )
+    const footerObs = new IntersectionObserver(
+      ([entry]) => {
+        footerVisible = entry.isIntersecting
+        evaluate()
+      },
+      { threshold: 0.05 }
+    )
 
     if (hero) heroObs.observe(hero)
     if (contact) contactObs.observe(contact)
+    if (footer) footerObs.observe(footer)
 
     return () => {
       heroObs.disconnect()
       contactObs.disconnect()
+      footerObs.disconnect()
     }
   }, [dismissed])
 

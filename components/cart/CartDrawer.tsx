@@ -61,9 +61,10 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
 
       {/* Drawer */}
       <div
+        aria-hidden={!isOpen}
         className={cn(
           "fixed top-0 right-0 h-full w-full max-w-[92vw] sm:max-w-md bg-white z-50 shadow-xl transition-transform duration-300 flex flex-col",
-          isOpen ? "translate-x-0" : "translate-x-full"
+          isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"
         )}
       >
         {/* Header */}

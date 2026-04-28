@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { ArticleCard } from "./ArticleCard"
+import { paginateRange } from "@/lib/utils"
 import type { ArticleCard as ArticleCardType } from "@/lib/types"
 
 interface ArticleGridProps {
@@ -27,19 +28,29 @@ export function ArticleGrid({ articles, currentPage, totalPages, baseSearchParam
 
       {totalPages > 1 && (
         <div className="flex flex-wrap justify-center gap-2 mt-10 sm:mt-16">
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <Link
-              key={page}
-              href={buildHref(page)}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
-                page === currentPage
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {page}
-            </Link>
-          ))}
+          {paginateRange(currentPage, totalPages).map((page, i) =>
+            page === "..." ? (
+              <span
+                key={`ellipsis-${i}`}
+                aria-hidden="true"
+                className="w-10 h-10 flex items-center justify-center text-sm text-muted-foreground"
+              >
+                …
+              </span>
+            ) : (
+              <Link
+                key={page}
+                href={buildHref(page)}
+                className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-colors ${
+                  page === currentPage
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-muted-foreground hover:bg-secondary/80"
+                }`}
+              >
+                {page}
+              </Link>
+            )
+          )}
         </div>
       )}
     </div>

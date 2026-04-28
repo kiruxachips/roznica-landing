@@ -258,7 +258,7 @@ export function CoffeeShopsMap() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[88vh] max-h-[88dvh] flex flex-col overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border shrink-0">
               <h2 className="font-sans text-lg sm:text-xl font-bold text-foreground">Наши кофе-шопы</h2>
@@ -329,15 +329,16 @@ export function CoffeeShopsMap() {
                       href={`https://yandex.ru/maps/?rtext=~${selectedShop.lat},${selectedShop.lng}&rtt=auto`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
+                      aria-label="Построить маршрут"
+                      className="shrink-0 inline-flex items-center gap-1.5 h-11 sm:h-9 px-3 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
                     >
-                      <Navigation className="w-3.5 h-3.5" strokeWidth={1.75} />
-                      <span className="hidden sm:inline">Маршрут</span>
+                      <Navigation className="w-4 h-4" strokeWidth={1.75} />
+                      <span>Маршрут</span>
                     </a>
                     <button
                       onClick={() => setSelectedKey(null)}
                       aria-label="Скрыть"
-                      className="shrink-0 w-9 h-9 rounded-lg text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center"
+                      className="shrink-0 w-11 h-11 sm:w-9 sm:h-9 rounded-lg text-muted-foreground hover:bg-muted transition-colors flex items-center justify-center"
                     >
                       <X className="w-4 h-4" strokeWidth={1.75} />
                     </button>
