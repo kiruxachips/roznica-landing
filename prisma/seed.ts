@@ -286,6 +286,9 @@ async function main() {
     pochta_access_token: "",
     pochta_user_auth: "",
     pochta_object_type: "47030",
+    // Pochta tariff API возвращает цену «до отделения». Доставка курьером на дом
+    // оплачивается отдельно — добавляем фикс. надбавку на «до двери» вариант.
+    pochta_door_surcharge: "300",
     // Local courier
     courier_enabled: "true",
     courier_price: "300",

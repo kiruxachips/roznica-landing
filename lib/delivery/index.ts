@@ -168,6 +168,7 @@ export async function calculateDeliveryRates(params: {
         objectType: parseInt(settings.pochta_object_type) || 47030,
         senderPostalCode: sender.postalCode,
         dadataApiKey: settings.dadata_api_key || undefined,
+        doorSurcharge: parseInt(settings.pochta_door_surcharge) || 300,
       }).calculateRates(req)
     )
   }

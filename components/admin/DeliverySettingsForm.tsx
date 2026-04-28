@@ -741,6 +741,21 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
                 <option value="27030">Посылка 1 класса нестандартная</option>
               </select>
             </div>
+            <div>
+              <label className={labelClass}>Надбавка за «до двери» (₽)</label>
+              <input
+                className={inputClass}
+                type="number"
+                min={0}
+                value={localSettings.pochta_door_surcharge || ""}
+                onChange={(e) => set("pochta_door_surcharge", e.target.value)}
+                placeholder="300"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                API Почты возвращает цену «до отделения». Курьерская доставка на дом — отдельная услуга.
+                Эту сумму добавим только к варианту «до двери», чтобы цена соответствовала pochta.ru.
+              </p>
+            </div>
             <p className="text-xs text-muted-foreground">
               Расчёт стоимости работает без токенов. Токены нужны только для автоматического создания отправок.
             </p>

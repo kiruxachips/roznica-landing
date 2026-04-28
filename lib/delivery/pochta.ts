@@ -104,6 +104,14 @@ export function createPochtaProvider(config: {
   objectType: number // 47030 = посылка нестандартная
   senderPostalCode: string
   dadataApiKey?: string
+  /**
+   * Доплата за курьерскую доставку по адресу получателя.
+   * Pochta API в /tariff/v1/calculate всегда возвращает цену «до отделения» —
+   * стоимость курьерской доставки на дом ($16) не входит. Сверка с pochta.ru
+   * показывает дельту ~250-350 ₽ на типовую посылку, поэтому делаем
+   * административную надбавку (default 300, настраивается).
+   */
+  doorSurcharge?: number
 }): DeliveryProvider {
   return {
     carrier: "pochta",
@@ -170,9 +178,14 @@ export function createPochtaProvider(config: {
       if (results.some((r) => r === null)) return []
 
       const valid = results as { price: number; minDays: number; maxDays: number }[]
-      const totalPrice = valid.reduce((s, r) => s + r.price, 0)
+      const pvzPrice = valid.reduce((s, r) => s + r.price, 0)
       const minDays = Math.max(...valid.map((r) => r.minDays))
       const maxDays = Math.max(...valid.map((r) => r.maxDays))
+
+      // Цена «до отделения» = ответ API (отправитель приносит на почту, получатель забирает в отделении).
+      // Цена «до двери» = ответ API + надбавка на курьерскую доставку получателю на дом.
+      const doorSurcharge = Math.max(0, config.doorSurcharge ?? 0)
+      const doorPrice = pvzPrice + doorSurcharge
 
       return [
         {
@@ -181,8 +194,8 @@ export function createPochtaProvider(config: {
           tariffCode: config.objectType,
           tariffName: "Почта России — До двери",
           deliveryType: "door",
-          price: totalPrice,
-          priceWithMarkup: totalPrice,
+          price: doorPrice,
+          priceWithMarkup: doorPrice,
           minDays,
           maxDays,
         },
@@ -192,8 +205,8 @@ export function createPochtaProvider(config: {
           tariffCode: config.objectType + POCHTA_PVZ_TARIFF_OFFSET,
           tariffName: "Почта России — До отделения",
           deliveryType: "pvz",
-          price: totalPrice,
-          priceWithMarkup: totalPrice,
+          price: pvzPrice,
+          priceWithMarkup: pvzPrice,
           minDays: Math.max(minDays - 1, 1),
           maxDays: Math.max(maxDays - 1, minDays),
         },
