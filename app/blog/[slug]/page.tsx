@@ -124,12 +124,12 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
         {/* Breadcrumbs */}
         <div className="bg-secondary/30">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
-              <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
+            <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
+              <Link href="/" className="hover:text-primary transition-colors shrink-0">Главная</Link>
               <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <Link href="/blog" className="hover:text-primary transition-colors">Блог</Link>
+              <Link href="/blog" className="hover:text-primary transition-colors shrink-0">Блог</Link>
               <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-              <span className="text-foreground font-medium truncate">{article.title}</span>
+              <span className="text-foreground font-medium truncate min-w-0">{article.title}</span>
             </nav>
           </div>
         </div>

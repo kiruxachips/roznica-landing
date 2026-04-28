@@ -157,12 +157,12 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 product.productType === "instant" ? "/catalog?type=instant" :
                 "/catalog?type=coffee"
               return (
-                <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap">
-                  <Link href="/" className="hover:text-primary transition-colors">Главная</Link>
+                <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground min-w-0">
+                  <Link href="/" className="hover:text-primary transition-colors shrink-0">Главная</Link>
                   <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <Link href={typeHref} className="hover:text-primary transition-colors">{typeLabel}</Link>
+                  <Link href={typeHref} className="hover:text-primary transition-colors shrink-0">{typeLabel}</Link>
                   <ChevronRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                  <span className="text-foreground font-medium truncate">{product.name}</span>
+                  <span className="text-foreground font-medium truncate min-w-0">{product.name}</span>
                 </nav>
               )
             })()}

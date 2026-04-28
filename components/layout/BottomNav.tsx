@@ -54,12 +54,18 @@ export function BottomNav() {
   )
 
   // На checkout/admin/wholesale/auth — прячем (чтобы юзер случайно не
-  // потерял введённые данные при регистрации/логине).
+  // потерял введённые данные при регистрации/логине). На карточке товара
+  // /catalog/[slug] sticky-CTA «В корзину» (z-50) перекрывает BottomNav, а
+  // глобальная навигация на детальной странице мешает выбору варианта —
+  // прячем тоже. На листинге /catalog оставляем как обычно.
+  const isProductDetail =
+    pathname.startsWith("/catalog/") && pathname !== "/catalog"
   const hide =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/checkout") ||
     pathname.startsWith("/wholesale") ||
-    pathname.startsWith("/auth")
+    pathname.startsWith("/auth") ||
+    isProductDetail
   if (hide) return null
 
   return (
