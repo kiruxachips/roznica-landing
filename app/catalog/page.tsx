@@ -107,12 +107,15 @@ export default async function CatalogPage({
       <main className="pt-16">
         <section className="py-4 sm:py-6">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-3 sm:mb-4 flex items-baseline gap-3">
-              <h1 className="font-sans text-xl sm:text-2xl font-bold">{heading}</h1>
-              {countLabel && (
-                <p className="text-xs sm:text-sm text-muted-foreground">{countLabel}</p>
-              )}
-            </div>
+            {/* H1 для SEO/доступности (визуально скрыт): таб «Кофе/Чай/
+                Растворимая» в FilterBar уже выполняет роль заголовка раздела,
+                а дублирующий H1 сверху создавал визуальный шум. */}
+            <h1 className="sr-only">{heading}</h1>
+            {countLabel && (
+              <p className="mb-3 sm:mb-4 text-xs sm:text-sm text-muted-foreground">
+                {countLabel}
+              </p>
+            )}
 
             <FilterBar
               filterOptions={filterOptions}
