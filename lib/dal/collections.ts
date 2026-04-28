@@ -39,7 +39,7 @@ export async function getCollectionIdsForProduct(productId: string) {
 }
 
 // For catalog page — active collections with products mapped to ProductCard
-export async function getCollectionsWithProducts(): Promise<
+async function getCollectionsWithProductsUncached(): Promise<
   { id: string; name: string; slug: string; emoji: string | null; products: ProductCard[] }[]
 > {
   const collections = await prisma.productCollection.findMany({
@@ -150,3 +150,15 @@ export async function getCollectionsWithProducts(): Promise<
         }),
     }))
 }
+
+/**
+ * Кешированная обёртка. Стартовый экран каталога — самый частый запрос
+ * /catalog?type=coffee, грузит подборки + товары + рейтинги одним пакетом.
+ * revalidate=120 + теги products/collections — после правки коллекции в
+ * админке кеш чистится через revalidateTag(collections).
+ */
+export const getCollectionsWithProducts = unstable_cache(
+  getCollectionsWithProductsUncached,
+  ["collections-with-products"],
+  { revalidate: 120, tags: [CACHE_TAGS.products, CACHE_TAGS.collections] }
+)

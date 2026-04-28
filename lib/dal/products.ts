@@ -221,16 +221,21 @@ export async function getProducts(
   )()
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+async function getProductBySlugUncached(slug: string): Promise<ProductDetail | null> {
   const product = await prisma.product.findFirst({
     where: { slug, isActive: true },
     include: {
       category: { select: { name: true, slug: true } },
       images: { orderBy: { sortOrder: "asc" } },
       variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" } },
+      // Лимитируем 20 свежих отзывов в SSR-payload. Полный список и пагинация
+      // подгружаются через client-fetch в ProductTabs при необходимости.
+      // Раньше тащили ВСЕ отзывы целиком (`text @db.Text`) — на товаре с 200+
+      // отзывами это давало JSON на сотни КБ.
       reviews: {
         where: { isVisible: true },
         orderBy: { createdAt: "desc" },
+        take: 20,
       },
     },
   })
@@ -294,6 +299,22 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
   }
 }
 
+/**
+ * Кешированная карточка товара. revalidate=300 — устроит большинство сценариев
+ * (правка товара в админке инвалидирует кеш через revalidateTag products).
+ * Не кеширует пользовательскую обвязку (FavoriteButton тянет состояние через
+ * isProductFavorited на странице — она пока остаётся force-dynamic).
+ */
+export async function getProductBySlug(
+  slug: string
+): Promise<ProductDetail | null> {
+  return unstable_cache(
+    () => getProductBySlugUncached(slug),
+    ["product-by-slug", slug],
+    { revalidate: 300, tags: [CACHE_TAGS.products] }
+  )()
+}
+
 async function getFeaturedProductsUncached(limit: number): Promise<ProductCard[]> {
   const items = await prisma.product.findMany({
     where: { isActive: true, isFeatured: true },
@@ -338,11 +359,11 @@ export async function getFeaturedProducts(limit = 3): Promise<ProductCard[]> {
   )()
 }
 
-export async function getRelatedProducts(
+async function getRelatedProductsUncached(
   productId: string,
   productType: ProductType,
   categoryId: string,
-  limit = 4
+  limit: number
 ): Promise<ProductCard[]> {
   // Prefer same category first, fallback to same productType
   const items = await prisma.product.findMany({
@@ -357,6 +378,19 @@ export async function getRelatedProducts(
   })
 
   return items.map(mapToProductCard)
+}
+
+export async function getRelatedProducts(
+  productId: string,
+  productType: ProductType,
+  categoryId: string,
+  limit = 4
+): Promise<ProductCard[]> {
+  return unstable_cache(
+    () => getRelatedProductsUncached(productId, productType, categoryId, limit),
+    ["related-products", productId, productType, categoryId, String(limit)],
+    { revalidate: 300, tags: [CACHE_TAGS.products] }
+  )()
 }
 
 // P2-13: sitemap / generateStaticParams читают весь список slug'ов в память.

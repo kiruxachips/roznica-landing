@@ -1,14 +1,18 @@
-export const dynamic = "force-dynamic"
+// ISR: контент статьи правится редко, дёргать БД на каждый GET смысла нет.
+// View-count тоже больше не пишется тут (см. ArticleViewTracker — async POST
+// из клиента с дедупом через sessionStorage), что и позволяет ISR.
+export const revalidate = 1800
 
 import { Metadata } from "next"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ChevronRight, Calendar, Clock, Eye } from "lucide-react"
-import { getArticleBySlug, getArticleSlugs, getRelatedArticles, incrementArticleViewCount } from "@/lib/dal/articles"
+import { getArticleBySlug, getArticleSlugs, getRelatedArticles } from "@/lib/dal/articles"
 import { Header } from "@/components/layout/Header"
 import { Footer } from "@/components/layout/Footer"
 import { ArticleCard } from "@/components/blog/ArticleCard"
+import { ArticleViewTracker } from "@/components/blog/ArticleViewTracker"
 import { sanitizeArticleHtml } from "@/lib/sanitize-html"
 
 export async function generateStaticParams() {
@@ -49,9 +53,6 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const { slug } = await params
   const article = await getArticleBySlug(slug)
   if (!article) notFound()
-
-  // Fire-and-forget view count
-  incrementArticleViewCount(article.id)
 
   const relatedArticles = await getRelatedArticles(article.id, article.categoryId, 3)
 
@@ -104,6 +105,7 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <Header />
+      <ArticleViewTracker articleId={article.id} />
       <main className="pt-16">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
