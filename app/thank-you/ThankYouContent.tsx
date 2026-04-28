@@ -259,7 +259,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
           {order.customerEmail && (
             <div>
               <span className="text-muted-foreground">Email</span>
-              <p className="font-medium">{order.customerEmail}</p>
+              <p className="font-medium break-all">{order.customerEmail}</p>
             </div>
           )}
         </div>
@@ -270,7 +270,7 @@ export function ThankYouContent({ order, shouldTrack, paymentStatus }: { order: 
         <h2 className="font-semibold mb-3">Что дальше?</h2>
         <ul className="space-y-2 text-sm text-muted-foreground">
           {order.customerEmail && (
-            <li>Мы отправили подтверждение заказа на <span className="text-foreground font-medium">{order.customerEmail}</span></li>
+            <li>Мы отправили подтверждение заказа на <span className="text-foreground font-medium break-all">{order.customerEmail}</span></li>
           )}
           <li>Свежий кофе обжарим специально под ваш заказ и отправим в ближайший рабочий день</li>
           <li>О каждом изменении статуса вы получите письмо — подтверждение оплаты, передача в доставку, вручение</li>

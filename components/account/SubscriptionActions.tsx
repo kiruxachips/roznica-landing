@@ -31,22 +31,24 @@ export function SubscriptionActions({
   if (confirming === "cancel") {
     return (
       <div className="flex flex-col gap-1.5 shrink-0">
-        <p className="text-xs text-muted-foreground max-w-[140px]">Точно отменить?</p>
+        <p className="text-xs text-muted-foreground max-w-[160px]">Точно отменить?</p>
+        {/* Безопасное действие («Нет») сверху и шире, деструктив снизу — иначе
+            пользователь по привычке тапает первое и теряет подписку. */}
+        <button
+          onClick={() => setConfirming(null)}
+          className="h-9 px-3 border border-border rounded-lg text-xs font-medium hover:bg-muted"
+        >
+          Нет, оставить
+        </button>
         <button
           onClick={() => {
             runAction(() => cancelSubscription(subscriptionId))
             setConfirming(null)
           }}
           disabled={loading}
-          className="h-8 px-3 bg-red-600 text-white rounded-lg text-xs font-medium disabled:opacity-60"
+          className="h-9 px-3 bg-red-600 text-white rounded-lg text-xs font-medium disabled:opacity-60"
         >
           Да, отменить
-        </button>
-        <button
-          onClick={() => setConfirming(null)}
-          className="h-8 px-3 border border-border rounded-lg text-xs"
-        >
-          Нет
         </button>
       </div>
     )

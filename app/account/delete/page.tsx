@@ -70,19 +70,19 @@ export default async function AccountDeletePage({
             Удаление произойдёт только после клика по ссылке в письме.
           </p>
 
-          <form action={handleRequest} className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Link
-              href="/account"
-              className="h-11 px-5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center"
-            >
-              Отмена
-            </Link>
+          <form action={handleRequest} className="flex flex-col-reverse sm:flex-row gap-3 pt-2">
             <button
               type="submit"
-              className="flex-1 h-11 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
+              className="h-11 px-5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
             >
               Отправить подтверждение на email
             </button>
+            <Link
+              href="/account"
+              className="flex-1 h-11 px-5 border border-border rounded-xl text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center"
+            >
+              Отмена
+            </Link>
           </form>
         </div>
       )}

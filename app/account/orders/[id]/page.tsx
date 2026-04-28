@@ -149,7 +149,7 @@ export default async function OrderDetailPage({
           {order.customerEmail && (
             <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Email</span>
-              <span>{order.customerEmail}</span>
+              <span className="break-all">{order.customerEmail}</span>
             </div>
           )}
           {order.deliveryMethod && (
@@ -161,7 +161,7 @@ export default async function OrderDetailPage({
           {order.trackingNumber && (
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-0.5">
               <span className="text-muted-foreground">Трек-номер</span>
-              <span className="font-mono text-sm">{order.trackingNumber}</span>
+              <span className="font-mono text-sm break-all">{order.trackingNumber}</span>
             </div>
           )}
           {order.carrierStatus && (
@@ -193,7 +193,7 @@ export default async function OrderDetailPage({
           {order.deliveryAddress && (
             <div className="flex flex-col sm:flex-row sm:justify-between gap-0.5">
               <span className="text-muted-foreground">Адрес</span>
-              <span className="sm:text-right sm:max-w-[60%]">{order.deliveryAddress}</span>
+              <span className="sm:text-right sm:max-w-[60%] break-words">{order.deliveryAddress}</span>
             </div>
           )}
           {order.notes && (

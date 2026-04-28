@@ -96,7 +96,7 @@ export function TrackingContent({ order }: { order: OrderDetails }) {
       {order.trackingNumber && (
         <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm mb-5 sm:mb-6 text-center">
           <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Трек-номер</p>
-          <p className="text-lg sm:text-xl font-bold text-primary tracking-wider mb-3">{order.trackingNumber}</p>
+          <p className="text-lg sm:text-xl font-bold text-primary tracking-wider mb-3 break-all">{order.trackingNumber}</p>
           {trackUrl && (
             <a
               href={trackUrl}
@@ -246,7 +246,7 @@ export function TrackingContent({ order }: { order: OrderDetails }) {
           {order.customerEmail && (
             <div>
               <span className="text-muted-foreground">Email</span>
-              <p className="font-medium">{order.customerEmail}</p>
+              <p className="font-medium break-all">{order.customerEmail}</p>
             </div>
           )}
         </div>

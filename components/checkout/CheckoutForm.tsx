@@ -157,11 +157,15 @@ export function CheckoutForm() {
             <button
               type="button"
               disabled={!agreed}
-              onClick={() =>
-                document.getElementById("checkout-submit")?.dispatchEvent(
-                  new MouseEvent("click", { bubbles: true })
-                )
-              }
+              onClick={() => {
+                const submit = document.getElementById(
+                  "checkout-submit"
+                ) as HTMLButtonElement | null
+                // Не дублируем клик, если внутренняя кнопка уже в loading-state
+                // (PaymentStep сам выставляет disabled на время запроса).
+                if (!submit || submit.disabled) return
+                submit.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+              }}
               className="shrink-0 h-12 px-5 bg-primary text-primary-foreground rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
             >
               Оплатить
