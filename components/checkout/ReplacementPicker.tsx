@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Image from "next/image"
 import { Check, Truck } from "lucide-react"
 import { useCartStore } from "@/lib/store/cart"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { FREE_DELIVERY_INFO } from "@/lib/constants"
 import type { RecommendedProduct } from "@/lib/types"
 
 interface ReplacementPickerProps {
@@ -145,6 +147,7 @@ export function ReplacementPicker({
                     <p className="text-[11px] text-green-700 font-medium mt-0.5 flex items-center gap-1">
                       <Truck className="w-3 h-3" />
                       Откроется бесплатная доставка
+                      <InfoTooltip text={FREE_DELIVERY_INFO} align="start" iconSize="xs" />
                     </p>
                   )}
                 </div>

@@ -6,6 +6,8 @@ import type { CartItem } from "@/lib/types"
 import { useDeliveryStore } from "@/lib/store/delivery"
 import { useCheckoutWizard } from "@/lib/store/checkout-wizard"
 import { useWelcomeDiscount } from "@/lib/hooks/use-welcome-discount"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { FREE_DELIVERY_INFO } from "@/lib/constants"
 
 interface Props {
   items: CartItem[]
@@ -134,8 +136,11 @@ export function OrderSummary({
         )}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Доставка</span>
-          <span>
+          <span className="inline-flex items-center gap-1">
             {selectedRate ? (deliveryPrice === 0 ? "Бесплатно" : `${deliveryPrice}₽`) : "—"}
+            {selectedRate && deliveryPrice === 0 && (
+              <InfoTooltip text={FREE_DELIVERY_INFO} align="end" iconSize="xs" />
+            )}
           </span>
         </div>
         <div className="flex justify-between text-lg font-bold pt-2 border-t border-border">

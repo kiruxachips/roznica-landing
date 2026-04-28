@@ -1,11 +1,18 @@
 import { Flame, Award, Truck, Gift } from "lucide-react"
-import { features } from "@/lib/constants"
+import { features, FREE_DELIVERY_INFO, DELIVERY_TIME_INFO } from "@/lib/constants"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
 
 const iconMap = {
   Flame: Flame,
   Award: Award,
   Truck: Truck,
   Gift: Gift,
+}
+
+// Какому feature.icon какой тултип повесить на заголовок
+const featureTooltip: Record<string, string> = {
+  Truck: DELIVERY_TIME_INFO,
+  Gift: FREE_DELIVERY_INFO,
 }
 
 export function Features() {
@@ -34,8 +41,11 @@ export function Features() {
                 <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-6 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:scale-110 transition-all duration-300">
                   <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-primary group-hover:text-white transition-colors" />
                 </div>
-                <h3 className="font-semibold text-sm sm:text-lg text-foreground mb-1.5 sm:mb-2">
-                  {feature.title}
+                <h3 className="font-semibold text-sm sm:text-lg text-foreground mb-1.5 sm:mb-2 flex items-center justify-center gap-1.5">
+                  <span>{feature.title}</span>
+                  {featureTooltip[feature.icon] && (
+                    <InfoTooltip text={featureTooltip[feature.icon]} />
+                  )}
                 </h3>
                 <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                   {feature.description}

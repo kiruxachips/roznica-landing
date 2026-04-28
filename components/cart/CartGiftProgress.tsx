@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { Package, Gift } from "lucide-react"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { FREE_DELIVERY_INFO } from "@/lib/constants"
 
 interface Thresholds {
   freeDelivery: number
@@ -76,6 +78,7 @@ export function CartGiftProgress({ total }: CartGiftProgressProps) {
         <div className="flex items-center gap-2 text-amber-800 font-medium">
           <Gift className="w-4 h-4 text-amber-500 shrink-0" />
           <span>Бесплатная доставка Почтой России + {giftDescription}!</span>
+          <InfoTooltip text={FREE_DELIVERY_INFO} align="end" />
         </div>
       </div>
     )
@@ -102,6 +105,7 @@ export function CartGiftProgress({ total }: CartGiftProgressProps) {
           <div className="flex items-center gap-1 text-green-600 font-medium">
             <Package className="w-3 h-3 shrink-0" />
             <span>Бесплатная доставка Почтой России</span>
+            <InfoTooltip text={FREE_DELIVERY_INFO} align="end" iconSize="xs" />
           </div>
         )}
 

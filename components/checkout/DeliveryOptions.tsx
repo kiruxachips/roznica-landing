@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react"
 import { Truck, Package, Clock, ChevronDown, MapPin, Home } from "lucide-react"
 import { useDeliveryStore } from "@/lib/store/delivery"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { FREE_DELIVERY_INFO, DELIVERY_TIME_INFO } from "@/lib/constants"
 
 interface CarrierInfo {
   id: string
@@ -214,12 +216,18 @@ export function DeliveryOptions() {
                 {/* Price & days summary */}
                 {isAvailable && (
                   <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
-                    <p className="font-medium text-foreground">
-                      {hasFree ? "Бесплатно" : `от ${minPrice}₽`}
+                    <p className="font-medium text-foreground inline-flex items-center justify-center gap-1">
+                      <span>{hasFree ? "Бесплатно" : `от ${minPrice}₽`}</span>
+                      {hasFree && (
+                        <InfoTooltip text={FREE_DELIVERY_INFO} iconSize="xs" />
+                      )}
                     </p>
                     <p className="flex items-center justify-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {minDays === maxDays ? `${minDays} дн.` : `${minDays}-${maxDays} дн.`}
+                      <span>
+                        {minDays === maxDays ? `${minDays} дн.` : `${minDays}-${maxDays} дн.`}
+                      </span>
+                      <InfoTooltip text={DELIVERY_TIME_INFO} iconSize="xs" />
                     </p>
                   </div>
                 )}

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import { ArrowRight, Coffee, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { InfoTooltip } from "@/components/ui/info-tooltip"
+import { DELIVERY_TIME_INFO } from "@/lib/constants"
 
 const DISMISS_KEY = "millor-sticky-cta-dismissed"
 
@@ -95,7 +97,10 @@ export function StickyMobileCTA() {
           </div>
           <div className="flex flex-col leading-tight min-w-0">
             <span className="text-sm font-semibold text-foreground">Свежий кофе</span>
-            <span className="text-[11px] text-muted-foreground truncate">обжарка под заказ · доставка 2-3 дня</span>
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1 min-w-0">
+              <span className="truncate">обжарка под заказ · доставка 2-3 дня</span>
+              <InfoTooltip text={DELIVERY_TIME_INFO} iconSize="xs" placement="top" align="end" />
+            </span>
           </div>
         </div>
         <Link
