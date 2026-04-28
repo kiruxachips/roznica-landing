@@ -91,6 +91,18 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        "overlay-in": {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        "sheet-in": {
+          "0%": { opacity: "0", transform: "translateY(24px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "modal-in": {
+          "0%": { opacity: "0", transform: "scale(0.96)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
         snowfall: {
           "0%": { transform: "translateY(-10vh) translateX(0) rotate(0deg)", opacity: "1" },
           "100%": { transform: "translateY(110vh) translateX(20px) rotate(360deg)", opacity: "0.3" },
@@ -106,6 +118,9 @@ const config: Config = {
       },
       animation: {
         "fade-in": "fade-in 0.5s ease-out forwards",
+        "overlay-in": "overlay-in 180ms ease-out forwards",
+        "sheet-in": "sheet-in 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
+        "modal-in": "modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards",
         snowfall: "snowfall 10s linear infinite",
         "snowfall-slow": "snowfall 15s linear infinite",
         "snowfall-fast": "snowfall 7s linear infinite",

@@ -2,12 +2,15 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Search, SlidersHorizontal, X } from "lucide-react"
+import { Search, SlidersHorizontal, X, Globe } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getCountryFlag } from "@/lib/constants"
+import { OriginPicker } from "./OriginPicker"
 import type { ProductType } from "@/lib/types"
 
 interface FilterOptions {
   origins: string[]
+  originStats?: { name: string; count: number }[]
   roastLevels: string[]
   brewingMethods: string[]
   teaTypes: { name: string; slug: string }[]
@@ -131,6 +134,28 @@ export function FilterBar({
   }, [router, activeType, activeSort, searchValue])
 
   const [filtersOpen, setFiltersOpen] = useState(!!hasSubFilters)
+  const [originPickerOpen, setOriginPickerOpen] = useState(false)
+
+  // Кнопка «Кофе по странам» имеет смысл только на вкладке кофе: чай и
+  // растворимая используют другие оси сегментации, и на них поиск растягивается
+  // обратно на всю свободную ширину.
+  const isCoffee = !activeType || activeType === "coffee"
+  const showOriginButton = isCoffee && (filterOptions.originStats?.length ?? 0) > 0
+
+  // При переключении на «Чай»/«Растворимая» CTA скрывается и попап
+  // анмаунтится, но локальный state `originPickerOpen=true` остаётся —
+  // при возврате на «Кофе» попап откроется сам без клика. Сбрасываем
+  // явно при смене вкладки.
+  useEffect(() => {
+    if (!showOriginButton) setOriginPickerOpen(false)
+  }, [showOriginButton])
+
+  const clearOrigin = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete("origin")
+    params.delete("page")
+    router.push(`/catalog?${params.toString()}`)
+  }, [router, searchParams])
 
   return (
     <div className="sticky top-16 z-30 bg-white/95 backdrop-blur-sm border-b border-border -mx-4 px-4 sm:-mx-6 sm:px-6 mb-4 py-2">
@@ -156,9 +181,17 @@ export function FilterBar({
           })}
         </div>
 
-        {/* Search + filter toggle + sort — shares a row with tabs on md+ */}
+        {/* Search + filter toggle + sort — shares a row with tabs on md+.
+            На coffee-вкладке поиск ужимается до max-w-[360px], чтобы освободить
+            место под CTA «Кофе по странам». На остальных вкладках поиск
+            растягивается как раньше (`flex-1`). */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="relative flex-1 min-w-0">
+          <div
+            className={cn(
+              "relative flex-1 min-w-0",
+              showOriginButton && "md:max-w-[360px]"
+            )}
+          >
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input
               type="search"
@@ -177,6 +210,55 @@ export function FilterBar({
               </button>
             )}
           </div>
+
+          {/* Десктоп-версия CTA «Кофе по странам». При активной стране кнопка
+              распадается на pill из двух соседних button (валидный HTML —
+              без вложенных button). Стилизация нейтральная: акцент только в
+              иконке/флаге, чтобы не спорить с активным табом сверху. */}
+          {showOriginButton && (
+            activeOrigin ? (
+              <div
+                className="hidden md:inline-flex shrink-0 items-center h-9 rounded-lg border border-input bg-secondary/40 overflow-hidden"
+                role="group"
+                aria-label={`Выбрана страна: ${activeOrigin}`}
+              >
+                <button
+                  type="button"
+                  onClick={() => setOriginPickerOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-expanded={originPickerOpen}
+                  className="inline-flex items-center gap-1.5 h-full pl-2.5 pr-2 text-sm font-medium text-foreground hover:bg-secondary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  title="Сменить страну"
+                >
+                  <span className="text-base leading-none" aria-hidden="true">
+                    {getCountryFlag(activeOrigin)}
+                  </span>
+                  <span className="max-w-[140px] truncate">{activeOrigin}</span>
+                </button>
+                <span aria-hidden="true" className="w-px h-4 bg-border" />
+                <button
+                  type="button"
+                  onClick={clearOrigin}
+                  aria-label="Сбросить страну"
+                  className="inline-flex items-center justify-center h-full w-8 text-muted-foreground hover:bg-secondary/70 hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setOriginPickerOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={originPickerOpen}
+                className="hidden md:inline-flex shrink-0 items-center gap-1.5 h-9 px-3 rounded-lg border border-input bg-background text-sm font-medium text-foreground hover:bg-secondary hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                title="Выбрать кофе по стране"
+              >
+                <Globe className="w-4 h-4 text-primary" aria-hidden="true" />
+                <span>Кофе по странам</span>
+              </button>
+            )
+          )}
 
           <button
             onClick={() => setFiltersOpen(!filtersOpen)}
@@ -202,6 +284,63 @@ export function FilterBar({
           </select>
         </div>
       </div>
+
+      {/* Мобильная CTA «Кофе по странам» — отдельной строкой, full-width.
+          Та же логика «pill из двух кнопок» при активной стране. */}
+      {showOriginButton && (
+        activeOrigin ? (
+          <div
+            className="md:hidden mt-2 w-full h-10 rounded-lg border border-input bg-secondary/40 flex items-center overflow-hidden"
+            role="group"
+            aria-label={`Выбрана страна: ${activeOrigin}`}
+          >
+            <button
+              type="button"
+              onClick={() => setOriginPickerOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={originPickerOpen}
+              className="flex-1 min-w-0 inline-flex items-center justify-start gap-2 h-full pl-3 pr-2 text-sm font-medium text-foreground hover:bg-secondary/70 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              title="Сменить страну"
+            >
+              <span className="text-base leading-none shrink-0" aria-hidden="true">
+                {getCountryFlag(activeOrigin)}
+              </span>
+              <span className="truncate">{activeOrigin}</span>
+            </button>
+            <span aria-hidden="true" className="w-px h-5 bg-border" />
+            <button
+              type="button"
+              onClick={clearOrigin}
+              aria-label="Сбросить страну"
+              className="inline-flex items-center justify-center h-full w-10 text-muted-foreground hover:bg-secondary/70 hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOriginPickerOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={originPickerOpen}
+            className="md:hidden mt-2 w-full h-10 rounded-lg border border-input bg-background flex items-center justify-center gap-2 text-sm font-medium text-foreground hover:bg-secondary hover:border-primary/40 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          >
+            <Globe className="w-4 h-4 text-primary" aria-hidden="true" />
+            <span>Кофе по странам</span>
+          </button>
+        )
+      )}
+
+      {showOriginButton && (
+        <OriginPicker
+          open={originPickerOpen}
+          onClose={() => setOriginPickerOpen(false)}
+          origins={filterOptions.originStats ?? []}
+          activeOrigin={activeOrigin}
+          preserveSort={activeSort}
+          preserveSearch={searchValue.trim() || undefined}
+        />
+      )}
 
       {/* Sub-filters — collapsible, content varies by tab */}
       {filtersOpen && (

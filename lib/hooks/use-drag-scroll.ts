@@ -1,20 +1,31 @@
 "use client"
 
-import { useEffect, useRef, type RefObject } from "react"
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
+
+export interface DragScrollHandle<T extends HTMLElement> {
+  ref: RefObject<T | null>
+  canScrollLeft: boolean
+  canScrollRight: boolean
+  scrollByAmount: (delta: number) => void
+}
 
 /**
  * Десктопный drag-to-scroll для горизонтальных лент (категории товаров, чипы).
  * На мобиле не нужен — там нативный touch-скролл. Активируется только для мыши,
  * touch-события не перехватываются.
  *
- * Возвращает ref на контейнер, на который вешаются handlers.
+ * Возвращает ref + признаки наличия скролла слева/справа + helper для прокрутки
+ * на заданное число пикселей. Признаки переключаются по `scroll`/`resize` —
+ * на их основе рисуем стрелки навигации.
  *
  * Порог 5px разделяет click vs drag: если мышка прошла меньше — это клик,
  * внутренние `<a>` должны отработать навигацию. Если больше — preventDefault
  * на click перехватывает переход.
  */
-export function useDragScroll<T extends HTMLElement>(): RefObject<T | null> {
+export function useDragScroll<T extends HTMLElement>(): DragScrollHandle<T> {
   const ref = useRef<T>(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
 
   useEffect(() => {
     const el = ref.current
@@ -28,7 +39,6 @@ export function useDragScroll<T extends HTMLElement>(): RefObject<T | null> {
     const DRAG_THRESHOLD = 5
 
     function onMouseDown(e: MouseEvent) {
-      // Только ЛКМ, игнорируем touch-devices (у них есть нативный скролл)
       if (e.button !== 0 || !el) return
       isDown = true
       moved = false
@@ -52,14 +62,18 @@ export function useDragScroll<T extends HTMLElement>(): RefObject<T | null> {
       isDown = false
       el.style.cursor = ""
       el.style.userSelect = ""
+      // Сбрасываем `moved` после короткого тика: сначала отрабатывает
+      // capture-handler `onClickCapture` (читает текущее `moved`), затем
+      // флаг очищается, чтобы следующий чистый клик не блокировался.
+      queueMicrotask(() => {
+        moved = false
+      })
     }
 
     function onMouseLeave() {
       onMouseUp()
     }
 
-    // Перехватываем клик по внутренним <a> ровно в том случае, если
-    // пользователь тянул мышь — иначе переход по карточке отработает.
     function onClickCapture(e: MouseEvent) {
       if (moved) {
         e.preventDefault()
@@ -82,5 +96,32 @@ export function useDragScroll<T extends HTMLElement>(): RefObject<T | null> {
     }
   }, [])
 
-  return ref
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    // Порог 8px разделяет «реально проскроллили» от «дёрнули inertial scroll
+    // на трекпаде» — иначе на каждый микро-сдвиг стрелки моргают.
+    const update = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el
+      setCanScrollLeft(scrollLeft > 8)
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 8)
+    }
+
+    update()
+    el.addEventListener("scroll", update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+
+    return () => {
+      el.removeEventListener("scroll", update)
+      ro.disconnect()
+    }
+  }, [])
+
+  const scrollByAmount = useCallback((delta: number) => {
+    ref.current?.scrollBy({ left: delta, behavior: "smooth" })
+  }, [])
+
+  return { ref, canScrollLeft, canScrollRight, scrollByAmount }
 }

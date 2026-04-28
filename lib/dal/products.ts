@@ -367,6 +367,7 @@ async function getFilterOptionsUncached(productType?: ProductType) {
     ])
     return {
       origins: origins.map((o) => o.origin!).filter(Boolean),
+      originStats: [] as { name: string; count: number }[],
       roastLevels: [],
       brewingMethods: [],
       teaTypes: teaCategories,
@@ -382,6 +383,7 @@ async function getFilterOptionsUncached(productType?: ProductType) {
     })
     return {
       origins: [],
+      originStats: [] as { name: string; count: number }[],
       roastLevels: [],
       brewingMethods: [],
       teaTypes: [],
@@ -389,12 +391,19 @@ async function getFilterOptionsUncached(productType?: ProductType) {
     }
   }
 
-  // Default: coffee
-  const [origins, roastLevels] = await Promise.all([
-    prisma.product.findMany({
-      where: { ...baseWhere, origin: { not: null } },
-      select: { origin: true },
-      distinct: ["origin"],
+  // Default: coffee — для попапа OriginPicker берём не только список стран,
+  // но и количество SKU по каждой через groupBy. Считаем только товары, у
+  // которых есть хотя бы один активный вариант с остатком — иначе попап
+  // показывал бы «5 сортов», когда из них половина распродана.
+  const [originGroups, roastLevels] = await Promise.all([
+    prisma.product.groupBy({
+      by: ["origin"],
+      where: {
+        ...baseWhere,
+        origin: { not: null },
+        variants: { some: { isActive: true, stock: { gt: 0 } } },
+      },
+      _count: { _all: true },
     }),
     prisma.product.findMany({
       where: { ...baseWhere, roastLevel: { not: null } },
@@ -403,8 +412,14 @@ async function getFilterOptionsUncached(productType?: ProductType) {
     }),
   ])
 
+  const originStats = originGroups
+    .map((g) => ({ name: g.origin as string, count: g._count._all }))
+    .filter((g) => Boolean(g.name))
+    .sort((a, b) => b.count - a.count)
+
   return {
-    origins: origins.map((o) => o.origin!).filter(Boolean),
+    origins: originStats.map((s) => s.name),
+    originStats,
     roastLevels: roastLevels.map((r) => r.roastLevel!).filter(Boolean),
     brewingMethods: ["espresso", "filter", "french-press", "turka"],
     teaTypes: [],
