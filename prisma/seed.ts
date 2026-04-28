@@ -277,9 +277,10 @@ async function main() {
     cdek_client_id: "",
     cdek_client_secret: "",
     cdek_test_mode: "true",
-    // Эконом-тарифы (233/234) первыми — они дешевле магистральных (136/137).
-    // Покупателю показываем оба: пусть сам выбирает между «подешевле» и «побыстрее».
-    cdek_tariffs: JSON.stringify([233, 234, 136, 137]),
+    // Все тарифы — «дверь-...»: CDEK-курьер забирает посылку у нас (door pickup),
+    // а не мы везём её на склад СДЭК. Покупателю показываем 4 опции:
+    // эконом до двери / эконом в ПВЗ / посылка до двери / посылка в ПВЗ.
+    cdek_tariffs: JSON.stringify([231, 232, 138, 139]),
     // Pochta RF — enabled by default (tariff API works without tokens)
     pochta_enabled: "true",
     pochta_access_token: "",

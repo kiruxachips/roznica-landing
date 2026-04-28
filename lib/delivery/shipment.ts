@@ -90,7 +90,7 @@ export async function createShipmentForOrder(
   const req: CreateShipmentRequest = {
     orderId: order.id,
     carrier: order.deliveryMethod as "cdek" | "pochta",
-    tariffCode: order.tariffCode || 136,
+    tariffCode: order.tariffCode || 138,
     deliveryType: (order.deliveryType as "door" | "pvz") || "pvz",
     pickupPointCode: order.pickupPointCode || undefined,
     senderCityCode: sender.cityCode,
@@ -116,7 +116,7 @@ export async function createShipmentForOrder(
     if (!settings.cdek_client_id || !settings.cdek_client_secret) {
       throw new Error("CDEK credentials not configured")
     }
-    let tariffs: number[] = [233, 234, 136, 137]
+    let tariffs: number[] = [231, 232, 138, 139]
     try {
       const parsed = JSON.parse(settings.cdek_tariffs)
       if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed
@@ -160,7 +160,7 @@ export async function refreshTrackingForOrder(orderId: string) {
 
   if (order.deliveryMethod === "cdek") {
     const sender = getDefaultSenderLocation(settings)
-    let tariffs: number[] = [233, 234, 136, 137]
+    let tariffs: number[] = [231, 232, 138, 139]
     try {
       const parsed = JSON.parse(settings.cdek_tariffs)
       if (Array.isArray(parsed) && parsed.length > 0) tariffs = parsed

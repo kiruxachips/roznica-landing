@@ -655,10 +655,10 @@ export function DeliverySettingsForm({ settings, rules }: Props) {
               <label className={labelClass}>Тарифы</label>
               <div className="flex flex-wrap gap-3">
                 {[
-                  { code: 136, name: "Посылка склад-склад" },
-                  { code: 137, name: "Посылка склад-дверь" },
-                  { code: 233, name: "Эконом склад-склад" },
-                  { code: 234, name: "Эконом склад-дверь" },
+                  { code: 138, name: "Посылка дверь-склад" },
+                  { code: 139, name: "Посылка дверь-дверь" },
+                  { code: 231, name: "Эконом дверь-дверь" },
+                  { code: 232, name: "Эконом дверь-склад" },
                 ].map((t) => {
                   const tariffs: number[] = (() => {
                     try { return JSON.parse(localSettings.cdek_tariffs || "[]") } catch { return [] }
