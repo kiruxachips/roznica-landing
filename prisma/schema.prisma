@@ -93,6 +93,7 @@ model Product {
   @@index([isActive, categoryId])
   @@index([isActive, productType])
   @@index([isActive, isFeatured, sortOrder])
+  @@index([isActive, productType, origin])
 }
 
 model ProductImage {
