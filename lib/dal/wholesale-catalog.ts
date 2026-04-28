@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
 import {
   parseWeightGrams,
   resolvePrice,
@@ -6,6 +7,7 @@ import {
   type PriceContext,
   type ResolvedPrice,
 } from "@/lib/dal/pricing"
+import { CACHE_TAGS } from "@/lib/cache-tags"
 import type { ProductType } from "@/lib/types"
 
 /**
@@ -64,7 +66,7 @@ function isWholesaleCoffeeKg(weight: string): boolean {
   return parseWeightGrams(weight) === 1000
 }
 
-export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleProductCard[]> {
+async function getWholesaleCatalogUncached(ctx: PriceContext): Promise<WholesaleProductCard[]> {
   const products = await prisma.product.findMany({
     where: { isActive: true, productType: "coffee" },
     orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
@@ -139,7 +141,32 @@ export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleP
     .filter((p) => p.variants.length > 0)
 }
 
-export async function getWholesaleProductBySlug(
+/**
+ * Кешированный оптовый каталог. Кешируется по `priceListId` (главное измерение
+ * цен) — у разных компаний разные прайс-листы, но компаний/прайслистов мало
+ * (5-20 на проект). revalidate=120 + теги products/wholesalePriceList дают
+ * точечную инвалидацию: меняется прайс-лист → revalidateTag(wholesalePriceList(id))
+ * сбрасывает только этот ключ, не трогая остальные.
+ */
+export async function getWholesaleCatalog(ctx: PriceContext): Promise<WholesaleProductCard[]> {
+  // Для retail-fallback (без priceListId) используем общий ключ.
+  const priceListKey = ctx.priceListId ?? "__retail_fallback__"
+  return unstable_cache(
+    () => getWholesaleCatalogUncached(ctx),
+    ["wholesale-catalog", priceListKey],
+    {
+      revalidate: 120,
+      tags: [
+        CACHE_TAGS.products,
+        ...(ctx.priceListId
+          ? [CACHE_TAGS.wholesalePriceList(ctx.priceListId), CACHE_TAGS.wholesaleCatalog(ctx.priceListId)]
+          : []),
+      ],
+    }
+  )()
+}
+
+async function getWholesaleProductBySlugUncached(
   slug: string,
   ctx: PriceContext
 ): Promise<WholesaleProductDetail | null> {
@@ -238,6 +265,29 @@ export async function getWholesaleProductBySlug(
     minPrice: variants[0]!.price,
     variants,
   }
+}
+
+/**
+ * Кешированная карточка оптового товара. Кешируется по slug + priceListId.
+ */
+export async function getWholesaleProductBySlug(
+  slug: string,
+  ctx: PriceContext
+): Promise<WholesaleProductDetail | null> {
+  const priceListKey = ctx.priceListId ?? "__retail_fallback__"
+  return unstable_cache(
+    () => getWholesaleProductBySlugUncached(slug, ctx),
+    ["wholesale-product", slug, priceListKey],
+    {
+      revalidate: 300,
+      tags: [
+        CACHE_TAGS.products,
+        ...(ctx.priceListId
+          ? [CACHE_TAGS.wholesalePriceList(ctx.priceListId), CACHE_TAGS.wholesaleCatalog(ctx.priceListId)]
+          : []),
+      ],
+    }
+  )()
 }
 
 /**

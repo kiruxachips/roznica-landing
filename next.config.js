@@ -86,6 +86,18 @@ try {
     // ограничен spam'ом в dashboard. Квоты Sentry + rate-limit на их
     // стороне защищают от bill-overrun.
     tunnelRoute: '/monitoring',
+    // Tree-shake тяжёлые компоненты Sentry, которые мы не используем.
+    // Bundle analyzer показал sentry.client.config + 166 modules в shared
+    // chunk — replay/feedback/profiling не включены в client config, но их
+    // SDK-код всё равно бандлится. Эти флаги выкидывают мёртвый код.
+    bundleSizeOptimizations: {
+      excludeDebugStatements: true,
+      excludeReplayCanvas: true,
+      excludeReplayShadowDom: true,
+      excludeReplayIframe: true,
+      excludeReplayWorker: true,
+      excludeTracing: false, // tracing мы используем (tracesSampleRate: 0.1)
+    },
   })
 } catch {
   // @sentry/nextjs не установлен — работаем без Sentry.
