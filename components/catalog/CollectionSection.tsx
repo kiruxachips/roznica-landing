@@ -55,44 +55,44 @@ export function CollectionSection({ name, slug, emoji, products, favoritedIds }:
           )}
         />
 
-        {/* Стрелки навигации — только десктоп/планшет. Видны всегда
-            (`opacity-70`), на hover секции усиливаются. Скрываются, когда
-            скроллить некуда. Размер 32px, придвинуты к краю wrapper'а —
-            живут в padding-зоне (sm:px-6/lg:px-8), минимально перекрывая
-            карточки и не наезжая на FavoriteButton (top-2 right-2). */}
+        {/* Стрелки навигации — только десктоп/планшет. Размер 28px, прижаты
+            к самому краю wrapper'а: wrapper выходит за контент на 16/24/32px
+            (-mx-4/-mx-6/-mx-8), стрелка занимает 28px от left-0 — итого
+            заканчивается до того, как начинается первая карточка, не
+            перекрывает её. */}
         <button
           type="button"
           onClick={() => scrollByAmount(-CARD_STEP)}
           aria-label="Прокрутить влево"
           className={cn(
-            "hidden sm:flex absolute left-1 lg:left-2 top-[35%] -translate-y-1/2 z-20",
-            "w-8 h-8 rounded-full bg-white shadow-md border border-border",
+            "hidden sm:flex absolute left-0 top-[35%] -translate-y-1/2 z-20",
+            "w-7 h-7 rounded-full bg-white shadow-md border border-border",
             "items-center justify-center text-foreground hover:bg-secondary hover:scale-105",
             "transition-all duration-200",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
             canScrollLeft
-              ? "opacity-70 group-hover:opacity-100 pointer-events-auto"
+              ? "opacity-80 group-hover:opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
           )}
         >
-          <ChevronLeft className="w-4 h-4" />
+          <ChevronLeft className="w-3.5 h-3.5" />
         </button>
         <button
           type="button"
           onClick={() => scrollByAmount(CARD_STEP)}
           aria-label="Прокрутить вправо"
           className={cn(
-            "hidden sm:flex absolute right-1 lg:right-2 top-[35%] -translate-y-1/2 z-20",
-            "w-8 h-8 rounded-full bg-white shadow-md border border-border",
+            "hidden sm:flex absolute right-0 top-[35%] -translate-y-1/2 z-20",
+            "w-7 h-7 rounded-full bg-white shadow-md border border-border",
             "items-center justify-center text-foreground hover:bg-secondary hover:scale-105",
             "transition-all duration-200",
             "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
             canScrollRight
-              ? "opacity-70 group-hover:opacity-100 pointer-events-auto"
+              ? "opacity-80 group-hover:opacity-100 pointer-events-auto"
               : "opacity-0 pointer-events-none"
           )}
         >
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-3.5 h-3.5" />
         </button>
 
         <div

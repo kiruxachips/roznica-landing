@@ -345,7 +345,9 @@ export function FilterBar({
       {/* Sub-filters — collapsible, content varies by tab */}
       {filtersOpen && (
         <div className="space-y-3 mt-3">
-          {/* COFFEE sub-filters */}
+          {/* COFFEE sub-filters. Блок «Страна» сюда не выводим — для кофе есть
+              отдельная CTA-кнопка «Кофе по странам» с попапом, дублировать
+              вторую копию в фильтрах не нужно. */}
           {(!activeType || activeType === "coffee") && (
             <>
               {filterOptions.roastLevels.length > 0 && (
@@ -354,16 +356,6 @@ export function FilterBar({
                   {filterOptions.roastLevels.map((level) => (
                     <FilterPill key={level} active={activeRoast === level} onClick={() => updateParams("roast", activeRoast === level ? undefined : level)}>
                       {level}
-                    </FilterPill>
-                  ))}
-                </FilterRow>
-              )}
-              {filterOptions.origins.length > 1 && (
-                <FilterRow label="Страна">
-                  <FilterPill active={!activeOrigin} onClick={() => updateParams("origin", undefined)}>Все</FilterPill>
-                  {filterOptions.origins.map((origin) => (
-                    <FilterPill key={origin} active={activeOrigin === origin} onClick={() => updateParams("origin", activeOrigin === origin ? undefined : origin)}>
-                      {origin}
                     </FilterPill>
                   ))}
                 </FilterRow>
