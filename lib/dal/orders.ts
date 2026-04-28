@@ -213,6 +213,12 @@ export async function createOrder(data: OrderData) {
   // Delivery price: always calculate server-side, never trust client price.
   // Передаём ВСЕ доступные параметры локации (город-строка нужен для Почты,
   // когда у клиента нет postalCode — провайдер разрешает через DaData/by-address).
+  //
+  // cartTotal для правил бесплатной доставки: НЕ вычитаем welcome-скидку.
+  // Иначе клиент видит подытог 3005₽, ожидает «бесплатно от 3000₽», но
+  // welcome -10% опускает до 2705₽ и порог не пробивается. Промокод и
+  // списанные бонусы — это явные действия пользователя, их вычитаем.
+  const cartTotalForDelivery = subtotal - (welcomeApplied ? 0 : discount) - bonusUsed
   let deliveryPrice = 0
   if (data.tariffCode !== undefined && data.deliveryMethod) {
     const rates = await calculateDeliveryRates({
@@ -220,7 +226,7 @@ export async function createOrder(data: OrderData) {
       toPostalCode: data.postalCode,
       toCity: data.destinationCity,
       items: packingItems,
-      cartTotal: afterDiscount - bonusUsed,
+      cartTotal: cartTotalForDelivery,
     })
     const matchingRate = rates.find(
       (r) => r.tariffCode === data.tariffCode && r.carrier === data.deliveryMethod

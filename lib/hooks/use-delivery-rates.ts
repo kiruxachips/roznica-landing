@@ -32,21 +32,17 @@ export function useDeliveryRates() {
   const cartItems = useCartStore((s) => s.items)
   const itemsForPacking = useCartStore((s) => s.itemsForPacking)()
 
-  // Сервер в createOrder передаёт в calculateDeliveryRates `cartTotal =
-  // afterDiscount - bonusUsed`. Welcome-скидка применяется только если
-  // нет промокода (так в DAL). Воспроизводим ту же формулу, иначе правило
-  // «бесплатно от X₽» сработает на клиенте, но не на сервере → списание
-  // больше суммы, которую видел пользователь.
+  // Сервер в createOrder передаёт в calculateDeliveryRates тот же cartTotal:
+  // subtotal минус промокод (если есть) минус списанные бонусы. Welcome-
+  // скидка в порог НЕ вычитается — иначе пользователь видит подытог 3005₽,
+  // ожидает «бесплатно от 3000₽», но welcome -10% опускает базу под порог.
+  // Промокод/бонусы — явные действия пользователя, их учитываем.
   //
-  // C7: ждём loading=false из useWelcomeDiscount. Без этого первый fetch
-  // тарифов уходил с cartTotal = subtotal (без скидки) → сервер мог
-  // вернуть «бесплатно», потом welcome загружался, refetch возвращал
-  // платную доставку — visible jitter и переплата у пользователей с
-  // быстрой сетью.
+  // C7: useWelcomeDiscount всё равно дёргаем (нужен .loading) — он же
+  // используется в OrderSummary для UI-разметки. Если убрать — будет 2
+  // независимых fetch'а на /api/cart/welcome-discount.
   const welcome = useWelcomeDiscount(subtotal)
-  const effectiveDiscount =
-    promoDiscount > 0 ? promoDiscount : welcome.value?.discount ?? 0
-  const cartTotal = Math.max(0, subtotal - effectiveDiscount)
+  const cartTotal = Math.max(0, subtotal - promoDiscount)
   // Стабильная строка-ключ — массив каждый рендер новый, без хэша
   // useEffect зацикливался бы.
   const itemsKey = cartItems
