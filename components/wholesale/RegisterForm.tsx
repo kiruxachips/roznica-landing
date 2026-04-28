@@ -62,6 +62,9 @@ export function WholesaleRegisterForm() {
           <input
             name="name"
             required
+            autoComplete="name"
+            autoCapitalize="words"
+            enterKeyHint="next"
             placeholder="Иван Иванов"
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
@@ -73,6 +76,8 @@ export function WholesaleRegisterForm() {
             type="email"
             required
             autoComplete="email"
+            inputMode="email"
+            enterKeyHint="next"
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
@@ -82,6 +87,9 @@ export function WholesaleRegisterForm() {
             name="phone"
             type="tel"
             required
+            autoComplete="tel"
+            inputMode="tel"
+            enterKeyHint="next"
             placeholder="+7 900 000-00-00"
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
@@ -94,6 +102,7 @@ export function WholesaleRegisterForm() {
             required
             minLength={8}
             autoComplete="new-password"
+            enterKeyHint="next"
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>

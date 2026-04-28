@@ -131,6 +131,8 @@ export function LoginForm() {
             type="email"
             required
             autoComplete="email"
+            inputMode="email"
+            enterKeyHint="next"
             autoFocus
             defaultValue={rememberedEmail}
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -148,6 +150,7 @@ export function LoginForm() {
             type="password"
             required
             autoComplete="current-password"
+            enterKeyHint="go"
             onKeyUp={(e) => setCapsLock(e.getModifierState?.("CapsLock") ?? false)}
             onBlur={() => setCapsLock(false)}
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"

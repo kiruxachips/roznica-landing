@@ -109,6 +109,9 @@ export function TeamManagement(props: {
                 name="name"
                 required
                 placeholder="Имя"
+                autoComplete="name"
+                autoCapitalize="words"
+                enterKeyHint="next"
                 className="rounded-lg border border-border px-3 py-2 text-sm"
               />
               <input
@@ -116,6 +119,9 @@ export function TeamManagement(props: {
                 required
                 type="email"
                 placeholder="email"
+                autoComplete="email"
+                inputMode="email"
+                enterKeyHint="next"
                 className="rounded-lg border border-border px-3 py-2 text-sm"
               />
               <select

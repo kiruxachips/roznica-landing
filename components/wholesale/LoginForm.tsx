@@ -54,6 +54,8 @@ export function WholesaleLoginForm() {
           type="email"
           required
           autoComplete="email"
+          inputMode="email"
+          enterKeyHint="next"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
@@ -67,6 +69,7 @@ export function WholesaleLoginForm() {
           type="password"
           required
           autoComplete="current-password"
+          enterKeyHint="go"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>

@@ -69,6 +69,9 @@ export function RegisterForm() {
             id="name"
             name="name"
             required
+            autoComplete="given-name"
+            autoCapitalize="words"
+            enterKeyHint="next"
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="Иван"
           />
@@ -83,6 +86,9 @@ export function RegisterForm() {
             name="email"
             type="email"
             required
+            autoComplete="email"
+            inputMode="email"
+            enterKeyHint="next"
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="email@example.com"
           />
@@ -97,7 +103,9 @@ export function RegisterForm() {
             name="password"
             type="password"
             required
-            minLength={6}
+            minLength={8}
+            autoComplete="new-password"
+            enterKeyHint="next"
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
@@ -111,7 +119,9 @@ export function RegisterForm() {
             name="confirmPassword"
             type="password"
             required
-            minLength={6}
+            minLength={8}
+            autoComplete="new-password"
+            enterKeyHint="done"
             className="w-full h-11 px-4 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>

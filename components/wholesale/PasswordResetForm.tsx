@@ -38,6 +38,8 @@ export function WholesalePasswordResetForm() {
           type="email"
           required
           autoComplete="email"
+          inputMode="email"
+          enterKeyHint="send"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>

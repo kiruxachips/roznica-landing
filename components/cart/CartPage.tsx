@@ -184,6 +184,10 @@ export function CartPage() {
                   }}
                   onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
                   placeholder="Введите код"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  enterKeyHint="done"
                   className="flex-1 h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary uppercase"
                 />
                 <button

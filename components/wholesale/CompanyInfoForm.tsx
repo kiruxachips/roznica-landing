@@ -157,8 +157,11 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
           <label className="text-sm font-medium mb-1.5 block">КПП (если ООО)</label>
           <input
             value={values.kpp}
-            onChange={(e) => setValues((v) => ({ ...v, kpp: e.target.value }))}
+            onChange={(e) => setValues((v) => ({ ...v, kpp: e.target.value.replace(/\D/g, "") }))}
             disabled={readonly}
+            inputMode="numeric"
+            pattern="\d{9}"
+            maxLength={9}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm disabled:bg-muted/40"
           />
         </div>
@@ -166,8 +169,11 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
           <label className="text-sm font-medium mb-1.5 block">ОГРН / ОГРНИП</label>
           <input
             value={values.ogrn}
-            onChange={(e) => setValues((v) => ({ ...v, ogrn: e.target.value }))}
+            onChange={(e) => setValues((v) => ({ ...v, ogrn: e.target.value.replace(/\D/g, "") }))}
             disabled={readonly}
+            inputMode="numeric"
+            pattern="\d{13}|\d{15}"
+            maxLength={15}
             className="w-full rounded-xl border border-border px-4 py-2.5 text-sm disabled:bg-muted/40"
           />
         </div>
@@ -198,8 +204,11 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
             <label className="text-sm font-medium mb-1.5 block">Расчётный счёт</label>
             <input
               value={values.bankAccount}
-              onChange={(e) => setValues((v) => ({ ...v, bankAccount: e.target.value }))}
+              onChange={(e) => setValues((v) => ({ ...v, bankAccount: e.target.value.replace(/\D/g, "") }))}
               disabled={readonly}
+              inputMode="numeric"
+              pattern="\d{20}"
+              maxLength={20}
               className="w-full rounded-xl border border-border px-4 py-2.5 text-sm disabled:bg-muted/40"
             />
           </div>
@@ -207,8 +216,11 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
             <label className="text-sm font-medium mb-1.5 block">БИК</label>
             <input
               value={values.bankBic}
-              onChange={(e) => setValues((v) => ({ ...v, bankBic: e.target.value }))}
+              onChange={(e) => setValues((v) => ({ ...v, bankBic: e.target.value.replace(/\D/g, "") }))}
               disabled={readonly}
+              inputMode="numeric"
+              pattern="\d{9}"
+              maxLength={9}
               className="w-full rounded-xl border border-border px-4 py-2.5 text-sm disabled:bg-muted/40"
             />
           </div>
@@ -216,8 +228,11 @@ export function CompanyInfoForm({ company }: { company: CompanyState }) {
             <label className="text-sm font-medium mb-1.5 block">Корр. счёт</label>
             <input
               value={values.corrAccount}
-              onChange={(e) => setValues((v) => ({ ...v, corrAccount: e.target.value }))}
+              onChange={(e) => setValues((v) => ({ ...v, corrAccount: e.target.value.replace(/\D/g, "") }))}
               disabled={readonly}
+              inputMode="numeric"
+              pattern="\d{20}"
+              maxLength={20}
               className="w-full rounded-xl border border-border px-4 py-2.5 text-sm disabled:bg-muted/40"
             />
           </div>

@@ -53,6 +53,9 @@ export function WholesalePasswordResetConfirmForm() {
           type="email"
           defaultValue={emailFromQuery}
           required
+          autoComplete="email"
+          inputMode="email"
+          enterKeyHint="next"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
@@ -64,6 +67,8 @@ export function WholesalePasswordResetConfirmForm() {
           inputMode="numeric"
           pattern="\d{6}"
           maxLength={6}
+          autoComplete="one-time-code"
+          enterKeyHint="next"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
@@ -75,6 +80,7 @@ export function WholesalePasswordResetConfirmForm() {
           required
           minLength={8}
           autoComplete="new-password"
+          enterKeyHint="done"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>

@@ -138,6 +138,7 @@ export function ContactStep() {
           <input
             autoComplete="family-name"
             autoCapitalize="words"
+            enterKeyHint="next"
             value={contact.lastName}
             onChange={(e) => {
               setContact({ lastName: e.target.value })
@@ -155,6 +156,7 @@ export function ContactStep() {
           <input
             autoComplete="given-name"
             autoCapitalize="words"
+            enterKeyHint="next"
             value={contact.firstName}
             onChange={(e) => {
               setContact({ firstName: e.target.value })
@@ -190,6 +192,7 @@ export function ContactStep() {
             type="email"
             autoComplete="email"
             inputMode="email"
+            enterKeyHint="done"
             value={contact.email}
             onChange={(e) => {
               setContact({ email: e.target.value })

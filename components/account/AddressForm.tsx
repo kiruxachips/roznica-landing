@@ -60,6 +60,8 @@ export function AddressForm({ address, onDone }: AddressFormProps) {
             required
             defaultValue={address?.title}
             placeholder="Дом, Работа..."
+            autoCapitalize="words"
+            enterKeyHint="next"
             className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
@@ -69,6 +71,9 @@ export function AddressForm({ address, onDone }: AddressFormProps) {
             name="recipientName"
             defaultValue={address?.recipientName || ""}
             placeholder="Иван Иванов"
+            autoComplete="name"
+            autoCapitalize="words"
+            enterKeyHint="next"
             className="w-full h-10 px-3 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           />
         </div>
@@ -82,6 +87,8 @@ export function AddressForm({ address, onDone }: AddressFormProps) {
           rows={2}
           defaultValue={address?.fullAddress}
           placeholder="Город, улица, дом, квартира"
+          autoComplete="street-address"
+          enterKeyHint="next"
           className="w-full px-3 py-2 rounded-lg border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>

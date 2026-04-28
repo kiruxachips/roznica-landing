@@ -51,6 +51,9 @@ export function InviteAcceptForm({ token, email }: { token: string; email: strin
         <label className="text-sm font-medium mb-1.5 block">Ваше имя (если нужно уточнить)</label>
         <input
           name="name"
+          autoComplete="name"
+          autoCapitalize="words"
+          enterKeyHint="next"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>
@@ -62,6 +65,7 @@ export function InviteAcceptForm({ token, email }: { token: string; email: strin
           required
           minLength={8}
           autoComplete="new-password"
+          enterKeyHint="done"
           className="w-full rounded-xl border border-border px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
         />
       </div>

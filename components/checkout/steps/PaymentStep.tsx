@@ -398,6 +398,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
           rows={2}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          enterKeyHint="done"
           className="w-full px-4 py-3 rounded-xl border border-input text-sm focus:outline-none focus:ring-2 focus:ring-primary"
           placeholder="Пожелания курьеру, время доставки и т.п."
         />
@@ -464,6 +465,8 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
                 <input
                   type={passwordVisible ? "text" : "password"}
                   autoComplete="new-password"
+                  enterKeyHint="done"
+                  minLength={8}
                   value={accountPassword}
                   onChange={(e) => {
                     setAccountPassword(e.target.value)
