@@ -20,7 +20,7 @@ export default async function CheckoutSuccessPage({
   return (
     <>
       <Header />
-      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 min-h-screen flex items-center">
+      <main className="pt-20 sm:pt-24 pb-12 sm:pb-16 min-h-screen min-h-dvh flex items-center">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-md mx-auto text-center">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-5 sm:mb-6">

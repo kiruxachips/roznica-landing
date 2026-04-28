@@ -58,5 +58,39 @@ html {
   .text-balance {
     text-wrap: balance;
   }
+  /* Безопасная зона под home-indicator iPhone X+. Применяется к sticky/fixed
+     bottom элементам — иначе кнопки уходят под индикатор и ловят системный
+     swipe-up жест. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottom-safe {
+    bottom: env(safe-area-inset-bottom);
+  }
 }
 
+/* iOS Safari зумит viewport при фокусе на input с font-size < 16px и обратно
+   не возвращается. Tailwind text-sm = 14px, text-xs = 12px — массово триггерят
+   зум. Принудительно поднимаем до 16px только на мобильных размерах, на
+   десктопе оставляем дизайнерские размеры. */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Уважаем prefers-reduced-motion: декоративные slide/scale/fade анимации
+   в попапе и hover-эффекты на стрелках навигации становятся мгновенными,
+   без motion. Бесконечные анимации (snowfall, twinkle) тоже останавливаются. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
