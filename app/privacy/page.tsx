@@ -19,7 +19,7 @@ export default function PrivacyPage() {
           {/* Back Link */}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors mb-5 sm:mb-8"
+            className="inline-flex items-center gap-2 py-2 -ml-1 px-1 min-h-[44px] text-sm text-muted-foreground hover:text-primary transition-colors mb-3 sm:mb-6"
           >
             <ArrowLeft className="w-4 h-4" />
             Вернуться на главную

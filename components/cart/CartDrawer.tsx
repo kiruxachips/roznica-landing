@@ -110,11 +110,11 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                   <p className="text-sm font-semibold text-primary mt-1">{item.price}₽</p>
                 </div>
 
-                <div className="flex flex-col items-end justify-between">
+                <div className="flex flex-col items-end justify-between gap-2">
                   <button
                     onClick={() => removeItem(item.variantId)}
                     aria-label={`Удалить ${item.name} из корзины`}
-                    className="p-2 text-muted-foreground hover:text-red-500"
+                    className="w-10 h-10 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -122,9 +122,9 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                     <button
                       onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
                       aria-label="Уменьшить количество"
-                      className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
+                      className="w-10 h-10 flex items-center justify-center rounded-md border border-border hover:bg-muted"
                     >
-                      <Minus className="w-3.5 h-3.5" />
+                      <Minus className="w-4 h-4" />
                     </button>
                     <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
                     {(() => {
@@ -143,9 +143,9 @@ export function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () =
                           disabled={atCap}
                           aria-label="Увеличить количество"
                           title={atCap && cap < 99 ? `Всего ${cap} в наличии` : undefined}
-                          className="w-8 h-8 flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs disabled:opacity-30"
+                          className="w-10 h-10 flex items-center justify-center rounded-md border border-border hover:bg-muted disabled:opacity-30"
                         >
-                          <Plus className="w-3 h-3" />
+                          <Plus className="w-4 h-4" />
                         </button>
                       )
                     })()}

@@ -126,12 +126,12 @@ export function RegisterForm() {
           />
         </div>
 
-        <label className="flex items-start gap-2 cursor-pointer">
+        <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-2">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-1 h-4 w-4 rounded border-input accent-primary"
+            className="mt-0.5 h-5 w-5 rounded border-input accent-primary shrink-0"
           />
           <span className="text-sm text-muted-foreground">
             Я соглашаюсь с{" "}

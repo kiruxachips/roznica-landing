@@ -65,7 +65,8 @@ export function SubscriptionActions({
           }
           disabled={loading}
           title="Пауза на 14 дней"
-          className="h-8 w-8 rounded-lg border border-border hover:bg-muted flex items-center justify-center disabled:opacity-60"
+          aria-label="Поставить подписку на паузу на 14 дней"
+          className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg border border-border hover:bg-muted flex items-center justify-center disabled:opacity-60"
         >
           <Pause className="w-4 h-4" />
         </button>
@@ -75,7 +76,8 @@ export function SubscriptionActions({
           onClick={() => runAction(() => resumeSubscription(subscriptionId))}
           disabled={loading}
           title="Возобновить"
-          className="h-8 w-8 rounded-lg border border-primary bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center disabled:opacity-60"
+          aria-label="Возобновить подписку"
+          className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg border border-primary bg-primary/10 text-primary hover:bg-primary/20 flex items-center justify-center disabled:opacity-60"
         >
           <Play className="w-4 h-4" />
         </button>
@@ -83,7 +85,8 @@ export function SubscriptionActions({
       <button
         onClick={() => setConfirming("cancel")}
         title="Отменить"
-        className="h-8 w-8 rounded-lg border border-border hover:bg-red-50 hover:border-red-200 hover:text-red-700 flex items-center justify-center"
+        aria-label="Отменить подписку"
+        className="h-11 w-11 sm:h-9 sm:w-9 rounded-lg border border-border hover:bg-red-50 hover:border-red-200 hover:text-red-700 flex items-center justify-center"
       >
         <X className="w-4 h-4" />
       </button>

@@ -188,9 +188,9 @@ export function TeamManagement(props: {
               {props.isOwner && u.id !== props.currentUserId && u.role !== "owner" && u.status !== "blocked" && (
                 <button
                   onClick={() => handleRemove(u.id)}
-                  className="text-xs text-red-600 hover:underline shrink-0"
+                  className="text-xs font-medium text-red-600 hover:bg-red-50 rounded-md px-2.5 py-2 min-h-[40px] shrink-0 border border-transparent hover:border-red-200 transition-colors"
                 >
-                  заблокировать
+                  Заблокировать
                 </button>
               )}
             </li>

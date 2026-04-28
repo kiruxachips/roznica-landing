@@ -83,17 +83,17 @@ export function Footer() {
           </nav>
 
           {/* Contacts */}
-          <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row flex-wrap gap-x-5 gap-y-1.5 text-sm">
+          <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row flex-wrap gap-x-5 gap-y-1 text-sm">
             <a
               href="tel:+74012375343"
-              className="flex items-center gap-1.5 text-coffee-300 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 py-2 text-coffee-300 hover:text-white transition-colors"
             >
               <Phone className="w-3.5 h-3.5 shrink-0" />
               +7 (401) 237 53 43
             </a>
             <a
               href="mailto:Import@kldrefine.com"
-              className="flex items-center gap-1.5 text-coffee-300 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 py-2 text-coffee-300 hover:text-white transition-colors"
             >
               <Mail className="w-3.5 h-3.5 shrink-0" />
               Import@kldrefine.com

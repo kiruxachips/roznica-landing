@@ -412,7 +412,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
 
       {showRegistrationPrompt && (
         <div className="rounded-xl border border-border bg-secondary/30 p-4">
-          <label className="flex items-start gap-3 cursor-pointer">
+          <label className="flex items-start gap-3 cursor-pointer min-h-[44px]">
             <input
               type="checkbox"
               checked={createAccount}
@@ -423,7 +423,7 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
                   setAccountError("")
                 }
               }}
-              className="mt-1 h-4 w-4 rounded border-input accent-primary"
+              className="mt-0.5 h-5 w-5 rounded border-input accent-primary shrink-0"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -503,12 +503,12 @@ export function PaymentStep({ finalTotal }: { finalTotal: number }) {
         </div>
       )}
 
-      <label className="flex items-start gap-2 cursor-pointer">
+      <label className="flex items-start gap-3 cursor-pointer min-h-[44px] py-2">
         <input
           type="checkbox"
           checked={agreed}
           onChange={(e) => setAgreed(e.target.checked)}
-          className="mt-1 h-4 w-4 rounded border-input accent-primary"
+          className="mt-0.5 h-5 w-5 rounded border-input accent-primary shrink-0"
         />
         <span className="text-sm text-muted-foreground">
           Я соглашаюсь с{" "}

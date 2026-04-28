@@ -116,7 +116,7 @@ export function PendingPaymentBanner() {
           type="button"
           onClick={() => clear()}
           aria-label="Скрыть напоминание"
-          className="shrink-0 text-amber-700 hover:text-amber-900 transition-colors"
+          className="shrink-0 w-9 h-9 -mr-1 -mt-1 flex items-center justify-center rounded-md text-amber-700 hover:text-amber-900 hover:bg-amber-100 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>

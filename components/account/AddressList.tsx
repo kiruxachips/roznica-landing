@@ -74,7 +74,8 @@ export function AddressList({ addresses }: Props) {
                 <button
                   onClick={() => handleSetDefault(addr.id)}
                   disabled={isPending}
-                  className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                  className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
+                  aria-label="Сделать адресом по умолчанию"
                   title="Сделать по умолчанию"
                 >
                   <Star className="w-4 h-4" />
@@ -82,7 +83,8 @@ export function AddressList({ addresses }: Props) {
               )}
               <button
                 onClick={() => setEditingId(addr.id)}
-                className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Редактировать адрес"
                 title="Редактировать"
               >
                 <Pencil className="w-4 h-4" />
@@ -90,7 +92,8 @@ export function AddressList({ addresses }: Props) {
               <button
                 onClick={() => handleDelete(addr.id)}
                 disabled={isPending}
-                className="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors"
+                className="w-11 h-11 sm:w-9 sm:h-9 rounded-lg hover:bg-red-50 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors"
+                aria-label="Удалить адрес"
                 title="Удалить"
               >
                 <Trash2 className="w-4 h-4" />

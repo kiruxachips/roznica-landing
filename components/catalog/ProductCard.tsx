@@ -200,9 +200,9 @@ export function ProductCard({ product, favorited, priority }: ProductCardProps) 
                 <button
                   onClick={handleQuickAdd}
                   aria-label="В корзину"
-                  className="shrink-0 h-8 w-8 sm:h-9 sm:w-auto sm:px-3 bg-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center sm:gap-1.5 hover:bg-primary/90 transition-colors"
+                  className="shrink-0 h-11 w-11 sm:h-9 sm:w-auto sm:px-3 bg-primary text-white rounded-lg text-xs sm:text-sm font-medium flex items-center justify-center sm:gap-1.5 hover:bg-primary/90 transition-colors"
                 >
-                  <ShoppingCart className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <ShoppingCart className="w-4 h-4" />
                   <span className="hidden sm:inline">В корзину</span>
                 </button>
               )}

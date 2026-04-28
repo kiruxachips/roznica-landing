@@ -127,23 +127,26 @@ export function CartPage() {
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm"
+                    aria-label="Уменьшить количество"
+                    className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm"
                   >
-                    <Minus className="w-3.5 h-3.5" />
+                    <Minus className="w-4 h-4" />
                   </button>
                   <span className="w-9 text-center text-sm font-medium">{item.quantity}</span>
                   <button
                     onClick={() => item.quantity < 99 && updateQuantity(item.variantId, item.quantity + 1)}
                     disabled={item.quantity >= 99}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm disabled:opacity-30"
+                    aria-label="Увеличить количество"
+                    className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg border border-border hover:bg-muted text-sm disabled:opacity-30"
                   >
-                    <Plus className="w-3.5 h-3.5" />
+                    <Plus className="w-4 h-4" />
                   </button>
                 </div>
                 <span className="text-sm font-semibold ml-auto">{item.price * item.quantity}₽</span>
                 <button
                   onClick={() => removeItem(item.variantId)}
-                  className="p-2 text-muted-foreground hover:text-red-500 transition-colors"
+                  aria-label="Удалить товар"
+                  className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -169,7 +172,8 @@ export function CartPage() {
                 </span>
                 <button
                   onClick={handleClearPromo}
-                  className="p-1 text-muted-foreground hover:text-red-500 transition-colors"
+                  aria-label="Снять промокод"
+                  className="w-9 h-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>

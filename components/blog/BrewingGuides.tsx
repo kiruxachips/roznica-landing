@@ -161,7 +161,8 @@ function GuideModal({ method, onClose }: { method: BrewingMethod; onClose: () =>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors shrink-0"
+            aria-label="Закрыть"
+            className="w-11 h-11 rounded-full bg-secondary flex items-center justify-center hover:bg-secondary/80 transition-colors shrink-0"
           >
             <X className="w-4 h-4" />
           </button>

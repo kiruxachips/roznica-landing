@@ -499,7 +499,7 @@ export function PickupPointModal({ open, onClose }: Props) {
             type="button"
             onClick={onClose}
             aria-label="Закрыть"
-            className="shrink-0 h-9 w-9 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+            className="shrink-0 h-11 w-11 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
