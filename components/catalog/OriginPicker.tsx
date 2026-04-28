@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
-import { X, Globe, Check } from "lucide-react"
+import { X, Globe, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getCountryFlag, pluralizeSorts } from "@/lib/constants"
 
@@ -33,6 +33,12 @@ export function OriginPicker({
   const router = useRouter()
   const dialogRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
+  // useTransition оборачивает router.push в pending state — пока серверный
+  // рендер новой страницы каталога не завершился, попап остаётся открытым с
+  // лоадером на выбранной кнопке. Юзер видит мгновенный feedback вместо
+  // «попап закрылся → ничего не происходит → новая страница появилась».
+  const [pendingOrigin, setPendingOrigin] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
   // SSR-safe portal: createPortal требует document, поэтому рендерим только
   // после монтирования. До этого попап вообще не выводится (он закрыт).
@@ -127,16 +133,38 @@ export function OriginPicker({
     }
   }, [open])
 
+  // Когда серверная навигация завершилась — закрываем попап. Это контролируется
+  // через isPending (false после router.push + RSC отработали).
+  useEffect(() => {
+    if (!isPending && pendingOrigin !== null) {
+      setPendingOrigin(null)
+      onClose()
+    }
+  }, [isPending, pendingOrigin, onClose])
+
   if (!open || !mounted) return null
 
-  const selectOrigin = (name: string | null) => {
+  const buildHref = (name: string | null) => {
     const params = new URLSearchParams()
     params.set("type", "coffee")
     if (name) params.set("origin", name)
     if (preserveSort) params.set("sort", preserveSort)
     if (preserveSearch) params.set("q", preserveSearch)
-    router.push(`/catalog?${params.toString()}`)
-    onClose()
+    return `/catalog?${params.toString()}`
+  }
+
+  const selectOrigin = (name: string | null) => {
+    if (isPending) return
+    setPendingOrigin(name ?? "__reset__")
+    startTransition(() => {
+      router.push(buildHref(name))
+    })
+  }
+
+  // Префетч страницы при наведении/фокусе: Next.js подтягивает RSC данные в
+  // фон, и при клике переход — мгновенный.
+  const prefetchOrigin = (name: string) => {
+    router.prefetch(buildHref(name))
   }
 
   const content = (
@@ -200,6 +228,7 @@ export function OriginPicker({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 {origins.map((o, i) => {
                   const isActive = activeOrigin === o.name
+                  const isLoadingThis = pendingOrigin === o.name
                   // Первая фокусируемая кнопка для focus-trap — активная страна
                   // или первая в списке (если ничего не выбрано).
                   const isPrimary = isActive || (!activeOrigin && i === 0)
@@ -208,11 +237,16 @@ export function OriginPicker({
                       key={o.name}
                       type="button"
                       onClick={() => selectOrigin(o.name)}
+                      onMouseEnter={() => prefetchOrigin(o.name)}
+                      onFocus={() => prefetchOrigin(o.name)}
+                      onTouchStart={() => prefetchOrigin(o.name)}
+                      disabled={isPending && !isLoadingThis}
                       data-origin-picker-primary={isPrimary ? "true" : undefined}
                       className={cn(
                         "group relative flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl border text-left transition-all",
                         "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                        isActive
+                        "disabled:opacity-50 disabled:cursor-wait",
+                        isActive || isLoadingThis
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border bg-white hover:border-primary/40 hover:bg-primary/5"
                       )}
@@ -227,15 +261,17 @@ export function OriginPicker({
                         <span
                           className={cn(
                             "block text-xs",
-                            isActive ? "text-primary/70" : "text-muted-foreground"
+                            isActive || isLoadingThis ? "text-primary/70" : "text-muted-foreground"
                           )}
                         >
                           {pluralizeSorts(o.count)}
                         </span>
                       </span>
-                      {isActive && (
+                      {isLoadingThis ? (
+                        <Loader2 className="w-4 h-4 shrink-0 text-primary animate-spin" aria-hidden="true" />
+                      ) : isActive ? (
                         <Check className="w-4 h-4 shrink-0 text-primary" aria-hidden="true" />
-                      )}
+                      ) : null}
                     </button>
                   )
                 })}
@@ -250,8 +286,12 @@ export function OriginPicker({
               <button
                 type="button"
                 onClick={() => selectOrigin(null)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded px-1"
+                disabled={isPending}
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded px-1 disabled:opacity-50 inline-flex items-center gap-1.5"
               >
+                {pendingOrigin === "__reset__" && (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+                )}
                 Сбросить страну
               </button>
             ) : (

@@ -79,7 +79,7 @@ export function mapToProductCard(p: ProductCardRow): ProductCard {
   }
 }
 
-export async function getProducts(filters: ProductFilters = {}): Promise<{
+async function getProductsUncached(filters: ProductFilters = {}): Promise<{
   products: ProductCard[]
   total: number
 }> {
@@ -188,6 +188,37 @@ export async function getProducts(filters: ProductFilters = {}): Promise<{
   const products: ProductCard[] = items.map(mapToProductCard)
 
   return { products, total }
+}
+
+/**
+ * Кешированная обёртка над getProductsUncached. Ключ кеша строится из
+ * стабилизированной строки фильтров — повторные переходы между странами/
+ * сортировками внутри одной минуты возвращаются мгновенно. revalidate=60
+ * минимизирует stale-данные при добавлении/правке товара (плюс tag-based
+ * invalidation через revalidateTag(CACHE_TAGS.products) в админке).
+ */
+export async function getProducts(
+  filters: ProductFilters = {}
+): Promise<{ products: ProductCard[]; total: number }> {
+  const key = JSON.stringify({
+    c: filters.categorySlug ?? null,
+    co: filters.collectionSlug ?? null,
+    pt: filters.productType ?? null,
+    rl: filters.roastLevel ?? null,
+    o: filters.origin ?? null,
+    bm: filters.brewingMethod ?? null,
+    tt: filters.teaType ?? null,
+    pf: filters.productForm ?? null,
+    q: filters.search ?? null,
+    s: filters.sort ?? null,
+    p: filters.page ?? 1,
+    l: filters.limit ?? 12,
+  })
+  return unstable_cache(
+    () => getProductsUncached(filters),
+    ["products-list", key],
+    { revalidate: 60, tags: [CACHE_TAGS.products] }
+  )()
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
